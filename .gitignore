@@ -1,0 +1,12 @@
+*.o
+*.iso
+*.elf
+
+build/
+.vscode/
+.vagrant/
+
+tools/**
+!tools/*.sh
+!tools/vagrant
+!tools/vagrant/*.sh
