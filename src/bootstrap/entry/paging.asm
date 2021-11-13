@@ -24,51 +24,51 @@ pt_0:
 [bits 32]
 
 %define PTE_FLAGS 0x03
-%define LOAD_ADDRESS 0x00100000
 
 [extern _start_addr]
 
 init_paging:
-    mov eax, 0
-    ; Zero out pml4
+    ; Set CR3 to pml4
     mov edi, pml4
-    mov ecx, SIZE_4KB
-    rep stosd
-    ; Zero out pdp_0
+    mov cr3, edi
+    ; Zero out pml4
+    call clear_table
+    ; Set entry 0 of pml4 to point to pdp_0
     mov edi, pdp_0
-    mov ecx, SIZE_4KB
-    rep stosd
-    ; Add entry 0 in the pml4 to point to pdp_0
+    call clear_table
     or edi, PTE_FLAGS
     mov [pml4], edi
-    ; Zero out pd_0
+    ; Set entry 0 of pdp_0 to point to pd_0
     mov edi, pd_0
-    mov ecx, SIZE_4KB
-    rep stosd
-    ; Add entry 0 in the pdp_0 to point to pd_0
+    call clear_table
     or edi, PTE_FLAGS
     mov [pdp_0], edi
-    ; Zero out pt_0
+    ; Set entry 0 of pd_0 to point to pt_0
     mov edi, pt_0
-    mov ecx, SIZE_4KB
-    rep stosd
-    ; Add entry 0 in the pd_0 to point to pt_0
     or edi, PTE_FLAGS
     mov [pd_0], edi
-    ; Set start map address
-    mov eax, LOAD_ADDRESS
-    ; Set page table (Map a max of 2MB)
-    mov ebx, pt_0
-    ; Set flags
-    or eax, PTE_FLAGS
-    ; Set number of entries
+    ; Map the first 2MB of memory
+    mov edi, pt_0
+    mov eax, 0x00000000
+    call fill_table
+    ret
+
+fill_table:
     mov ecx, 512
-    ; Fill pt_0
+    or eax, PTE_FLAGS
     .fill_loop:
-        mov [ebx], eax
+        mov [edi], eax
         add eax, SIZE_4KB
-        add ebx, 8
+        add edi, 8
         loop .fill_loop
+    ret
+
+clear_table:
+    push edi
+    mov al, 0
+    mov ecx, SIZE_4KB
+    rep stosb
+    pop edi
     ret
 
 enable_paging:
@@ -91,6 +91,6 @@ enable_paging:
 
 disable_paging:
     mov eax, cr0
-    and eax, 0x7FFFFFFF
+    and eax, ~(1 << 31)
     mov cr0, eax
     ret
