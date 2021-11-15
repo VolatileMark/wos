@@ -4,11 +4,12 @@ AC = nasm
 
 BUILD_DIR ?= .
 SOURCE_DIR = .
+LIBC_DIR = $(SOURCE_DIR)/../libc
 
 TARGET = bootstrap.elf
 
-C_SRCS = $(shell find $(SOURCE_DIR) -name '*.c')
-C_HDRS = $(shell find $(SOURCE_DIR) -name '*.h')
+C_SRCS = $(shell find $(SOURCE_DIR) -name '*.c') $(shell find $(LIBC_DIR) -name '*.c')
+C_HDRS = $(shell find $(SOURCE_DIR) -name '*.h') $(shell find $(LIBC_DIR) -name '*.h')
 C_OBJS = $(patsubst $(SOURCE_DIR)%.c, $(BUILD_DIR)%.o, $(C_SRCS))
 
 ASM_SRCS = $(shell find $(SOURCE_DIR) -name '*.asm' -not -path '$(SOURCE_DIR)/entry/*') $(SOURCE_DIR)/entry/entry.asm
@@ -17,7 +18,7 @@ ASM_OBJS = $(patsubst $(SOURCE_DIR)%.asm, $(BUILD_DIR)%_asm.o, $(ASM_SRCS))
 LDS = $(SOURCE_DIR)/Linker.ld
 
 AC_FLAGS = -I $(SOURCE_DIR) -f elf64
-CC_FLAGS = -I $(SOURCE_DIR)/../libc -g -std=c99 -m64 -Wall -Werror -ffreestanding -mcmodel=large -mno-red-zone -nostdinc -nostartfiles -nodefaultlibs -nostdlib
+CC_FLAGS = -I $(LIBC_DIR) -g -std=c99 -m64 -Wall -Werror -ffreestanding -mcmodel=large -mno-red-zone -nostdinc -nostartfiles -nodefaultlibs -nostdlib
 LD_FLAGS = -T $(LDS) -nostdlib -z max-page-size=0x1000
 
 

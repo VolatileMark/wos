@@ -18,6 +18,10 @@ align SIZE_4KB
 pt_0:
     resb SIZE_4KB
 
+align SIZE_4KB
+pt_1:
+    resb SIZE_4KB
+
 
 
 [section .text]
@@ -51,6 +55,18 @@ init_paging:
     mov edi, pt_0
     mov eax, 0x00000000
     call fill_table
+    ; Set entry 0 of pd_0 to point to pt_0
+    mov edi, pt_1
+    or edi, PTE_FLAGS
+    mov [pd_0 + 8], edi
+    ; Map the first 2MB of memory
+    mov edi, pt_1
+    mov eax, 0x00200000
+    call fill_table
+    ; Map PML4
+    mov edi, pml4
+    or edi, PTE_FLAGS
+    mov [pml4 + 510 * 8], edi
     ret
 
 fill_table:
