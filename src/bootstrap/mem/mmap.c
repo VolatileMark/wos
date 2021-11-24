@@ -1,5 +1,4 @@
 #include "mmap.h"
-#include <stdint.h>
 #include <stddef.h>
 
 static uint64_t memory_segment_sizes[5];
@@ -19,7 +18,7 @@ void mmap_init(struct multiboot_tag_mmap* tag)
     largest_segments[MULTIBOOT_MEMORY_RESERVED] = NULL;
     largest_segments[MULTIBOOT_MEMORY_AVAILABLE] = NULL;
 
-    uint32_t entries = (tag->size - ((uint32_t)(tag - &tag->entries))) / tag->entry_size;
+    uint32_t entries = (tag->size - (((uint64_t) tag) - ((uint64_t) &tag->entries))) / tag->entry_size;
     uint32_t i;
     struct multiboot_mmap_entry* entry;
     for (i = 0; i < entries; i ++)

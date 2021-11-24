@@ -33,7 +33,7 @@ _start:
     ; Make sure paging is disabled
     call disable_paging
     ; Initialize page tables
-    call init_paging
+    call init_basic_paging
     ; Enable paging (and long mode)
     call enable_paging
     ; Tweak the GDT to work in 64bit

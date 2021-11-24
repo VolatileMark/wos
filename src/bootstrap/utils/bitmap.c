@@ -1,6 +1,6 @@
 #include "bitmap.h"
 
-uint8_t bitmap_Set(Bitmap* bitmap, uint64_t index, uint8_t value)
+uint8_t bitmap_set(bitmap_t* bitmap, uint64_t index, uint8_t value)
 {
     if (index > bitmap->size * 8)
         return 0;
@@ -13,7 +13,7 @@ uint8_t bitmap_Set(Bitmap* bitmap, uint64_t index, uint8_t value)
     return 1;
 }
 
-uint8_t bitmap_Get(Bitmap* bitmap, uint64_t index)
+uint8_t bitmap_get(bitmap_t* bitmap, uint64_t index)
 {
     if (index > bitmap->size * 8)
         return 0;
