@@ -24,32 +24,22 @@ struct page_table_entry
 } __attribute__((packed));
 typedef struct page_table_entry page_table_entry_t;
 
-struct page_table
-{
-    page_table_entry_t entries[512];
-} __attribute__((aligned(SIZE_4KB)));
-typedef struct page_table page_table_t;
+typedef page_table_entry_t* page_table_t;
 
-struct address_indices
-{
-    uint16_t pml4;
-    uint16_t pdp;
-    uint16_t pd;
-    uint16_t pt;
-};
-typedef struct address_indices address_indices_t;
-
-#define CLEAR_PTE(pte) *((uint64_t*) pte) = 0
-//#define GET_PTE_ADDRESS(pte) (*((uint64_t*) pte) & 0x000FFFFFFFFFF000)
-//#define SET_PTE_ADDRESS(pte, addr) *((uint64_t*) pte) = ((*((uint64_t*) pte) & 0xFFF0000000000FFF) | (addr & 0x000FFFFFFFFFF000))
-#define I2A(pml4, pdp, pd, pt) ((((uint64_t) ((pml4 < 480) ? 0x0000 : 0xFFFF)) << 48) | ((((uint64_t) pml4) << 39) | (((uint64_t) pdp) << 30) | (((uint64_t) pd) << 21) | (((uint64_t) pt) << 12)))
-#define A2I(addr) address_indices_t indices = { .pml4 = (addr >> 39) & 0x01FF, .pdp = (addr >> 30) & 0x01FF, .pd = (addr >> 21) & 0x01FF, .pt = (addr >> 12) & 0x01FF }
-#define IS_TMP_VADDR(indices) ((indices)->pml4 == 511 && (indices)->pdp == 510 && (indices)->pd == 0 && (indices)->pt < 512 && (indices)->pt >= 2)
+#define PTE_CLEAR(pte) *((uint64_t*) pte) = 0
+#define VADDR_GET(pml4, pdp, pd, pt) ((((uint64_t) ((pml4 < 480) ? 0x0000 : 0xFFFF)) << 48) | ((((uint64_t) pml4) << 39) | (((uint64_t) pdp) << 30) | (((uint64_t) pd) << 21) | (((uint64_t) pt) << 12)))
+#define VADDR_IS_TEMPORARY(addr) ((addr & 0xFFFFFFFFFFE00000) != 0xFFFF80000000)
+#define VADDR_TO_PML4_IDX(addr) ((addr >> 39) & 0x1FF)
+#define VADDR_TO_PDP_IDX(addr) ((addr >> 30) & 0x1FF)
+#define VADDR_TO_PD_IDX(addr) ((addr >> 21) & 0x1FF)
+#define VADDR_TO_PT_IDX(addr) ((addr >> 12) & 0x1FF)
+#define VADDR_GET_TEMPORARY(idx) VADDR_GET(511, 510, 0, idx)
+#define PT_MAX_ENTRIES 512
 
 void paging_init(void);
-uint64_t paging_map_memory(page_table_t* pml4, uint64_t paddr, uint64_t vaddr, uint64_t size, uint8_t allow_writes, uint8_t allow_user_access);
-uint64_t paging_default_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size);
-uint64_t paging_unmap_memory(page_table_t* pml4, uint64_t vaddr, uint64_t size);
-uint64_t paging_default_unmap_memory(uint64_t vaddr, uint64_t size);
+uint64_t pml4_map_memory(page_table_t pml4, uint64_t paddr, uint64_t vaddr, uint64_t size, uint8_t allow_writes, uint8_t allow_user_access);
+uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size);
+uint64_t pml4_unmap_memory(page_table_t pml4, uint64_t vaddr, uint64_t size);
+uint64_t paging_unmap_memory(uint64_t vaddr, uint64_t size);
 
 #endif

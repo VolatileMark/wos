@@ -8,6 +8,7 @@
 #include "mem/paging.h"
 #include "utils/constants.h"
 #include "utils/elf.h"
+#include "utils/asmutils.h"
 
 void parse_multiboot_struct(uint64_t addr, uint64_t* out_size, struct multiboot_tag_module** out_module)
 {
@@ -71,7 +72,7 @@ int load_elf(uint64_t start_addr, uint64_t* entry_address)
         switch (phdr->p_type)
         {
         case PT_LOAD:
-            paging_default_map_memory(phdr->p_paddr, phdr->p_vaddr, phdr->p_memsz);
+            paging_map_memory(phdr->p_paddr, phdr->p_vaddr, phdr->p_memsz);
             memcpy((void*) phdr->p_vaddr, (void*) (((uint64_t) ehdr) + phdr->p_offset), phdr->p_filesz);
             break;
         }
@@ -103,10 +104,12 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
     /* Initialize paging helper */
     paging_init();
 
-    paging_default_map_memory(kernel_elf->mod_start, kernel_elf->mod_start, kernel_elf->mod_end - kernel_elf->mod_start);
+    paging_map_memory(kernel_elf->mod_start, kernel_elf->mod_start, kernel_elf->mod_end - kernel_elf->mod_start);
     
     if(load_elf(kernel_elf->mod_start, &kernel_entry))
         return;
+
+    jump(kernel_entry);
 
     FAIL:
         while (1);
