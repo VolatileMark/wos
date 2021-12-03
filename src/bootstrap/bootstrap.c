@@ -72,6 +72,7 @@ int load_elf(uint64_t start_addr, uint64_t* entry_address)
         switch (phdr->p_type)
         {
         case PT_LOAD:
+            paging_unmap_memory(phdr->p_paddr, phdr->p_memsz);
             paging_map_memory(phdr->p_paddr, phdr->p_vaddr, phdr->p_memsz);
             memcpy((void*) phdr->p_vaddr, (void*) (((uint64_t) ehdr) + phdr->p_offset), phdr->p_filesz);
             break;

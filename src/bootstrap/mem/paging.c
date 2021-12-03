@@ -34,7 +34,7 @@ static uint64_t get_pte_address(page_table_entry_t* entry)
 
 static uint64_t get_next_tmp_index(void)
 {
-    if (kernel_tmp_index >= PT_MAX_ENTRIES)
+    if (kernel_tmp_index >= MAX_TABLE_ENTRIES)
         return 0;
     uint64_t index = kernel_tmp_index ++;
     for 
@@ -97,6 +97,132 @@ uint64_t paging_unmap_memory(uint64_t vaddr, uint64_t size)
     return pml4_unmap_memory(current_pml4, vaddr, size);
 }
 
+static uint64_t pt_unmap_memory
+(
+    page_table_t pt, 
+    uint64_t vaddr, 
+    uint64_t size
+)
+{
+    uint64_t pt_idx = VADDR_TO_PT_IDX(vaddr);
+    uint64_t unmapped_size = 0;
+
+    while (unmapped_size < size && pt_idx < MAX_TABLE_ENTRIES)
+    {
+        if (pt[pt_idx].present)
+        {
+            PTE_CLEAR(&pt[pt_idx]);
+            invalidate_pte(vaddr);
+        }
+
+        vaddr += PT_ENTRY_SIZE;
+        unmapped_size += PT_ENTRY_SIZE;
+        ++pt_idx;
+    }
+
+    return unmapped_size;
+}
+
+static uint64_t pd_unmap_memory
+(
+    page_table_t pd, 
+    uint64_t vaddr, 
+    uint64_t size
+)
+{
+    uint64_t pd_idx = VADDR_TO_PML4_IDX(vaddr);
+    page_table_t pt;
+    page_table_entry_t entry;
+    uint64_t i;
+    uint64_t pt_paddr, pt_vaddr;
+    uint64_t unmapped_size = 0, total_unmapped_size = 0;
+
+    while (total_unmapped_size < size && pd_idx < MAX_TABLE_ENTRIES)
+    {
+        entry = pd[pd_idx];
+
+        if (!entry.present)
+        {
+            vaddr = alignu(vaddr, PD_ENTRY_SIZE);
+            ++pd_idx;
+            continue;
+        }
+
+        pt_paddr = get_pte_address(&entry);
+        pt_vaddr = paging_map_temporary_page(pt_paddr, 1, 1);
+
+        pt = (page_table_t) pt_vaddr;
+        unmapped_size = pt_unmap_memory(pt, vaddr, size);
+
+        for (i = 0; i < MAX_TABLE_ENTRIES && !pt[i].present; i ++);
+
+        paging_unmap_temporary_page(pt_vaddr);
+
+        if (i == MAX_TABLE_ENTRIES)
+        {
+            free_page(pt_paddr);
+            PTE_CLEAR(&pd[pd_idx]);
+        }
+
+        size -= unmapped_size;
+        total_unmapped_size += unmapped_size;
+        vaddr += unmapped_size;
+        ++pd_idx;
+    }
+    
+    return total_unmapped_size;
+}
+
+static uint64_t pdp_unmap_memory
+(
+    page_table_t pdp, 
+    uint64_t vaddr, 
+    uint64_t size
+)
+{
+    uint64_t pdp_idx = VADDR_TO_PML4_IDX(vaddr);
+    page_table_t pd;
+    page_table_entry_t entry;
+    uint64_t i;
+    uint64_t pd_paddr, pd_vaddr;
+    uint64_t unmapped_size = 0, total_unmapped_size = 0;
+
+    while (total_unmapped_size < size && pdp_idx < MAX_TABLE_ENTRIES)
+    {
+        entry = pdp[pdp_idx];
+
+        if (!entry.present)
+        {
+            vaddr = alignu(vaddr, PDP_ENTRY_SIZE);
+            ++pdp_idx;
+            continue;
+        }
+
+        pd_paddr = get_pte_address(&entry);
+        pd_vaddr = paging_map_temporary_page(pd_paddr, 1, 1);
+
+        pd = (page_table_t) pd_vaddr;
+        unmapped_size = pd_unmap_memory(pd, vaddr, size);
+
+        for (i = 0; i < MAX_TABLE_ENTRIES && !pd[i].present; i ++);
+
+        paging_unmap_temporary_page(pd_vaddr);
+
+        if (i == MAX_TABLE_ENTRIES)
+        {
+            free_page(pd_paddr);
+            PTE_CLEAR(&pdp[pdp_idx]);
+        }
+
+        size -= unmapped_size;
+        total_unmapped_size += unmapped_size;
+        vaddr += unmapped_size;
+        ++pdp_idx;
+    }
+    
+    return total_unmapped_size;
+}
+
 uint64_t pml4_unmap_memory
 (
     page_table_t pml4, 
@@ -104,9 +230,48 @@ uint64_t pml4_unmap_memory
     uint64_t size
 )
 {
-    //uint64_t pages = ceil((double) size / SIZE_4KB);
-    //uint64_t unmapped_pages;
-    return 0;
+    uint64_t pml4_idx = VADDR_TO_PML4_IDX(vaddr);
+    page_table_t pdp;
+    page_table_entry_t entry;
+    uint64_t i;
+    uint64_t pdp_paddr, pdp_vaddr;
+    uint64_t unmapped_size = 0, total_unmapped_size = 0;
+    size = alignu(size, PT_ENTRY_SIZE);
+
+    while (total_unmapped_size < size && pml4_idx < MAX_TABLE_ENTRIES)
+    {
+        entry = pml4[pml4_idx];
+
+        if (!entry.present)
+        {
+            vaddr = alignu(vaddr, PML4_ENTRY_SIZE);
+            ++pml4_idx;
+            continue;
+        }
+
+        pdp_paddr = get_pte_address(&entry);
+        pdp_vaddr = paging_map_temporary_page(pdp_paddr, 1, 1);
+
+        pdp = (page_table_t) pdp_vaddr;
+        unmapped_size = pdp_unmap_memory(pdp, vaddr, size);
+
+        for (i = 0; i < MAX_TABLE_ENTRIES && !pdp[i].present; i ++);
+
+        paging_unmap_temporary_page(pdp_vaddr);
+
+        if (i == MAX_TABLE_ENTRIES)
+        {
+            free_page(pdp_paddr);
+            PTE_CLEAR(&pml4[pml4_idx]);
+        }
+
+        size -= unmapped_size;
+        total_unmapped_size += unmapped_size;
+        vaddr += unmapped_size;
+        ++pml4_idx;
+    }
+    
+    return total_unmapped_size;
 }
 
 static uint64_t pt_map_memory
@@ -122,14 +287,14 @@ static uint64_t pt_map_memory
     uint64_t pt_idx = VADDR_TO_PT_IDX(vaddr);
     uint64_t mapped_size = 0;
 
-    while (mapped_size < size && pt_idx < PT_MAX_ENTRIES)
+    while (mapped_size < size && pt_idx < MAX_TABLE_ENTRIES)
     {
         if (pt[pt_idx].present)
             return mapped_size;
         create_pte(pt, pt_idx, paddr, 1, 1);
 
-        paddr += SIZE_4KB;
-        mapped_size += SIZE_4KB;
+        paddr += PT_ENTRY_SIZE;
+        mapped_size += PT_ENTRY_SIZE;
         ++pt_idx;
     }
 
@@ -152,7 +317,7 @@ static uint64_t pd_map_memory
     uint64_t pt_paddr, pt_vaddr;
     uint64_t mapped_size = 0, total_mapped_size = 0;
 
-    while (size != 0 && pd_idx < PT_MAX_ENTRIES)
+    while (mapped_size < size && pd_idx < MAX_TABLE_ENTRIES)
     {
         entry = pd[pd_idx];
 
@@ -205,7 +370,7 @@ static uint64_t pdp_map_memory
     uint64_t pd_paddr, pd_vaddr;
     uint64_t mapped_size = 0, total_mapped_size = 0;
 
-    while (size != 0 && pdp_idx < PT_MAX_ENTRIES)
+    while (mapped_size < size && pdp_idx < MAX_TABLE_ENTRIES)
     {
         entry = pdp[pdp_idx];
 
@@ -257,9 +422,9 @@ uint64_t pml4_map_memory
     page_table_entry_t entry;
     uint64_t pdp_paddr, pdp_vaddr;
     uint64_t mapped_size = 0, total_mapped_size = 0;
-    size = alignu(size, SIZE_4KB);
+    size = alignu(size, PT_ENTRY_SIZE);
 
-    while (size != 0 && pml4_idx < PT_MAX_ENTRIES)
+    while (mapped_size < size && pml4_idx < MAX_TABLE_ENTRIES)
     {
         entry = pml4[pml4_idx];
 
