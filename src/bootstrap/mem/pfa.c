@@ -1,6 +1,5 @@
 #include "pfa.h"
 #include "mmap.h"
-#include "../utils/bitmap.h"
 #include "../utils/constants.h"
 #include "../external/multiboot2.h"
 #include <math.h>

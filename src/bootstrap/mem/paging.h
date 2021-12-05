@@ -40,11 +40,16 @@ typedef page_table_entry_t* page_table_t;
 #define PD_ENTRY_SIZE (PT_ENTRY_SIZE * MAX_TABLE_ENTRIES)
 #define PDP_ENTRY_SIZE (PD_ENTRY_SIZE * MAX_TABLE_ENTRIES)
 #define PML4_ENTRY_SIZE (PDP_ENTRY_SIZE * MAX_TABLE_ENTRIES)
+#define PML4_VADDR VADDR_GET_TEMPORARY(0)
 
+void set_pte_address(page_table_entry_t* entry, uint64_t addr);
+uint64_t get_pte_address(page_table_entry_t* entry);
 void paging_init(void);
 uint64_t pml4_map_memory(page_table_t pml4, uint64_t paddr, uint64_t vaddr, uint64_t size, uint8_t allow_writes, uint8_t allow_user_access);
 uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size);
+uint64_t paging_map_temporary_page(uint64_t paddr, uint8_t allow_writes, uint8_t allow_user_access);
 uint64_t pml4_unmap_memory(page_table_t pml4, uint64_t vaddr, uint64_t size);
 uint64_t paging_unmap_memory(uint64_t vaddr, uint64_t size);
+void paging_unmap_temporary_page(uint64_t vaddr);
 
 #endif
