@@ -10,5 +10,6 @@ void free_page(uint64_t page_addr);
 void lock_pages(uint64_t page_addr, uint64_t num);
 void free_pages(uint64_t page_addr, uint64_t num);
 void init_pfa(void);
+bitmap_t* get_page_bitmap(void);
 
 #endif

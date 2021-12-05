@@ -8,7 +8,6 @@
 #include "mem/paging.h"
 #include "utils/constants.h"
 #include "utils/elf.h"
-#include "utils/asmutils.h"
 
 void parse_multiboot_struct(uint64_t addr, uint64_t* out_size, struct multiboot_tag_module** out_module)
 {
@@ -37,7 +36,7 @@ void parse_multiboot_struct(uint64_t addr, uint64_t* out_size, struct multiboot_
     }
 }
 
-int load_elf(uint64_t start_addr, uint64_t* entry_address)
+int load_elf(uint64_t start_addr, uint64_t* entry_address, uint64_t* elf_start_addr, uint64_t* elf_end_addr)
 {
     Elf64_Ehdr* ehdr = (Elf64_Ehdr*) start_addr;
 
@@ -57,6 +56,8 @@ int load_elf(uint64_t start_addr, uint64_t* entry_address)
         return -1;
 
     *entry_address = ehdr->e_entry;
+    *elf_start_addr = (uint64_t) -1;
+    *elf_end_addr = 0;
 
     Elf64_Phdr* phdr;
     uint64_t phdrs_offset = (((uint64_t) ehdr) + ehdr->e_phoff);
@@ -72,6 +73,10 @@ int load_elf(uint64_t start_addr, uint64_t* entry_address)
         switch (phdr->p_type)
         {
         case PT_LOAD:
+            if (*elf_start_addr > phdr->p_paddr)
+                *elf_start_addr = phdr->p_paddr;
+            if (*elf_end_addr < phdr->p_paddr + phdr->p_memsz)
+                *elf_end_addr = phdr->p_paddr + phdr->p_memsz;
             paging_unmap_memory(phdr->p_paddr, phdr->p_memsz);
             paging_map_memory(phdr->p_paddr, phdr->p_vaddr, phdr->p_memsz);
             memcpy((void*) phdr->p_vaddr, (void*) (((uint64_t) ehdr) + phdr->p_offset), phdr->p_filesz);
@@ -80,6 +85,13 @@ int load_elf(uint64_t start_addr, uint64_t* entry_address)
     }
 
     return 0;
+}
+
+void unlock_useless_pages(uint64_t multiboot_struct_addr, uint64_t multiboot_struct_size, struct multiboot_tag_module* kernel_elf)
+{
+    free_pages(alignd((uint64_t) &_start_addr, SIZE_4KB), ceil((double) (((uint64_t) &_end_addr) - ((uint64_t) &_start_addr)) / SIZE_4KB));
+    free_pages(alignd(multiboot_struct_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB));
+    free_pages(alignd(kernel_elf->mod_start, SIZE_4KB), ceil((double) (kernel_elf->mod_end - kernel_elf->mod_start) / SIZE_4KB));
 }
 
 void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
@@ -92,7 +104,7 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
         goto FAIL;
 
     struct multiboot_tag_module* kernel_elf;
-    uint64_t multiboot_struct_size, kernel_entry;
+    uint64_t multiboot_struct_size, kernel_entry, kernel_elf_start, kernel_elf_end;
 
     /* Parse the multiboot struct */
     parse_multiboot_struct(multiboot_struct_addr, &multiboot_struct_size, &kernel_elf);
@@ -101,16 +113,19 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
     init_pfa();
     lock_pages(alignd((uint64_t) &_start_addr, SIZE_4KB), ceil((double) (((uint64_t) &_end_addr) - ((uint64_t) &_start_addr)) / SIZE_4KB));
     lock_pages(alignd(multiboot_struct_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB));
+    lock_pages(alignd(kernel_elf->mod_start, SIZE_4KB), ceil((double) (kernel_elf->mod_end - kernel_elf->mod_start) / SIZE_4KB));
 
     /* Initialize paging helper */
     paging_init();
 
     paging_map_memory(kernel_elf->mod_start, kernel_elf->mod_start, kernel_elf->mod_end - kernel_elf->mod_start);
     
-    if(load_elf(kernel_elf->mod_start, &kernel_entry))
+    if(load_elf(kernel_elf->mod_start, &kernel_entry, &kernel_elf_start, &kernel_elf_end))
         return;
 
-    jump(kernel_entry);
+    unlock_useless_pages(multiboot_struct_addr, multiboot_struct_size, kernel_elf);
+
+    void (*kernel_main)(uint64_t) = ((__attribute__((sysv_abi)) void (*)(uint64_t)) kernel_entry);
 
     FAIL:
         while (1);

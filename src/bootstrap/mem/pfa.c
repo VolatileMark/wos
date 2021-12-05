@@ -90,3 +90,8 @@ void init_pfa(void)
     lock_pages((uint64_t) page_bitmap.buffer, ceil((double) page_bitmap.size / SIZE_4KB));
     last_page_index = ceil((double)((uint64_t) &_start_addr) / SIZE_4KB);
 }
+
+bitmap_t* get_page_bitmap(void)
+{
+    return &page_bitmap;
+}
