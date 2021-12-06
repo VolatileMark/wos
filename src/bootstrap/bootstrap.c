@@ -79,7 +79,7 @@ int load_elf(uint64_t start_addr, uint64_t* entry_address, uint64_t* elf_start_a
             if (*elf_end_addr < phdr->p_paddr + phdr->p_memsz)
                 *elf_end_addr = phdr->p_paddr + phdr->p_memsz;
             paging_unmap_memory(phdr->p_paddr, phdr->p_memsz);
-            paging_map_memory(phdr->p_paddr, phdr->p_vaddr, phdr->p_memsz);
+            paging_map_memory(phdr->p_paddr, phdr->p_vaddr, phdr->p_memsz, 1, 0);
             memcpy((void*) phdr->p_vaddr, (void*) (((uint64_t) ehdr) + phdr->p_offset), phdr->p_filesz);
             break;
         }
@@ -88,7 +88,7 @@ int load_elf(uint64_t start_addr, uint64_t* entry_address, uint64_t* elf_start_a
     return 0;
 }
 
-void free_useless_pages(uint64_t multiboot_struct_addr, uint64_t multiboot_struct_size, struct multiboot_tag_module* kernel_elf, uint64_t kernel_elf_start, uint64_t kernel_elf_end)
+bitmap_t* free_useless_pages(uint64_t multiboot_struct_addr, uint64_t multiboot_struct_size, struct multiboot_tag_module* kernel_elf, uint64_t kernel_elf_start, uint64_t kernel_elf_end)
 {
     page_table_t pml4, pdp, pd;
     page_table_entry_t entry;
@@ -99,7 +99,7 @@ void free_useless_pages(uint64_t multiboot_struct_addr, uint64_t multiboot_struc
     page_bitmap = get_page_bitmap();
 
     free_pages(alignd((uint64_t) &_start_addr, SIZE_4KB), ceil((double) (((uint64_t) &_end_addr) - ((uint64_t) &_start_addr)) / SIZE_4KB));
-    free_pages(alignd(multiboot_struct_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB));
+    /* free_pages(alignd(multiboot_struct_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB)); */
     free_pages(alignd(kernel_elf->mod_start, SIZE_4KB), ceil((double) (kernel_elf->mod_end - kernel_elf->mod_start) / SIZE_4KB));
     lock_pages(alignd(kernel_elf_start, SIZE_4KB), ceil((double) (kernel_elf_end - kernel_elf_start) / SIZE_4KB));
     lock_pages(alignd((uint64_t) page_bitmap->buffer, SIZE_4KB), ceil((double) page_bitmap->size / SIZE_4KB));
@@ -133,6 +133,8 @@ void free_useless_pages(uint64_t multiboot_struct_addr, uint64_t multiboot_struc
             paging_unmap_temporary_page((uint64_t) pdp);
         }
     }
+
+    return page_bitmap;
 }
 
 void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
@@ -142,7 +144,7 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
         multiboot2_magic != MULTIBOOT2_BOOTLOADER_MAGIC /* Check if the magic number is correct */ ||
         multiboot_struct_addr & 0x0000000000000007 /* Check if the info struct is aligned to 4KB */
     )
-        goto FAIL;
+        goto HANG;
 
     struct multiboot_tag_module* kernel_elf;
     uint64_t multiboot_struct_size, kernel_entry, kernel_elf_start, kernel_elf_end;
@@ -151,7 +153,7 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
     parse_multiboot_struct(multiboot_struct_addr, &multiboot_struct_size, &kernel_elf);
     
     /* Initialize the page frame allocator */
-    init_pfa();
+    pfa_init();
     lock_pages(alignd((uint64_t) &_start_addr, SIZE_4KB), ceil((double) (((uint64_t) &_end_addr) - ((uint64_t) &_start_addr)) / SIZE_4KB));
     lock_pages(alignd(multiboot_struct_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB));
     lock_pages(alignd(kernel_elf->mod_start, SIZE_4KB), ceil((double) (kernel_elf->mod_end - kernel_elf->mod_start) / SIZE_4KB));
@@ -159,17 +161,15 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
     /* Initialize paging helper */
     paging_init();
 
-    paging_map_memory(kernel_elf->mod_start, kernel_elf->mod_start, kernel_elf->mod_end - kernel_elf->mod_start);
+    paging_map_memory(kernel_elf->mod_start, kernel_elf->mod_start, kernel_elf->mod_end - kernel_elf->mod_start, 1, 0);
     
-    if(load_elf(kernel_elf->mod_start, &kernel_entry, &kernel_elf_start, &kernel_elf_end))
-        goto FAIL;
+    if (load_elf(kernel_elf->mod_start, &kernel_entry, &kernel_elf_start, &kernel_elf_end))
+        goto HANG;
 
-    free_useless_pages(multiboot_struct_addr, multiboot_struct_size, kernel_elf, kernel_elf_start, kernel_elf_end);
+    void (*kernel_main)(uint64_t, bitmap_t*) = ((__attribute__((sysv_abi)) void (*)(uint64_t, bitmap_t*)) kernel_entry);
 
-    void (*kernel_main)(uint64_t) = ((__attribute__((sysv_abi)) void (*)(uint64_t)) kernel_entry);
+    kernel_main(multiboot_struct_addr, free_useless_pages(multiboot_struct_addr, multiboot_struct_size, kernel_elf, kernel_elf_start, kernel_elf_end));
 
-    kernel_main(0);
-
-    FAIL:
+    HANG:
         while (1);
 }

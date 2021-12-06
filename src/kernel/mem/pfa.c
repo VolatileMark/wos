@@ -1,17 +1,16 @@
 #include "pfa.h"
 #include "mmap.h"
+#include "paging.h"
 #include "../utils/constants.h"
 #include "../external/multiboot2.h"
 #include <math.h>
 #include <stddef.h>
 #include <mem.h>
 
-#define PFA_MAX_MEM_SIZE 0x08000000 /* 128MB */
 #define PFA_GET_PAGE_IDX(addr) (addr / SIZE_4KB)
 
 static bitmap_t page_bitmap;
 static uint64_t last_page_index;
-static __attribute__((aligned(SIZE_4KB))) uint8_t page_bitmap_buffer[SIZE_4KB];
 
 uint64_t request_page(void)
 {
@@ -80,14 +79,26 @@ void free_pages(uint64_t page_addr, uint64_t num)
 
 void pfa_init(void)
 {
+    /* This method should allow at least 2TB of memory to be managed */
+    last_page_index = alignu((uint64_t) &_end_paddr, SIZE_4KB) / SIZE_4KB;
     uint64_t total_memory = get_total_memory_of_type(MULTIBOOT_MEMORY_AVAILABLE);
-    if (total_memory > PFA_MAX_MEM_SIZE)
-        total_memory = PFA_MAX_MEM_SIZE;
-    page_bitmap.size = ceil(((double) total_memory) / SIZE_4KB / 8.0);
-    page_bitmap.buffer = page_bitmap_buffer;
-    memset(page_bitmap.buffer, 0, page_bitmap.size);
-    lock_pages((uint64_t) page_bitmap.buffer, ceil((double) page_bitmap.size / SIZE_4KB));
-    last_page_index = ceil((double)((uint64_t) &_start_addr) / SIZE_4KB);
+    uint64_t bitmap_size = ceil(((double) total_memory) / SIZE_4KB / 8.0);
+    uint64_t bitmap_paddr = request_pages(ceil((double) bitmap_size / SIZE_4KB));
+    uint64_t bitmap_vaddr = (VADDR_GET(511, 510, 0, 0) + bitmap_paddr);
+    paging_map_memory(bitmap_paddr, bitmap_vaddr, bitmap_size, 1, 0);
+    memset((void*) bitmap_vaddr, 0, bitmap_size);
+    free_pages(alignd((uint64_t) page_bitmap.buffer, SIZE_4KB), ceil((double) page_bitmap.size / SIZE_4KB));
+    memcpy((void*) bitmap_vaddr, page_bitmap.buffer, page_bitmap.size);
+    page_bitmap.buffer = (uint8_t*) bitmap_vaddr;
+    page_bitmap.size = bitmap_size;
+    last_page_index = 0;
+}
+
+void pfa_restore(bitmap_t* current_bitmap)
+{
+    last_page_index = 0;
+    page_bitmap.buffer = current_bitmap->buffer;
+    page_bitmap.size = current_bitmap->size;
 }
 
 bitmap_t* get_page_bitmap(void)
