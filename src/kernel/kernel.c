@@ -3,7 +3,10 @@
 #include "mem/pfa.h"
 #include "mem/paging.h"
 #include "cpu/gdt.h"
+#include "cpu/idt.h"
+#include "cpu/isr.h"
 #include "cpu/tss.h"
+#include "cpu/interrupts.h"
 #include "utils/bitmap.h"
 #include "utils/macros.h"
 #include <stdint.h>
@@ -43,6 +46,11 @@ void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
     parse_multiboot_struct(multiboot_struct_addr, &multiboot_struct_size);
     pfa_init();
     gdt_init(tss_init());
+    idt_init();
+    isr_init();
+    enable_interrupts();
+
+    __asm__ __volatile__ ("int $0x10");
 
     if (multiboot_struct_size == 0)
         goto HANG;
