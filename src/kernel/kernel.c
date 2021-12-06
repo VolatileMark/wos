@@ -2,6 +2,8 @@
 #include "mem/mmap.h"
 #include "mem/pfa.h"
 #include "mem/paging.h"
+#include "cpu/gdt.h"
+#include "cpu/tss.h"
 #include "utils/bitmap.h"
 #include "utils/macros.h"
 #include <stdint.h>
@@ -40,6 +42,7 @@ void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
     pfa_restore(current_bitmap);
     parse_multiboot_struct(multiboot_struct_addr, &multiboot_struct_size);
     pfa_init();
+    gdt_init(tss_init());
 
     if (multiboot_struct_size == 0)
         goto HANG;

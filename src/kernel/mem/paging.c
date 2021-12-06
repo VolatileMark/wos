@@ -7,9 +7,6 @@ static page_table_t current_pml4;
 static page_table_t kernel_tmp_pt;
 static uint64_t kernel_tmp_index;
 
-extern page_table_t* get_current_pml4_paddr(void);
-extern void invalidate_pte(uint64_t vaddr);
-
 void set_pte_address(page_table_entry_t* entry, uint64_t addr)
 {
     addr >>= 12;

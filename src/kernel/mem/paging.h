@@ -42,6 +42,11 @@ typedef page_table_entry_t* page_table_t;
 #define PML4_ENTRY_SIZE (PDP_ENTRY_SIZE * MAX_TABLE_ENTRIES)
 #define PML4_VADDR VADDR_GET_TEMPORARY(0)
 
+extern void load_pml4(uint64_t pml4_paddr);
+extern void flush_tlb(void);
+extern page_table_t* get_current_pml4_paddr(void);
+extern void invalidate_pte(uint64_t vaddr);
+
 void set_pte_address(page_table_entry_t* entry, uint64_t addr);
 uint64_t get_pte_address(page_table_entry_t* entry);
 void paging_init(void);
