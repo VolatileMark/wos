@@ -77,7 +77,7 @@ void free_pages(uint64_t page_addr, uint64_t num)
         free_page(page_addr);
 }
 
-void pfa_init(void)
+void init_pfa(void)
 {
     /* This method should allow at least 2TB of memory to be managed */
     last_page_index = alignu((uint64_t) &_end_paddr, SIZE_4KB) / SIZE_4KB;
@@ -85,7 +85,7 @@ void pfa_init(void)
     uint64_t bitmap_size = ceil(((double) total_memory) / SIZE_4KB / 8.0);
     uint64_t bitmap_paddr = request_pages(ceil((double) bitmap_size / SIZE_4KB));
     uint64_t bitmap_vaddr = (VADDR_GET(511, 510, 0, 0) + bitmap_paddr);
-    paging_map_memory(bitmap_paddr, bitmap_vaddr, bitmap_size, 1, 0);
+    paging_map_memory(bitmap_paddr, bitmap_vaddr, bitmap_size, ACCESS_RW, PL0);
     memset((void*) bitmap_vaddr, 0, bitmap_size);
     free_pages(alignd((uint64_t) page_bitmap.buffer, SIZE_4KB), ceil((double) page_bitmap.size / SIZE_4KB));
     memcpy((void*) bitmap_vaddr, page_bitmap.buffer, page_bitmap.size);
@@ -94,7 +94,7 @@ void pfa_init(void)
     last_page_index = 0;
 }
 
-void pfa_restore(bitmap_t* current_bitmap)
+void restore_pfa(bitmap_t* current_bitmap)
 {
     last_page_index = 0;
     page_bitmap.buffer = current_bitmap->buffer;

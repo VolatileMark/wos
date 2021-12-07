@@ -7,13 +7,15 @@
 #define GDT_NUM_STD_ENTRIES 5
 #define GDT_NUM_ENTRIES (GDT_NUM_STD_ENTRIES + GDT_NUM_TSS_ENTRIES * 2)
 
-struct gdt_descriptor {
+struct gdt_descriptor 
+{
     uint16_t size;
     uint64_t addr;
 } __attribute__((packed));
 typedef struct gdt_descriptor gdt_descriptor_t;
 
-struct gdt_entry {
+struct gdt_entry 
+{
     uint16_t limit_lo;
     uint16_t base_lo;
     uint8_t base_mid;
@@ -33,11 +35,12 @@ struct gdt_entry {
 } __attribute__((packed));
 typedef struct gdt_entry gdt_entry_t;
 
-typedef enum {
-    SEG_NULL,
-    SEG_CODE,
-    SEG_DATA
-} SEGMENT_TYPE;
+typedef enum 
+{
+    GDT_SEG_NULL,
+    GDT_SEG_CODE,
+    GDT_SEG_DATA
+} GDT_SEG_TYPE;
 
 __attribute__((aligned(SIZE_4KB))) gdt_entry_t gdt[GDT_NUM_ENTRIES];
 __attribute__((aligned(SIZE_4KB))) gdt_descriptor_t gdt_descriptor;
@@ -53,12 +56,12 @@ static uint16_t create_gdt_entry
     uint16_t index, 
     uint32_t base, 
     uint32_t limit, 
-    PRIVILEGE_LEVEL pl,
-    SEGMENT_TYPE type
+    PRIVILEGE_LEVEL privilege_level,
+    GDT_SEG_TYPE type
 )
 {
     gdt_entry_t* entry = &gdt[index];
-    if (type == SEG_NULL)
+    if (type == GDT_SEG_NULL)
         memset(entry, 0, sizeof(gdt_entry_t));
     else
     {
@@ -72,9 +75,9 @@ static uint16_t create_gdt_entry
         entry->accessed = 0;
         entry->rw_enable = 1;
         entry->privilege_direction = 0;
-        entry->executable = (type == SEG_CODE);
+        entry->executable = (type == GDT_SEG_CODE);
         entry->not_tss = 1;
-        entry->privilege_level = pl;
+        entry->privilege_level = privilege_level;
         entry->present = 1;
 
         entry->reserved = 0;
@@ -119,13 +122,13 @@ static uint16_t create_tss_entry(uint16_t index, uint64_t addr)
     return (index * sizeof(gdt_entry_t));
 }
 
-void gdt_init(uint64_t tss_addr)
+void init_gdt(uint64_t tss_addr)
 {
-    create_gdt_entry(0, 0x00000000, 0x00000000, PL0, SEG_NULL);
-    kernel_cs = create_gdt_entry(1, 0x00000000, 0xFFFFFFFF, PL0, SEG_CODE);
-    kernel_ds = create_gdt_entry(2, 0x00000000, 0xFFFFFFFF, PL0, SEG_DATA);
-    user_cs = create_gdt_entry(3, 0x00000000, 0xFFFFFFFF, PL3, SEG_DATA);
-    user_ds = create_gdt_entry(4, 0x00000000, 0xFFFFFFFF, PL3, SEG_DATA);
+    create_gdt_entry(0, 0x00000000, 0x00000000, PL0, GDT_SEG_NULL);
+    kernel_cs = create_gdt_entry(1, 0x00000000, 0xFFFFFFFF, PL0, GDT_SEG_CODE);
+    kernel_ds = create_gdt_entry(2, 0x00000000, 0xFFFFFFFF, PL0, GDT_SEG_DATA);
+    user_cs = create_gdt_entry(3, 0x00000000, 0xFFFFFFFF, PL3, GDT_SEG_DATA);
+    user_ds = create_gdt_entry(4, 0x00000000, 0xFFFFFFFF, PL3, GDT_SEG_DATA);
     tss_ss = create_tss_entry(5, tss_addr);
 
     gdt_descriptor.size = (GDT_NUM_ENTRIES * sizeof(gdt_entry_t)) - 1;

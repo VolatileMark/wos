@@ -78,7 +78,7 @@ void free_pages(uint64_t page_addr, uint64_t num)
         free_page(page_addr);
 }
 
-void pfa_init(void)
+void init_pfa(void)
 {
     uint64_t total_memory = get_total_memory_of_type(MULTIBOOT_MEMORY_AVAILABLE);
     if (total_memory > PFA_MAX_MEM_SIZE)

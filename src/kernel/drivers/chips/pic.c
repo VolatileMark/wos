@@ -90,7 +90,7 @@
 
 
 
-void pic_init(void)
+void init_pic(void)
 {
     /* Send input control word no. 1 */
     ports_wait();

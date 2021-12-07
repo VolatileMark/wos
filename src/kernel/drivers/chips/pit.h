@@ -6,6 +6,6 @@
 
 int register_pit_callback(isr_handler_t handler);
 void set_pit_interval(uint64_t interval);
-void pit_init(void);
+void init_pit(void);
 
 #endif

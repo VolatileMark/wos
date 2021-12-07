@@ -43,17 +43,17 @@ static uint64_t get_next_tmp_index(void)
     return index;
 }
 
-static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, uint8_t allow_writes, uint8_t allow_user_access)
+static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
 {
     page_table_entry_t* entry = &table[index];
     PTE_CLEAR(entry);
     set_pte_address(entry, paddr);
     entry->present = 1;
-    entry->allow_writes = allow_writes;
-    entry->allow_user_access = allow_user_access;
+    entry->allow_writes = access;
+    entry->allow_user_access = (privilege_level > 0);
 }
 
-uint64_t paging_map_temporary_page(uint64_t paddr, uint8_t allow_writes, uint8_t allow_user_access)
+uint64_t paging_map_temporary_page(uint64_t paddr, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
 {
     uint64_t index = get_next_tmp_index();
     page_table_entry_t* entry = &kernel_tmp_pt[index];
@@ -77,16 +77,16 @@ void paging_unmap_temporary_page(uint64_t vaddr)
     invalidate_pte(vaddr);
 }
 
-void paging_init(void)
+void init_paging(void)
 {
     current_pml4 = (page_table_t) PML4_VADDR;
     kernel_tmp_pt = (page_table_t) VADDR_GET_TEMPORARY(1);
     kernel_tmp_index = 2;
 }
 
-uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, uint8_t allow_writes, uint8_t allow_user_access)
+uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
 {
-    return pml4_map_memory(current_pml4, paddr, vaddr, size, allow_writes, allow_user_access);
+    return pml4_map_memory(current_pml4, paddr, vaddr, size, access, privilege_level);
 }
 
 uint64_t paging_unmap_memory(uint64_t vaddr, uint64_t size)
@@ -277,8 +277,8 @@ static uint64_t pt_map_memory
     uint64_t paddr,
     uint64_t vaddr,
     uint64_t size,
-    uint8_t allow_writes,
-    uint8_t allow_user_access
+    PAGE_ACCESS_TYPE access,
+    PRIVILEGE_LEVEL privilege_level
 )
 {
     uint64_t pt_idx = VADDR_TO_PT_IDX(vaddr);
@@ -304,8 +304,8 @@ static uint64_t pd_map_memory
     uint64_t paddr,
     uint64_t vaddr,
     uint64_t size,
-    uint8_t allow_writes,
-    uint8_t allow_user_access
+    PAGE_ACCESS_TYPE access,
+    PRIVILEGE_LEVEL privilege_level
 )
 {
     uint64_t pd_idx = VADDR_TO_PD_IDX(vaddr);
@@ -334,7 +334,7 @@ static uint64_t pd_map_memory
         }
 
         pt = (page_table_t) pt_vaddr;
-        mapped_size = pt_map_memory(pt, paddr, vaddr, size - total_mapped_size, allow_writes, allow_user_access);
+        mapped_size = pt_map_memory(pt, paddr, vaddr, size - total_mapped_size, access, privilege_level);
 
         paging_unmap_temporary_page(pt_vaddr);
 
@@ -356,8 +356,8 @@ static uint64_t pdp_map_memory
     uint64_t paddr,
     uint64_t vaddr,
     uint64_t size,
-    uint8_t allow_writes,
-    uint8_t allow_user_access
+    PAGE_ACCESS_TYPE access,
+    PRIVILEGE_LEVEL privilege_level
 )
 {
     uint64_t pdp_idx = VADDR_TO_PDP_IDX(vaddr);
@@ -386,7 +386,7 @@ static uint64_t pdp_map_memory
         }
 
         pd = (page_table_t) pd_vaddr;
-        mapped_size = pd_map_memory(pd, paddr, vaddr, size - total_mapped_size, allow_writes, allow_user_access);
+        mapped_size = pd_map_memory(pd, paddr, vaddr, size - total_mapped_size, access, privilege_level);
 
         paging_unmap_temporary_page(pd_vaddr);
 
@@ -408,8 +408,8 @@ uint64_t pml4_map_memory
     uint64_t paddr, 
     uint64_t vaddr, 
     uint64_t size, 
-    uint8_t allow_writes, 
-    uint8_t allow_user_access
+    PAGE_ACCESS_TYPE access, 
+    PRIVILEGE_LEVEL privilege_level
 )
 {
     uint64_t pml4_idx = VADDR_TO_PML4_IDX(vaddr);
@@ -439,7 +439,7 @@ uint64_t pml4_map_memory
         }
 
         pdp = (page_table_t) pdp_vaddr;
-        mapped_size = pdp_map_memory(pdp, paddr, vaddr, size - total_mapped_size, allow_writes, allow_user_access);
+        mapped_size = pdp_map_memory(pdp, paddr, vaddr, size - total_mapped_size, access, privilege_level);
 
         paging_unmap_temporary_page(pdp_vaddr);
 

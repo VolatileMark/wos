@@ -5,7 +5,8 @@
 
 #define SIZE_4KB 0x1000
 
-typedef enum {
+typedef enum 
+{
     PL0 = 0x00,
     PL1 = 0x01,
     PL2 = 0x02,

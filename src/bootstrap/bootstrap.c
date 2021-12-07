@@ -79,7 +79,7 @@ int load_elf(uint64_t start_addr, uint64_t* entry_address, uint64_t* elf_start_a
             if (*elf_end_addr < phdr->p_paddr + phdr->p_memsz)
                 *elf_end_addr = phdr->p_paddr + phdr->p_memsz;
             paging_unmap_memory(phdr->p_paddr, phdr->p_memsz);
-            paging_map_memory(phdr->p_paddr, phdr->p_vaddr, phdr->p_memsz, 1, 0);
+            paging_map_memory(phdr->p_paddr, phdr->p_vaddr, phdr->p_memsz, ACCESS_RW, PL0);
             memcpy((void*) phdr->p_vaddr, (void*) (((uint64_t) ehdr) + phdr->p_offset), phdr->p_filesz);
             break;
         }
@@ -112,7 +112,7 @@ bitmap_t* free_useless_pages(uint64_t multiboot_struct_addr, uint64_t multiboot_
         {
             paddr = get_pte_address(&entry);
             lock_page(paddr);
-            pdp = (page_table_t) paging_map_temporary_page(paddr, 0, 0);
+            pdp = (page_table_t) paging_map_temporary_page(paddr, ACCESS_RO, PL0);
             for (pdp_idx = 0; pdp_idx < MAX_TABLE_ENTRIES; pdp_idx++)
             {
                 entry = pdp[pdp_idx];
@@ -120,7 +120,7 @@ bitmap_t* free_useless_pages(uint64_t multiboot_struct_addr, uint64_t multiboot_
                 {
                     paddr = get_pte_address(&entry);
                     lock_page(paddr);
-                    pd = (page_table_t) paging_map_temporary_page(paddr, 0, 0);
+                    pd = (page_table_t) paging_map_temporary_page(paddr, ACCESS_RO, PL0);
                     for (pd_idx = 0; pd_idx < MAX_TABLE_ENTRIES; pd_idx++)
                     {
                         entry = pd[pd_idx];
@@ -153,15 +153,15 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
     parse_multiboot_struct(multiboot_struct_addr, &multiboot_struct_size, &kernel_elf);
     
     /* Initialize the page frame allocator */
-    pfa_init();
+    init_pfa();
     lock_pages(alignd((uint64_t) &_start_addr, SIZE_4KB), ceil((double) (((uint64_t) &_end_addr) - ((uint64_t) &_start_addr)) / SIZE_4KB));
     lock_pages(alignd(multiboot_struct_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB));
     lock_pages(alignd(kernel_elf->mod_start, SIZE_4KB), ceil((double) (kernel_elf->mod_end - kernel_elf->mod_start) / SIZE_4KB));
 
     /* Initialize paging helper */
-    paging_init();
+    init_paging();
 
-    paging_map_memory(kernel_elf->mod_start, kernel_elf->mod_start, kernel_elf->mod_end - kernel_elf->mod_start, 1, 0);
+    paging_map_memory(kernel_elf->mod_start, kernel_elf->mod_start, kernel_elf->mod_end - kernel_elf->mod_start, ACCESS_RW, PL0);
     
     if (load_elf(kernel_elf->mod_start, &kernel_entry, &kernel_elf_start, &kernel_elf_end))
         goto HANG;

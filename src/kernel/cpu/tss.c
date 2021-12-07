@@ -3,7 +3,7 @@
 
 __attribute__((aligned(0x1000))) tss_t tss;
 
-uint64_t tss_init(void)
+uint64_t init_tss(void)
 {
     memset(&tss, 0, sizeof(tss_t));
     return (uint64_t) &tss;

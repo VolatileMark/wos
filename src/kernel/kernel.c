@@ -1,6 +1,7 @@
 #include "external/multiboot2.h"
 #include "mem/mmap.h"
 #include "mem/pfa.h"
+#include "mem/heap.h"
 #include "mem/paging.h"
 #include "cpu/gdt.h"
 #include "cpu/idt.h"
@@ -9,6 +10,7 @@
 #include "cpu/interrupts.h"
 #include "utils/bitmap.h"
 #include "utils/macros.h"
+#include "drivers/chips/pit.h"
 #include <stdint.h>
 #include <mem.h>
 
@@ -41,17 +43,17 @@ void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
     uint64_t multiboot_struct_size;
 
-    paging_init();
-    pfa_restore(current_bitmap);
+    init_paging();
+    restore_pfa(current_bitmap);
     parse_multiboot_struct(multiboot_struct_addr, &multiboot_struct_size);
-    pfa_init();
-    gdt_init(tss_init());
-    idt_init();
-    isr_init();
+    init_pfa();
+    init_gdt(init_tss());
+    init_idt();
+    init_isr();
+    init_heap(VADDR_GET(256, 0, 0, 0), 1);
+    init_pit();
     enable_interrupts();
-
-    __asm__ __volatile__ ("int $0x10");
-
+    
     if (multiboot_struct_size == 0)
         goto HANG;
     

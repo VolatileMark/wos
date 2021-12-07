@@ -3,6 +3,7 @@
 #include "../../cpu/interrupts.h"
 #include <stddef.h>
 #include <mem.h>
+#include "../../utils/alloc.h"
 
 #define PIT_BASE_FREQUENCY 1193182
 
@@ -26,11 +27,6 @@ typedef struct
 } pit_callback_list_t;
 
 static pit_callback_list_t callbacks;
-
-void* calloc(uint64_t num, uint64_t size)
-{
-    return NULL;
-}
 
 static void pit_handler(interrupt_frame_t* frame)
 {
@@ -76,7 +72,7 @@ void set_pit_interval(uint64_t interval)
     enable_interrupts();
 }
 
-void pit_init(void)
+void init_pit(void)
 {
     memset(&callbacks, 0, sizeof(pit_callback_list_t));   
     ports_write_byte(PIT_COMM, PIT_CONFIG);

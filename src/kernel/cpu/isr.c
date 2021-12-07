@@ -6,7 +6,7 @@
 
 static isr_handler_t isr_handlers[IDT_NUM_ENTRIES];
 
-void isr_init(void)
+void init_isr(void)
 {
     memset(isr_handlers, 0, IDT_NUM_ENTRIES * sizeof(isr_handler_t));
 }

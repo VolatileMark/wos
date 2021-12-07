@@ -26,6 +26,12 @@ typedef struct page_table_entry page_table_entry_t;
 
 typedef page_table_entry_t* page_table_t;
 
+typedef enum
+{
+    ACCESS_RO = 0,
+    ACCESS_RW = 1
+} PAGE_ACCESS_TYPE;
+
 #define PTE_CLEAR(pte) *((uint64_t*) pte) = 0
 #define VADDR_GET(pml4, pdp, pd, pt) ((((uint64_t) ((pml4 < 480) ? 0x0000 : 0xFFFF)) << 48) | ((((uint64_t) pml4) << 39) | (((uint64_t) pdp) << 30) | (((uint64_t) pd) << 21) | (((uint64_t) pt) << 12)))
 #define VADDR_IS_TEMPORARY(addr) ((addr & 0xFFFFFFFFFFE00000) != 0xFFFF80000000)
@@ -42,12 +48,17 @@ typedef page_table_entry_t* page_table_t;
 #define PML4_ENTRY_SIZE (PDP_ENTRY_SIZE * MAX_TABLE_ENTRIES)
 #define PML4_VADDR VADDR_GET_TEMPORARY(0)
 
+extern void load_pml4(uint64_t pml4_paddr);
+extern void flush_tlb(void);
+extern page_table_t* get_current_pml4_paddr(void);
+extern void invalidate_pte(uint64_t vaddr);
+
 void set_pte_address(page_table_entry_t* entry, uint64_t addr);
 uint64_t get_pte_address(page_table_entry_t* entry);
-void paging_init(void);
-uint64_t pml4_map_memory(page_table_t pml4, uint64_t paddr, uint64_t vaddr, uint64_t size, uint8_t allow_writes, uint8_t allow_user_access);
-uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, uint8_t allow_writes, uint8_t allow_user_access);
-uint64_t paging_map_temporary_page(uint64_t paddr, uint8_t allow_writes, uint8_t allow_user_access);
+void init_paging(void);
+uint64_t pml4_map_memory(page_table_t pml4, uint64_t paddr, uint64_t vaddr, uint64_t size, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level);
+uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level);
+uint64_t paging_map_temporary_page(uint64_t paddr, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level);
 uint64_t pml4_unmap_memory(page_table_t pml4, uint64_t vaddr, uint64_t size);
 uint64_t paging_unmap_memory(uint64_t vaddr, uint64_t size);
 void paging_unmap_temporary_page(uint64_t vaddr);
