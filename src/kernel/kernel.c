@@ -11,6 +11,7 @@
 #include "utils/bitmap.h"
 #include "utils/macros.h"
 #include "drivers/chips/pit.h"
+#include "sys/vfs.h"
 #include <stdint.h>
 #include <mem.h>
 

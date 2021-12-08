@@ -46,7 +46,6 @@ debug:
 initrd:
 	@mkdir -p $(BUILD_DIR)/initrd
 	@mkdir -p $(BUILD_DIR)/iso/boot
-	#cp -f $(BUILD_DIR)/kernel/kernel.elf $(BUILD_DIR)/initrd
 	cp -f $(DATA_DIR)/ttyfont.psf $(BUILD_DIR)/initrd
 	cd $(BUILD_DIR)/initrd && tar --no-auto-compress --format=ustar --create --file=$(BUILD_DIR)/iso/boot/initrd .
 
