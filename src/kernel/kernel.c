@@ -11,7 +11,6 @@
 #include "utils/bitmap.h"
 #include "utils/macros.h"
 #include "drivers/chips/pit.h"
-#include "sys/vfs.h"
 #include <stdint.h>
 #include <mem.h>
 
@@ -57,7 +56,7 @@ void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
     
     if (multiboot_struct_size == 0)
         goto HANG;
-    
+
     HANG:
         while (1);
 }

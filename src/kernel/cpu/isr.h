@@ -71,7 +71,7 @@ struct interrupt_info
 } __attribute__((packed));
 typedef struct interrupt_info interrupt_info_t;
 
-struct cpu_state
+struct registers_state
 {
     uint64_t rdi;
     uint64_t rsi;
@@ -90,7 +90,7 @@ struct cpu_state
     uint64_t r14;
     uint64_t r15;
 } __attribute__((packed));
-typedef struct cpu_state cpu_state_t;
+typedef struct registers_state registers_state_t;
 
 struct stack_state
 {
@@ -105,7 +105,7 @@ typedef struct stack_state stack_state_t;
 struct interrupt_frame
 {
     interrupt_info_t interrupt_info;
-    cpu_state_t cpu_state;
+    registers_state_t registers_state;
     stack_state_t stack_state;
 } __attribute__((packed));
 typedef struct interrupt_frame interrupt_frame_t;

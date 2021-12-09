@@ -31,7 +31,7 @@ uint64_t get_pte_address(page_table_entry_t* entry)
 
 static uint64_t get_next_tmp_index(void)
 {
-    if (kernel_tmp_index >= MAX_TABLE_ENTRIES)
+    if (kernel_tmp_index >= MAX_PAGE_TABLE_ENTRIES)
         return 0;
     uint64_t index = kernel_tmp_index++;
     for 
@@ -104,7 +104,7 @@ static uint64_t pt_unmap_memory
     uint64_t pt_idx = VADDR_TO_PT_IDX(vaddr);
     uint64_t unmapped_size = 0;
 
-    while (unmapped_size < size && pt_idx < MAX_TABLE_ENTRIES)
+    while (unmapped_size < size && pt_idx < MAX_PAGE_TABLE_ENTRIES)
     {
         if (pt[pt_idx].present)
         {
@@ -134,7 +134,7 @@ static uint64_t pd_unmap_memory
     uint64_t pt_paddr, pt_vaddr;
     uint64_t unmapped_size = 0, total_unmapped_size = 0;
 
-    while (total_unmapped_size < size && pd_idx < MAX_TABLE_ENTRIES)
+    while (total_unmapped_size < size && pd_idx < MAX_PAGE_TABLE_ENTRIES)
     {
         entry = pd[pd_idx];
 
@@ -152,11 +152,11 @@ static uint64_t pd_unmap_memory
         pt = (page_table_t) pt_vaddr;
         unmapped_size = pt_unmap_memory(pt, vaddr, size - total_unmapped_size);
 
-        for (i = 0; i < MAX_TABLE_ENTRIES && !pt[i].present; i++);
+        for (i = 0; i < MAX_PAGE_TABLE_ENTRIES && !pt[i].present; i++);
 
         paging_unmap_temporary_page(pt_vaddr);
 
-        if (i == MAX_TABLE_ENTRIES)
+        if (i == MAX_PAGE_TABLE_ENTRIES)
         {
             free_page(pt_paddr);
             PTE_CLEAR(&pd[pd_idx]);
@@ -184,7 +184,7 @@ static uint64_t pdp_unmap_memory
     uint64_t pd_paddr, pd_vaddr;
     uint64_t unmapped_size = 0, total_unmapped_size = 0;
 
-    while (total_unmapped_size < size && pdp_idx < MAX_TABLE_ENTRIES)
+    while (total_unmapped_size < size && pdp_idx < MAX_PAGE_TABLE_ENTRIES)
     {
         entry = pdp[pdp_idx];
 
@@ -202,11 +202,11 @@ static uint64_t pdp_unmap_memory
         pd = (page_table_t) pd_vaddr;
         unmapped_size = pd_unmap_memory(pd, vaddr, size - total_unmapped_size);
 
-        for (i = 0; i < MAX_TABLE_ENTRIES && !pd[i].present; i++);
+        for (i = 0; i < MAX_PAGE_TABLE_ENTRIES && !pd[i].present; i++);
 
         paging_unmap_temporary_page(pd_vaddr);
 
-        if (i == MAX_TABLE_ENTRIES)
+        if (i == MAX_PAGE_TABLE_ENTRIES)
         {
             free_page(pd_paddr);
             PTE_CLEAR(&pdp[pdp_idx]);
@@ -235,7 +235,7 @@ uint64_t pml4_unmap_memory
     uint64_t unmapped_size = 0, total_unmapped_size = 0;
     size = alignu(size, PT_ENTRY_SIZE);
 
-    while (total_unmapped_size < size && pml4_idx < MAX_TABLE_ENTRIES)
+    while (total_unmapped_size < size && pml4_idx < MAX_PAGE_TABLE_ENTRIES)
     {
         entry = pml4[pml4_idx];
 
@@ -253,11 +253,11 @@ uint64_t pml4_unmap_memory
         pdp = (page_table_t) pdp_vaddr;
         unmapped_size = pdp_unmap_memory(pdp, vaddr, size - total_unmapped_size);
 
-        for (i = 0; i < MAX_TABLE_ENTRIES && !pdp[i].present; i++);
+        for (i = 0; i < MAX_PAGE_TABLE_ENTRIES && !pdp[i].present; i++);
 
         paging_unmap_temporary_page(pdp_vaddr);
 
-        if (i == MAX_TABLE_ENTRIES)
+        if (i == MAX_PAGE_TABLE_ENTRIES)
         {
             free_page(pdp_paddr);
             PTE_CLEAR(&pml4[pml4_idx]);
@@ -284,7 +284,7 @@ static uint64_t pt_map_memory
     uint64_t pt_idx = VADDR_TO_PT_IDX(vaddr);
     uint64_t mapped_size = 0;
 
-    while (mapped_size < size && pt_idx < MAX_TABLE_ENTRIES)
+    while (mapped_size < size && pt_idx < MAX_PAGE_TABLE_ENTRIES)
     {
         if (pt[pt_idx].present)
             return mapped_size;
@@ -314,7 +314,7 @@ static uint64_t pd_map_memory
     uint64_t pt_paddr, pt_vaddr;
     uint64_t mapped_size = 0, total_mapped_size = 0;
 
-    while (total_mapped_size < size && pd_idx < MAX_TABLE_ENTRIES)
+    while (total_mapped_size < size && pd_idx < MAX_PAGE_TABLE_ENTRIES)
     {
         entry = pd[pd_idx];
 
@@ -366,7 +366,7 @@ static uint64_t pdp_map_memory
     uint64_t pd_paddr, pd_vaddr;
     uint64_t mapped_size = 0, total_mapped_size = 0;
 
-    while (total_mapped_size < size && pdp_idx < MAX_TABLE_ENTRIES)
+    while (total_mapped_size < size && pdp_idx < MAX_PAGE_TABLE_ENTRIES)
     {
         entry = pdp[pdp_idx];
 
@@ -419,7 +419,7 @@ uint64_t pml4_map_memory
     uint64_t mapped_size = 0, total_mapped_size = 0;
     size = alignu(size, PT_ENTRY_SIZE);
 
-    while (total_mapped_size < size && pml4_idx < MAX_TABLE_ENTRIES)
+    while (total_mapped_size < size && pml4_idx < MAX_PAGE_TABLE_ENTRIES)
     {
         entry = pml4[pml4_idx];
 

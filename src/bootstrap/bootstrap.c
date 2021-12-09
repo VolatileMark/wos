@@ -105,7 +105,7 @@ bitmap_t* free_useless_pages(uint64_t multiboot_struct_addr, uint64_t multiboot_
     lock_pages(alignd((uint64_t) page_bitmap->buffer, SIZE_4KB), ceil((double) page_bitmap->size / SIZE_4KB));
 
     pml4 = (page_table_t) PML4_VADDR;
-    for (pml4_idx = 0; pml4_idx < MAX_TABLE_ENTRIES; pml4_idx++)
+    for (pml4_idx = 0; pml4_idx < MAX_PAGE_TABLE_ENTRIES; pml4_idx++)
     {
         entry = pml4[pml4_idx];
         if (entry.present)
@@ -113,7 +113,7 @@ bitmap_t* free_useless_pages(uint64_t multiboot_struct_addr, uint64_t multiboot_
             paddr = get_pte_address(&entry);
             lock_page(paddr);
             pdp = (page_table_t) paging_map_temporary_page(paddr, ACCESS_RO, PL0);
-            for (pdp_idx = 0; pdp_idx < MAX_TABLE_ENTRIES; pdp_idx++)
+            for (pdp_idx = 0; pdp_idx < MAX_PAGE_TABLE_ENTRIES; pdp_idx++)
             {
                 entry = pdp[pdp_idx];
                 if (entry.present)
@@ -121,7 +121,7 @@ bitmap_t* free_useless_pages(uint64_t multiboot_struct_addr, uint64_t multiboot_
                     paddr = get_pte_address(&entry);
                     lock_page(paddr);
                     pd = (page_table_t) paging_map_temporary_page(paddr, ACCESS_RO, PL0);
-                    for (pd_idx = 0; pd_idx < MAX_TABLE_ENTRIES; pd_idx++)
+                    for (pd_idx = 0; pd_idx < MAX_PAGE_TABLE_ENTRIES; pd_idx++)
                     {
                         entry = pd[pd_idx];
                         if (entry.present)
