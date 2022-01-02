@@ -9,8 +9,9 @@
 #include "utils/constants.h"
 #include "utils/elf.h"
 #include "utils/bitmap.h"
+#include "utils/ustar.h"
 
-void parse_multiboot_struct(uint64_t addr, uint64_t* out_size, struct multiboot_tag_module** out_module)
+static int parse_multiboot_struct(uint64_t addr, uint64_t* out_size, struct multiboot_tag_module** out_module)
 {
     uint64_t size = (uint64_t) *((uint32_t*) addr);
     struct multiboot_tag* tag;
@@ -28,17 +29,22 @@ void parse_multiboot_struct(uint64_t addr, uint64_t* out_size, struct multiboot_
         switch (tag->type)
         {
         case MULTIBOOT_TAG_TYPE_MMAP:
-            mmap_init((struct multiboot_tag_mmap*) tag);
+            if (mmap_init((struct multiboot_tag_mmap*) tag))
+                return -1;
             break;
         case MULTIBOOT_TAG_TYPE_MODULE:
             *out_module = (struct multiboot_tag_module*) tag;
             break;
         }
     }
+
+    return 0;
 }
 
-int load_elf(uint64_t start_addr, uint64_t* entry_address, uint64_t* elf_start_addr, uint64_t* elf_end_addr)
+static int load_elf(uint64_t start_addr, uint64_t* entry_address, uint64_t* elf_start_addr, uint64_t* elf_end_addr)
 {
+    uint64_t phdrs_offset, phdrs_total_size;
+    Elf64_Phdr* phdr;
     Elf64_Ehdr* ehdr = (Elf64_Ehdr*) start_addr;
 
     if 
@@ -60,9 +66,9 @@ int load_elf(uint64_t start_addr, uint64_t* entry_address, uint64_t* elf_start_a
     *elf_start_addr = (uint64_t) -1;
     *elf_end_addr = 0;
 
-    Elf64_Phdr* phdr;
-    uint64_t phdrs_offset = (((uint64_t) ehdr) + ehdr->e_phoff);
-    uint64_t phdrs_total_size = ehdr->e_phentsize * ehdr->e_phnum;
+    
+    phdrs_offset = (((uint64_t) ehdr) + ehdr->e_phoff);
+    phdrs_total_size = ehdr->e_phentsize * ehdr->e_phnum;
 
     for
     (
@@ -79,7 +85,7 @@ int load_elf(uint64_t start_addr, uint64_t* entry_address, uint64_t* elf_start_a
             if (*elf_end_addr < phdr->p_paddr + phdr->p_memsz)
                 *elf_end_addr = phdr->p_paddr + phdr->p_memsz;
             paging_unmap_memory(phdr->p_paddr, phdr->p_memsz);
-            paging_map_memory(phdr->p_paddr, phdr->p_vaddr, phdr->p_memsz, ACCESS_RW, PL0);
+            paging_map_memory(phdr->p_paddr, phdr->p_vaddr, phdr->p_memsz, PAGE_ACCESS_RW, PL0);
             memcpy((void*) phdr->p_vaddr, (void*) (((uint64_t) ehdr) + phdr->p_offset), phdr->p_filesz);
             break;
         }
@@ -88,7 +94,7 @@ int load_elf(uint64_t start_addr, uint64_t* entry_address, uint64_t* elf_start_a
     return 0;
 }
 
-bitmap_t* free_useless_pages(uint64_t multiboot_struct_addr, uint64_t multiboot_struct_size, struct multiboot_tag_module* kernel_elf, uint64_t kernel_elf_start, uint64_t kernel_elf_end)
+static bitmap_t* free_useless_pages(struct multiboot_tag_module* initrd, uint64_t kernel_start_paddr, uint64_t kernel_end_paddr, uint64_t fsrv_addr, uint64_t fsrv_size)
 {
     page_table_t pml4, pdp, pd;
     page_table_entry_t entry;
@@ -100,9 +106,11 @@ bitmap_t* free_useless_pages(uint64_t multiboot_struct_addr, uint64_t multiboot_
 
     free_pages(alignd((uint64_t) &_start_addr, SIZE_4KB), ceil((double) (((uint64_t) &_end_addr) - ((uint64_t) &_start_addr)) / SIZE_4KB));
     /* free_pages(alignd(multiboot_struct_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB)); */
-    free_pages(alignd(kernel_elf->mod_start, SIZE_4KB), ceil((double) (kernel_elf->mod_end - kernel_elf->mod_start) / SIZE_4KB));
-    lock_pages(alignd(kernel_elf_start, SIZE_4KB), ceil((double) (kernel_elf_end - kernel_elf_start) / SIZE_4KB));
+    free_pages(alignd(initrd->mod_start, SIZE_4KB), ceil((double) (initrd->mod_end - initrd->mod_start) / SIZE_4KB));
+    lock_pages(alignd(kernel_start_paddr, SIZE_4KB), ceil((double) (kernel_end_paddr - kernel_start_paddr) / SIZE_4KB));
+    lock_pages(alignd(fsrv_addr, SIZE_4KB), ceil((double) (fsrv_addr + fsrv_size) / SIZE_4KB));
     lock_pages(alignd((uint64_t) page_bitmap->buffer, SIZE_4KB), ceil((double) page_bitmap->size / SIZE_4KB));
+    lock_page(get_current_pml4_paddr());
 
     pml4 = (page_table_t) PML4_VADDR;
     for (pml4_idx = 0; pml4_idx < MAX_PAGE_TABLE_ENTRIES; pml4_idx++)
@@ -112,7 +120,7 @@ bitmap_t* free_useless_pages(uint64_t multiboot_struct_addr, uint64_t multiboot_
         {
             paddr = get_pte_address(&entry);
             lock_page(paddr);
-            pdp = (page_table_t) paging_map_temporary_page(paddr, ACCESS_RO, PL0);
+            pdp = (page_table_t) paging_map_temporary_page(paddr, PAGE_ACCESS_RO, PL0);
             for (pdp_idx = 0; pdp_idx < MAX_PAGE_TABLE_ENTRIES; pdp_idx++)
             {
                 entry = pdp[pdp_idx];
@@ -120,7 +128,7 @@ bitmap_t* free_useless_pages(uint64_t multiboot_struct_addr, uint64_t multiboot_
                 {
                     paddr = get_pte_address(&entry);
                     lock_page(paddr);
-                    pd = (page_table_t) paging_map_temporary_page(paddr, ACCESS_RO, PL0);
+                    pd = (page_table_t) paging_map_temporary_page(paddr, PAGE_ACCESS_RO, PL0);
                     for (pd_idx = 0; pd_idx < MAX_PAGE_TABLE_ENTRIES; pd_idx++)
                     {
                         entry = pd[pd_idx];
@@ -137,8 +145,25 @@ bitmap_t* free_useless_pages(uint64_t multiboot_struct_addr, uint64_t multiboot_
     return page_bitmap;
 }
 
+static void relocate_initrd(struct multiboot_tag_module* initrd)
+{
+    uint64_t size = initrd->mod_end - initrd->mod_start;
+    paging_map_memory(initrd->mod_start, initrd->mod_start, size, PAGE_ACCESS_RO, PL0);
+    paging_map_memory(INITRD_RELOC_ADDR, INITRD_RELOC_ADDR, size, PAGE_ACCESS_RW, PL0);
+    memcpy((void*) INITRD_RELOC_ADDR, (void*) ((uint64_t) initrd->mod_start), size);
+    paging_unmap_memory(initrd->mod_start, size);
+    initrd->mod_start = INITRD_RELOC_ADDR;
+    initrd->mod_end = INITRD_RELOC_ADDR + size;
+}
+
 void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
 {
+    struct multiboot_tag_module* initrd;
+    uint64_t multiboot_struct_size;
+    uint64_t kernel_elf_addr, kernel_entry, kernel_start_paddr, kernel_end_paddr;
+    uint64_t fsrv_size, fsrv_addr, fsrv_new_addr;
+    bitmap_t* new_bitmap;
+
     if 
     (
         multiboot2_magic != MULTIBOOT2_BOOTLOADER_MAGIC /* Check if the magic number is correct */ ||
@@ -146,29 +171,40 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
     )
         goto HANG;
 
-    struct multiboot_tag_module* kernel_elf;
-    uint64_t multiboot_struct_size, kernel_entry, kernel_elf_start, kernel_elf_end;
-
     /* Parse the multiboot struct */
-    parse_multiboot_struct(multiboot_struct_addr, &multiboot_struct_size, &kernel_elf);
+    if (parse_multiboot_struct(multiboot_struct_addr, &multiboot_struct_size, &initrd))
+        goto HANG;
     
     /* Initialize the page frame allocator */
     init_pfa();
     lock_pages(alignd((uint64_t) &_start_addr, SIZE_4KB), ceil((double) (((uint64_t) &_end_addr) - ((uint64_t) &_start_addr)) / SIZE_4KB));
     lock_pages(alignd(multiboot_struct_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB));
-    lock_pages(alignd(kernel_elf->mod_start, SIZE_4KB), ceil((double) (kernel_elf->mod_end - kernel_elf->mod_start) / SIZE_4KB));
+    lock_pages(alignd(initrd->mod_start, SIZE_4KB), ceil((double) (initrd->mod_end - initrd->mod_start) / SIZE_4KB));
 
     /* Initialize paging helper */
     init_paging();
 
-    paging_map_memory(kernel_elf->mod_start, kernel_elf->mod_start, kernel_elf->mod_end - kernel_elf->mod_start, ACCESS_RW, PL0);
+    /* Relocate initrd */
+    relocate_initrd(initrd);
+    ustar_set_address(initrd->mod_start);
     
-    if (load_elf(kernel_elf->mod_start, &kernel_entry, &kernel_elf_start, &kernel_elf_end))
+    ustar_lookup("./kernel.elf", &kernel_elf_addr);
+    if (load_elf(kernel_elf_addr, &kernel_entry, &kernel_start_paddr, &kernel_end_paddr))
         goto HANG;
+    
+    {
+        fsrv_size = ustar_lookup("./fsrv.bin", &fsrv_addr);
+        fsrv_new_addr = alignu(kernel_end_paddr, SIZE_4KB);
+        paging_map_memory(fsrv_addr, fsrv_addr, fsrv_size, PAGE_ACCESS_RO, PL0);
+        paging_map_memory(fsrv_new_addr, fsrv_new_addr, fsrv_size, PAGE_ACCESS_RW, PL0);
+        memcpy((void*) fsrv_new_addr, (void*) fsrv_addr, fsrv_size);
+        paging_unmap_memory(fsrv_addr, fsrv_size);
+    }
 
-    void (*kernel_main)(uint64_t, bitmap_t*) = ((__attribute__((sysv_abi)) void (*)(uint64_t, bitmap_t*)) kernel_entry);
+    new_bitmap = free_useless_pages(initrd, kernel_start_paddr, kernel_end_paddr, fsrv_new_addr, fsrv_size);
 
-    kernel_main(multiboot_struct_addr, free_useless_pages(multiboot_struct_addr, multiboot_struct_size, kernel_elf, kernel_elf_start, kernel_elf_end));
+    void (*kernel_main)(uint64_t, uint64_t, uint64_t, bitmap_t*) = ((__attribute__((sysv_abi)) void (*)(uint64_t, uint64_t, uint64_t, bitmap_t*)) kernel_entry);
+    kernel_main(multiboot_struct_addr, fsrv_new_addr, fsrv_size, new_bitmap);
 
     HANG:
         while (1);

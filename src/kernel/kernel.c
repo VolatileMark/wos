@@ -11,6 +11,7 @@
 #include "utils/bitmap.h"
 #include "utils/macros.h"
 #include "drivers/chips/pit.h"
+#include "sys/process.h"
 #include <stdint.h>
 #include <mem.h>
 
@@ -39,9 +40,10 @@ void parse_multiboot_struct(uint64_t addr, uint64_t* out_size)
     }
 }
 
-void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
+void kernel_main(uint64_t multiboot_struct_addr, uint64_t fsrv_paddr, uint64_t fsrv_size, bitmap_t* current_bitmap)
 {
     uint64_t multiboot_struct_size;
+    process_file_t file = { .paddr = fsrv_paddr, .size = fsrv_size, .type = PROC_EXEC_BIN };
 
     init_paging();
     restore_pfa(current_bitmap);
@@ -57,6 +59,8 @@ void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
     if (multiboot_struct_size == 0)
         goto HANG;
 
+    create_process(&file, 0);
+    
     HANG:
         while (1);
 }

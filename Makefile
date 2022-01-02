@@ -27,7 +27,7 @@ DBG_FLAGS = -ex "target remote localhost:1234" \
 
 
 
-all: build iso
+all: build initrd iso
 
 build: build-bootstrap build-kernel
 
@@ -46,12 +46,13 @@ debug:
 initrd:
 	@mkdir -p $(BUILD_DIR)/initrd
 	@mkdir -p $(BUILD_DIR)/iso/boot
-	cp -f $(DATA_DIR)/ttyfont.psf $(BUILD_DIR)/initrd
-	cd $(BUILD_DIR)/initrd && tar --no-auto-compress --format=ustar --create --file=$(BUILD_DIR)/iso/boot/initrd .
+#	cp -f $(DATA_DIR)/ttyfont.psf $(BUILD_DIR)/initrd
+	cp -f $(DATA_DIR)/fsrv.bin $(BUILD_DIR)/initrd
+	cp -f $(BUILD_DIR)/kernel/kernel.elf $(BUILD_DIR)/initrd
+	cd $(BUILD_DIR)/initrd && tar --no-auto-compress --format=ustar --create --file=$(BUILD_DIR)/iso/boot/initrd.tar.gz .
 
 iso: cfg-file
 	cp -f $(BUILD_DIR)/bootstrap/bootstrap.elf $(BUILD_DIR)/iso/boot/bootstrap.elf
-	cp -f $(BUILD_DIR)/kernel/kernel.elf $(BUILD_DIR)/iso/boot/kernel.elf
 	@rm -f $(BUILD_DIR)/$(OS_NAME).iso
 	grub-mkrescue -o $(BUILD_DIR)/$(OS_NAME).iso $(BUILD_DIR)/iso
 
@@ -62,7 +63,7 @@ cfg-file:
 	set default=0\n\
 	menuentry "$(OS_NAME)" {\n\
 		multiboot2 /boot/bootstrap.elf\n\
-		module2 /boot/kernel.elf\n\
+		module2 /boot/initrd.tar.gz\n\
 		boot\n\
 	}\n\
 	" > $(BUILD_DIR)/iso/boot/grub/grub.cfg
@@ -70,7 +71,7 @@ cfg-file:
 clean:
 	find $(BUILD_DIR) -name '*.o' -delete
 	find $(BUILD_DIR) -name '*.elf' -delete
-#	rm -f $(BUILD_DIR)/initrd/initrd
+	rm -f $(BUILD_DIR)/initrd/initrd
 
 clean-all:
 	rm -rf $(BUILD_DIR)

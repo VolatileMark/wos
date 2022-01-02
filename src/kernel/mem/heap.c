@@ -20,7 +20,7 @@ static uint64_t expand_heap(uint64_t size)
     if (pages_paddr == 0)
         return 0;
     
-    size = paging_map_memory(pages_paddr, heap_end, size, 1, 1);
+    size = paging_map_memory(pages_paddr, heap_end, size, PAGE_ACCESS_RW, PL0);
     heap_end += size;
 
     new->free = 1;
@@ -82,9 +82,9 @@ uint64_t allocate_heap_memory(uint64_t size)
     if (seg == NULL)
         return 0;
     
-    new = (heap_segment_header_t*)(seg->data + seg->size);
+    new = (heap_segment_header_t*)(seg->data + size);
     new->free = 1;
-    new->size = seg->size - size;
+    new->size = seg->size - size - sizeof(heap_segment_header_t);
     new->prev = seg;
     new->next = seg->next;
     new->next->prev = new;
@@ -93,7 +93,7 @@ uint64_t allocate_heap_memory(uint64_t size)
         tail = new;
     
     seg->free = 0;
-    seg->size = size - sizeof(heap_segment_header_t);
+    seg->size = size;
     seg->next = new;
 
     return seg->data;
@@ -107,7 +107,7 @@ int init_heap(uint64_t addr, uint64_t pages)
     if 
     (
         pages_paddr == 0 || 
-        paging_map_memory(pages_paddr, addr, size, 1, 1) < size
+        paging_map_memory(pages_paddr, addr, size, PAGE_ACCESS_RW, PL0) < size
     )
         return -1;
     

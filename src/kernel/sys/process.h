@@ -6,6 +6,12 @@
 
 #define PROCESS_MAX_FDS 64
 
+typedef enum
+{
+    PROC_EXEC_ELF,
+    PROC_EXEC_BIN
+} PROC_EXEC_TYPE;
+
 struct registers
 {
     uint64_t rax;
@@ -36,7 +42,7 @@ typedef uint8_t fpu_state_t[512];
 typedef struct segment_list_entry
 {
     uint64_t paddr;
-    uint64_t size;
+    uint64_t pages;
     struct segment_list_entry* next;
 } segment_list_entry_t;
 
@@ -46,10 +52,7 @@ typedef struct
     segment_list_entry_t* tail;
 } segment_list_t;
 
-typedef struct 
-{
-    void* vnode;
-} file_descriptor_t;
+typedef uint64_t file_descriptor_t;
 
 typedef struct
 {
@@ -74,6 +77,15 @@ typedef struct
     segment_list_t kernel_stack_segments;
 } process_t;
 
-process_t* create_process(const char* path, uint64_t pid);
+typedef struct 
+{
+    PROC_EXEC_TYPE type;
+    uint64_t paddr;
+    uint64_t size;
+} process_file_t;
+
+process_t* create_process(const process_file_t* file, uint64_t pid);
+process_t* create_replacement_process(process_t* parent, const process_file_t* file);
+process_t* clone_process(process_t* parent, uint64_t id);
 
 #endif

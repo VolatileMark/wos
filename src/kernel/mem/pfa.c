@@ -79,19 +79,20 @@ void free_pages(uint64_t page_addr, uint64_t num)
 
 void init_pfa(void)
 {
+    uint64_t total_memory, bitmap_size, bitmap_paddr, bitmap_vaddr;
     /* This method should allow at least 2TB of memory to be managed */
-    last_page_index = alignu((uint64_t) &_end_paddr, SIZE_4KB) / SIZE_4KB;
-    uint64_t total_memory = get_total_memory_of_type(MULTIBOOT_MEMORY_AVAILABLE);
-    uint64_t bitmap_size = ceil(((double) total_memory) / SIZE_4KB / 8.0);
-    uint64_t bitmap_paddr = request_pages(ceil((double) bitmap_size / SIZE_4KB));
-    uint64_t bitmap_vaddr = (VADDR_GET(511, 510, 0, 0) + bitmap_paddr);
-    paging_map_memory(bitmap_paddr, bitmap_vaddr, bitmap_size, ACCESS_RW, PL0);
+    //last_page_index = alignu((uint64_t) &_end_paddr, SIZE_4KB) / SIZE_4KB;
+    total_memory = get_total_memory_of_type(MULTIBOOT_MEMORY_AVAILABLE);
+    bitmap_size = ceil(((double) total_memory) / SIZE_4KB / 8.0);
+    bitmap_paddr = request_pages(ceil((double) bitmap_size / SIZE_4KB));
+    //uint64_t bitmap_vaddr = (VADDR_GET(511, 510, 0, 0) + bitmap_paddr);
+    paging_get_next_vaddr(bitmap_size, &bitmap_vaddr);
+    paging_map_memory(bitmap_paddr, bitmap_vaddr, bitmap_size, PAGE_ACCESS_RW, PL0);
     memset((void*) bitmap_vaddr, 0, bitmap_size);
     free_pages(alignd((uint64_t) page_bitmap.buffer, SIZE_4KB), ceil((double) page_bitmap.size / SIZE_4KB));
     memcpy((void*) bitmap_vaddr, page_bitmap.buffer, page_bitmap.size);
     page_bitmap.buffer = (uint8_t*) bitmap_vaddr;
     page_bitmap.size = bitmap_size;
-    last_page_index = 0;
 }
 
 void restore_pfa(bitmap_t* current_bitmap)

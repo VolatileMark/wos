@@ -28,12 +28,12 @@ typedef page_table_entry_t* page_table_t;
 
 typedef enum
 {
-    ACCESS_RO = 0,
-    ACCESS_RW = 1
+    PAGE_ACCESS_RO = 0,
+    PAGE_ACCESS_RW = 1
 } PAGE_ACCESS_TYPE;
 
 #define PTE_CLEAR(pte) *((uint64_t*) pte) = 0
-#define VADDR_GET(pml4, pdp, pd, pt) ((((uint64_t) ((pml4 < 480) ? 0x0000 : 0xFFFF)) << 48) | ((((uint64_t) pml4) << 39) | (((uint64_t) pdp) << 30) | (((uint64_t) pd) << 21) | (((uint64_t) pt) << 12)))
+#define VADDR_GET(pml4, pdp, pd, pt) ((((uint64_t) ((pml4 < 256) ? 0x0000 : 0xFFFF)) << 48) | ((((uint64_t) pml4) << 39) | (((uint64_t) pdp) << 30) | (((uint64_t) pd) << 21) | (((uint64_t) pt) << 12)))
 #define VADDR_IS_TEMPORARY(addr) ((addr & 0xFFFFFFFFFFE00000) != 0xFFFF80000000)
 #define VADDR_TO_PML4_IDX(addr) ((addr >> 39) & 0x1FF)
 #define VADDR_TO_PDP_IDX(addr) ((addr >> 30) & 0x1FF)
@@ -50,7 +50,7 @@ typedef enum
 
 extern void load_pml4(uint64_t pml4_paddr);
 extern void flush_tlb(void);
-extern page_table_t* get_current_pml4_paddr(void);
+extern uint64_t get_current_pml4_paddr(void);
 extern void invalidate_pte(uint64_t vaddr);
 
 void set_pte_address(page_table_entry_t* entry, uint64_t addr);
@@ -62,5 +62,10 @@ uint64_t paging_map_temporary_page(uint64_t paddr, PAGE_ACCESS_TYPE access, PRIV
 uint64_t pml4_unmap_memory(page_table_t pml4, uint64_t vaddr, uint64_t size);
 uint64_t paging_unmap_memory(uint64_t vaddr, uint64_t size);
 void paging_unmap_temporary_page(uint64_t vaddr);
+uint64_t paging_get_next_vaddr(uint64_t size, uint64_t* vaddr_out);
+uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t size, uint64_t* vaddr_out);
+uint64_t paging_get_paddr(uint64_t vaddr);
+uint64_t pml4_get_paddr(page_table_t pml4, uint64_t vaddr);
+void delete_pml4(page_table_t pml4);
 
 #endif

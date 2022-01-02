@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #define SIZE_4KB 0x1000
+#define KERNEL_STACK_SIZE 16384
 
 typedef enum 
 {
