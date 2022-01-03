@@ -635,3 +635,15 @@ void delete_pml4(page_table_t pml4)
     }
     free_page(pml4_paddr);
 }
+
+void paging_inject_pml4(page_table_t pml4)
+{
+    uint64_t pml4_idx;
+    page_table_entry_t entry;
+    for (pml4_idx = VADDR_TO_PML4_IDX(HEAP_START_ADDR); pml4_idx < MAX_PAGE_TABLE_ENTRIES; pml4_idx++)
+    {
+        entry = current_pml4[pml4_idx];
+        if (entry.present)
+            pml4[pml4_idx] = entry;
+    }
+}

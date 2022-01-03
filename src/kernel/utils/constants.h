@@ -5,6 +5,7 @@
 
 #define SIZE_4KB 0x1000
 #define KERNEL_STACK_SIZE 16384
+#define HEAP_START_ADDR VADDR_GET(256, 0, 0, 0)
 
 typedef enum 
 {

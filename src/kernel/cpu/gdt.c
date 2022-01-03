@@ -127,7 +127,7 @@ void init_gdt(uint64_t tss_addr)
     create_gdt_entry(0, 0x00000000, 0x00000000, PL0, GDT_SEG_NULL);
     kernel_cs = create_gdt_entry(1, 0x00000000, 0xFFFFFFFF, PL0, GDT_SEG_CODE);
     kernel_ds = create_gdt_entry(2, 0x00000000, 0xFFFFFFFF, PL0, GDT_SEG_DATA);
-    user_cs = create_gdt_entry(3, 0x00000000, 0xFFFFFFFF, PL3, GDT_SEG_DATA);
+    user_cs = create_gdt_entry(3, 0x00000000, 0xFFFFFFFF, PL3, GDT_SEG_CODE);
     user_ds = create_gdt_entry(4, 0x00000000, 0xFFFFFFFF, PL3, GDT_SEG_DATA);
     tss_ss = create_tss_entry(5, tss_addr);
 

@@ -37,7 +37,7 @@ struct registers
 } __attribute__((packed));
 typedef struct registers registers_t;
 
-typedef uint8_t fpu_state_t[512];
+typedef __attribute__((aligned(16))) uint8_t fpu_state_t[512];
 
 typedef struct segment_list_entry
 {
@@ -87,5 +87,8 @@ typedef struct
 process_t* create_process(const process_file_t* file, uint64_t pid);
 process_t* create_replacement_process(process_t* parent, const process_file_t* file);
 process_t* clone_process(process_t* parent, uint64_t id);
+void delete_and_free_process(process_t* ps);
+void delete_process_resources(process_t* ps);
+void load_process_pml4(process_t* ps);
 
 #endif

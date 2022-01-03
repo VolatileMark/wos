@@ -187,7 +187,7 @@ static uint64_t delete_segments_list(segment_list_t* list)
     return pages * SIZE_4KB;
 }
 
-static void process_delete_resources(process_t* ps)
+void delete_process_resources(process_t* ps)
 {
     uint64_t size, i;
 
@@ -212,9 +212,9 @@ static void process_delete_resources(process_t* ps)
     }
 }
 
-static void process_delete_and_free(process_t* ps)
+void delete_and_free_process(process_t* ps)
 {
-    process_delete_resources(ps);
+    delete_process_resources(ps);
     free(ps);
 }
 
@@ -234,7 +234,7 @@ process_t* create_process(const process_file_t* file, uint64_t pid)
         process_load_kernel_stack(ps)
     )
     {
-        process_delete_and_free(ps);
+        delete_and_free_process(ps);
         return NULL;
     }
 
@@ -249,6 +249,7 @@ static int copy_file_descriptors(file_descriptor_t* from, file_descriptor_t* to)
     {
         if (from[i] != 0)
         {
+            /* Implement file descriptor copy */
             to[i] = from[i];
         }
     }
@@ -263,7 +264,7 @@ process_t* create_replacement_process(process_t* parent, const process_file_t* f
     child->parent_pid = parent->parent_pid;
     if (copy_file_descriptors(parent->fds, child->fds))
     {
-        process_delete_and_free(child);
+        delete_and_free_process(child);
         return NULL;
     }
     return child;
@@ -272,8 +273,8 @@ process_t* create_replacement_process(process_t* parent, const process_file_t* f
 static int copy_segments_list(page_table_t pml4, uint64_t vaddr, segment_list_t* from, segment_list_t* to)
 {
     uint64_t bytes, size, paddr, kernel_vaddr;
-    segment_list_entry_t* ptr = from->head;
     segment_list_entry_t* segment;
+    segment_list_entry_t* ptr = from->head;
 
     while (ptr != NULL)
     {
@@ -355,9 +356,15 @@ process_t* clone_process(process_t* parent, uint64_t id)
         copy_file_descriptors(parent->fds, child->fds)
     )
     {
-        process_delete_and_free(child);
+        delete_and_free_process(child);
         return NULL;
     }
 
     return child;
+}
+
+void load_process_pml4(process_t* ps)
+{
+    paging_inject_pml4(ps->pml4);
+    load_pml4(ps->pml4_paddr);
 }

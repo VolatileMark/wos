@@ -12,6 +12,7 @@
 #include "utils/macros.h"
 #include "drivers/chips/pit.h"
 #include "sys/process.h"
+#include "sys/scheduler.h"
 #include <stdint.h>
 #include <mem.h>
 
@@ -43,7 +44,10 @@ void parse_multiboot_struct(uint64_t addr, uint64_t* out_size)
 void kernel_main(uint64_t multiboot_struct_addr, uint64_t fsrv_paddr, uint64_t fsrv_size, bitmap_t* current_bitmap)
 {
     uint64_t multiboot_struct_size;
+    process_t* fsrv;
     process_file_t file = { .paddr = fsrv_paddr, .size = fsrv_size, .type = PROC_EXEC_BIN };
+
+    disable_interrupts();
 
     init_paging();
     restore_pfa(current_bitmap);
@@ -52,15 +56,18 @@ void kernel_main(uint64_t multiboot_struct_addr, uint64_t fsrv_paddr, uint64_t f
     init_gdt(init_tss());
     init_idt();
     init_isr();
-    init_heap(VADDR_GET(256, 0, 0, 0), 1);
+    init_heap(HEAP_START_ADDR, 1);
     init_pit();
-    enable_interrupts();
     
     if (multiboot_struct_size == 0)
         goto HANG;
 
-    create_process(&file, 0);
+    fsrv = create_process(&file, 0);
+    init_scheduler();
+    schedule_runnable_process(fsrv);
+    run_scheduler();
     
     HANG:
-        while (1);
+        while (1)
+            __asm__("hlt");
 }

@@ -94,11 +94,11 @@ typedef struct registers_state registers_state_t;
 
 struct stack_state
 {
-    uint64_t rip;
-    uint64_t cs;
+    uint64_t return_rip;
+    uint64_t return_cs;
     uint64_t rflags;
-    uint64_t rsp_return;
-    uint64_t ss_return;
+    uint64_t return_rsp;
+    uint64_t return_ss;
 } __attribute__((packed));
 typedef struct stack_state stack_state_t;
 
@@ -110,7 +110,7 @@ struct interrupt_frame
 } __attribute__((packed));
 typedef struct interrupt_frame interrupt_frame_t;
 
-typedef void (*isr_handler_t)(interrupt_frame_t* info); 
+typedef void (*isr_handler_t)(const interrupt_frame_t* info); 
 
 void init_isr(void);
 uint8_t isr_register_handler(uint8_t interrupt_number, isr_handler_t handler);

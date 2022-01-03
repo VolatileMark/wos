@@ -28,7 +28,7 @@ typedef struct
 
 static pit_callback_list_t callbacks;
 
-static void pit_handler(interrupt_frame_t* frame)
+static void pit_handler(const interrupt_frame_t* frame)
 {
     pit_callback_t* callback = callbacks.start;
     while (callback != NULL)
@@ -62,14 +62,12 @@ int register_pit_callback(isr_handler_t handler)
 
 void set_pit_interval(uint64_t interval)
 {
-    disable_interrupts();
     uint64_t frequency = 1000 / interval;
     uint16_t divider = (uint16_t) (PIT_BASE_FREQUENCY / frequency);
     ports_write_byte(PIT_CH0, (uint8_t) divider);
     ports_wait();
     ports_write_byte(PIT_CH0, (uint8_t) (divider >> 8));
     ports_wait();
-    enable_interrupts();
 }
 
 void init_pit(void)
@@ -77,5 +75,5 @@ void init_pit(void)
     memset(&callbacks, 0, sizeof(pit_callback_list_t));   
     ports_write_byte(PIT_COMM, PIT_CONFIG);
     ports_wait();
-    isr_register_handler(IRQ(0), pit_handler);
+    isr_register_handler(IRQ(0), &pit_handler);
 }

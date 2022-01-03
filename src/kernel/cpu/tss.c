@@ -1,7 +1,8 @@
 #include "tss.h"
+#include "../utils/constants.h"
 #include <mem.h>
 
-__attribute__((aligned(0x1000))) tss_t tss;
+static __attribute__((aligned(SIZE_4KB))) tss_t tss;
 
 uint64_t init_tss(void)
 {
