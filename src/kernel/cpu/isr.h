@@ -5,9 +5,9 @@
 
 #define DECLARE_ISR(index) extern void isr##index(void)
 #define DECLARE_IRQ(index) extern void irq##index(void)
+#define DECLARE_SFT(index) extern void sft##index(void)
 
-#define IRQ(index) 32 + index
-
+#define IRQ(index) (32 + index)
 
 
 /* ISRs */
@@ -62,6 +62,7 @@ DECLARE_IRQ(13);
 DECLARE_IRQ(14);
 DECLARE_IRQ(15);
 
+DECLARE_SFT(128);
 
 
 struct interrupt_info
@@ -113,6 +114,6 @@ typedef struct interrupt_frame interrupt_frame_t;
 typedef void (*isr_handler_t)(const interrupt_frame_t* info); 
 
 void init_isr(void);
-uint8_t isr_register_handler(uint8_t interrupt_number, isr_handler_t handler);
+uint8_t register_isr_handler(uint8_t interrupt_number, isr_handler_t handler);
 
 #endif

@@ -105,8 +105,8 @@ static bitmap_t* free_useless_pages(struct multiboot_tag_module* initrd, uint64_
     page_bitmap = get_page_bitmap();
 
     free_pages(alignd((uint64_t) &_start_addr, SIZE_4KB), ceil((double) (((uint64_t) &_end_addr) - ((uint64_t) &_start_addr)) / SIZE_4KB));
-    /* free_pages(alignd(multiboot_struct_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB)); */
     free_pages(alignd(initrd->mod_start, SIZE_4KB), ceil((double) (initrd->mod_end - initrd->mod_start) / SIZE_4KB));
+    
     lock_pages(alignd(kernel_start_paddr, SIZE_4KB), ceil((double) (kernel_end_paddr - kernel_start_paddr) / SIZE_4KB));
     lock_pages(alignd(fsrv_addr, SIZE_4KB), ceil((double) (fsrv_addr + fsrv_size) / SIZE_4KB));
     lock_pages(alignd((uint64_t) page_bitmap->buffer, SIZE_4KB), ceil((double) page_bitmap->size / SIZE_4KB));
@@ -188,12 +188,12 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
     relocate_initrd(initrd);
     ustar_set_address(initrd->mod_start);
     
-    ustar_lookup("./kernel.elf", &kernel_elf_addr);
+    ustar_lookup("./wkernel.elf", &kernel_elf_addr);
     if (load_elf(kernel_elf_addr, &kernel_entry, &kernel_start_paddr, &kernel_end_paddr))
         goto HANG;
     
     {
-        fsrv_size = ustar_lookup("./fsrv.bin", &fsrv_addr);
+        fsrv_size = ustar_lookup("./wfsrv.bin", &fsrv_addr);
         fsrv_new_addr = alignu(kernel_end_paddr, SIZE_4KB);
         paging_map_memory(fsrv_addr, fsrv_addr, fsrv_size, PAGE_ACCESS_RO, PL0);
         paging_map_memory(fsrv_new_addr, fsrv_new_addr, fsrv_size, PAGE_ACCESS_RW, PL0);

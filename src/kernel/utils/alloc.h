@@ -3,9 +3,9 @@
 
 #include "stdint.h"
 
-void* malloc(uint64_t size);
-void* calloc(uint64_t n, uint64_t size);
-void* realloc(void* src, uint64_t new_size);
-void free(void* ptr);
+void* kmalloc(uint64_t size);
+void* kcalloc(uint64_t n, uint64_t size);
+void* krealloc(void* src, uint64_t new_size);
+void kfree(void* ptr);
 
 #endif

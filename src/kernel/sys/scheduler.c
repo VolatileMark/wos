@@ -1,6 +1,6 @@
 #include "scheduler.h"
-#include "../cpu/isr.h"
 #include "../cpu/gdt.h"
+#include "../cpu/isr.h"
 #include "../cpu/tss.h"
 #include "../cpu/interrupts.h"
 #include "../utils/constants.h"
@@ -102,7 +102,7 @@ static void schedule_on_interrupt(const registers_state_t* regs, const stack_sta
     run_scheduler();
 }
 
-static void handle_pit_interrupt(const interrupt_frame_t* int_frame)
+static void scheduler_pit_handler(const interrupt_frame_t* int_frame)
 {
     ms += SCHEDULER_PIT_INTERVAL;
     if (ms >= SCHEDULER_TIME_SLICE)
@@ -114,13 +114,20 @@ static void handle_pit_interrupt(const interrupt_frame_t* int_frame)
         pic_acknowledge((uint8_t) int_frame->interrupt_info.interrupt_number);
 }
 
+static void yield_interrupt_handler(const interrupt_frame_t* int_frame)
+{
+    ms = 0;
+    schedule_on_interrupt(&int_frame->registers_state, &int_frame->stack_state, (uint8_t) int_frame->interrupt_info.interrupt_number);
+}
+
 int init_scheduler(void)
 {
     ms = 0;
     memset(&runnable_pss, 0, sizeof(process_list_t));
     memset(&zombie_pss, 0, sizeof(process_list_t));
     set_pit_interval(SCHEDULER_PIT_INTERVAL);
-    return register_pit_callback(&handle_pit_interrupt);
+    register_isr_handler(128, &yield_interrupt_handler);
+    return register_pit_callback(&scheduler_pit_handler);
 }
 
 process_t* get_current_scheduled_process(void)
@@ -130,7 +137,7 @@ process_t* get_current_scheduled_process(void)
 
 static int schedule_process(process_list_t* pss, process_t* ps)
 {
-    process_list_entry_t* entry = malloc(sizeof(process_list_entry_t));
+    process_list_entry_t* entry = kmalloc(sizeof(process_list_entry_t));
     if (entry == NULL)
         return -1;
     
@@ -174,7 +181,7 @@ static int remove_process(process_list_t* pss, uint64_t pid, uint8_t should_dele
             if (should_delete)
                 delete_and_free_process(current->ps);
             
-            free(current);
+            kfree(current);
             
             return 0;
         }

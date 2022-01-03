@@ -91,6 +91,14 @@ int_frame:
         jmp common_stub
 %endmacro
 
+%macro SOFTWARE 1
+    [global sft%1]
+    sft%1:
+        push qword 0x69
+        push qword %1
+        jmp common_stub
+%endmacro
+
 %macro FILL_STRUCT 0
     mov [cpu_state.rdi], rdi
     mov [cpu_state.rsi], rsi
@@ -204,3 +212,5 @@ IRQ 12
 IRQ 13
 IRQ 14
 IRQ 15
+
+SOFTWARE 128

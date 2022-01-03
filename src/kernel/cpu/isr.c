@@ -17,14 +17,13 @@ void isr_handler(interrupt_frame_t* frame)
     if (isr_handlers[interrupt_number] != NULL)
     {
         isr_handlers[interrupt_number](frame);
-        if (interrupt_number >= IRQ(0))
-            pic_acknowledge(interrupt_number);
+        pic_acknowledge(interrupt_number);
     }
     else
         while (1);
 }
 
-uint8_t isr_register_handler(uint8_t interrupt_number, isr_handler_t handler)
+uint8_t register_isr_handler(uint8_t interrupt_number, isr_handler_t handler)
 {
     if (interrupt_number >= IDT_NUM_ENTRIES || isr_handlers[interrupt_number] != NULL)
         return 1;

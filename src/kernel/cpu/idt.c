@@ -2,16 +2,17 @@
 #include "isr.h"
 #include "gdt.h"
 #include "../drivers/chips/pic.h"
+#include "../sys/scheduler.h"
 #include "../utils/constants.h"
 
 #define SET_ISR(index) set_idt_gate(index, (uint64_t) &isr##index, get_kernel_cs(), PL0, IDT_INTERRUPT_GATE, 1)
-#define SET_IRQ(index) set_idt_gate(32 + index, (uint64_t) &irq##index, get_kernel_cs(), PL0, IDT_INTERRUPT_GATE, 0)
+#define SET_IRQ(index) set_idt_gate(IRQ(index), (uint64_t) &irq##index, get_kernel_cs(), PL0, IDT_INTERRUPT_GATE, 0)
+#define SET_SFT(index) set_idt_gate(index, (uint64_t) &sft##index, get_kernel_cs(), PL3, IDT_INTERRUPT_GATE, 0)
 
 typedef enum
 {
     IDT_TRAP_GATE = 0x0,
     IDT_INTERRUPT_GATE = 0x1,
-    IDT_CALL_GATE = 0x02
 } IDT_GATE_TYPE;
 
 struct idt64_descriptor 
@@ -60,7 +61,7 @@ static void set_idt_gate
     entry->reserved = 0;
     entry->segment_selector = segment_selector;
     entry->ist = 0;
-    entry->type = (type != IDT_CALL_GATE) ? (type ^ 0xF) : 0b0101;
+    entry->type = (type ^ 0xF);
     entry->present = present;
     entry->privilege_level = privilege_level;
     entry->zero = 0;
@@ -128,6 +129,8 @@ void init_idt(void)
     SET_IRQ(13);
     SET_IRQ(14);
     SET_IRQ(15);
-    
+
+    SET_SFT(128); /* Yield (probably useless, but just for fun) */
+
     load_idt((uint64_t) &idt_descriptor);
 }

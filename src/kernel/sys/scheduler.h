@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "process.h"
+#include "../cpu/isr.h"
 
 uint64_t get_next_pid(void);
 

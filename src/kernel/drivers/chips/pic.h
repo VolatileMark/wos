@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define IRQ_COUNT 16
+
 /**
  * Initialize the PIC
  */

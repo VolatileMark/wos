@@ -69,7 +69,7 @@ static int process_load_binary(process_t* ps, const process_file_t* file, uint64
     if (size < file->size)
         return -1;
     
-    code_segments = malloc(sizeof(segment_list_entry_t));
+    code_segments = kmalloc(sizeof(segment_list_entry_t));
     if (code_segments == NULL)
         return -1;
     
@@ -118,7 +118,7 @@ static int process_load_stack(process_t* ps)
     if (size < bytes)
         return -1;
 
-    stack_segments = malloc(sizeof(segment_list_entry_t));
+    stack_segments = kmalloc(sizeof(segment_list_entry_t));
     if (stack_segments == NULL)
         return -1;
     
@@ -153,7 +153,7 @@ static int process_load_kernel_stack(process_t* ps)
     if (size < bytes)
         return -1;
     
-    kernel_stack_segments = malloc(sizeof(segment_list_entry_t));
+    kernel_stack_segments = kmalloc(sizeof(segment_list_entry_t));
     if (kernel_stack_segments == NULL)
         return -1;
     
@@ -180,7 +180,7 @@ static uint64_t delete_segments_list(segment_list_t* list)
         pages += current->pages;
         tmp = current->next;
         free_pages(current->paddr, current->pages);
-        free(current);
+        kfree(current);
         current = tmp;
     }
 
@@ -215,12 +215,12 @@ void delete_process_resources(process_t* ps)
 void delete_and_free_process(process_t* ps)
 {
     delete_process_resources(ps);
-    free(ps);
+    kfree(ps);
 }
 
 process_t* create_process(const process_file_t* file, uint64_t pid)
 {
-    process_t* ps = malloc(sizeof(process_t));
+    process_t* ps = kmalloc(sizeof(process_t));
     if (ps == NULL)
         return NULL;
 
@@ -302,7 +302,7 @@ static int copy_segments_list(page_table_t pml4, uint64_t vaddr, segment_list_t*
         memcpy((void*) kernel_vaddr, (void*) vaddr, bytes);
         paging_unmap_memory(kernel_vaddr, bytes);
         
-        segment = malloc(sizeof(segment_list_entry_t));
+        segment = kmalloc(sizeof(segment_list_entry_t));
         if (segment == NULL)
         {
             free_pages(paddr, ptr->pages);
@@ -322,7 +322,7 @@ static int copy_segments_list(page_table_t pml4, uint64_t vaddr, segment_list_t*
         size = pml4_map_memory(pml4, paddr, vaddr, bytes, PAGE_ACCESS_RW, PL3);
         if (size < bytes)
         {
-            free(segment);
+            kfree(segment);
             free_pages(paddr, ptr->pages);
             return -1;
         }
@@ -336,7 +336,7 @@ static int copy_segments_list(page_table_t pml4, uint64_t vaddr, segment_list_t*
 
 process_t* clone_process(process_t* parent, uint64_t id)
 {
-    process_t* child = malloc(sizeof(process_t));
+    process_t* child = kmalloc(sizeof(process_t));
     if (child == NULL)
         return NULL;
     

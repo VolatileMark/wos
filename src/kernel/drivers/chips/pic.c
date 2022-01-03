@@ -2,8 +2,6 @@
 #include "../io/ports.h"
 #include "../../cpu/isr.h"
 
-#define IRQ_COUNT 16
-
 #define PIC1 0x20
 #define PIC2 0xA0
 
@@ -208,6 +206,8 @@ void pic_toggle_irq(uint8_t index)
 
 void pic_acknowledge(uint8_t interrupt_number)
 {
+    if (interrupt_number < IRQ(0) || interrupt_number >= IRQ(IRQ_COUNT))
+        return;
     if (interrupt_number >= IRQ(IRQ_COUNT / 2))
         ports_write_byte(PIC2_COMM, PIC_EOI);
     ports_write_byte(PIC1_COMM, PIC_EOI);

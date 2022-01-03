@@ -2,8 +2,9 @@
 #define __CONSTANTS_H__
 
 #define SIZE_4KB 0x1000
-#define MIN_MEMORY 0x1600000
-#define INITRD_RELOC_ADDR 0x1200000
+#define SIZE_1MB 0x100000
+#define MIN_MEMORY (SIZE_1MB * 16)
+#define INITRD_RELOC_ADDR (SIZE_1MB * 12)
 
 typedef enum 
 {
