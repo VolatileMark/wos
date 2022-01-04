@@ -1,7 +1,7 @@
 #ifndef __ALLOC_H__
 #define __ALLOC_H__
 
-#include "stdint.h"
+#include <stdint.h>
 
 void* kmalloc(uint64_t size);
 void* kcalloc(uint64_t n, uint64_t size);

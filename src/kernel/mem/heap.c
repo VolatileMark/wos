@@ -1,12 +1,14 @@
 #include "heap.h"
 #include "pfa.h"
 #include "paging.h"
+#include "../utils/constants.h"
 #include <mem.h>
+#include <math.h>
 #include <stddef.h>
 
 #define MIN_SIZE 16
 
-static uint64_t heap_start, heap_end;
+static uint64_t heap_start, heap_end, max_size;
 static heap_segment_header_t* head;
 static heap_segment_header_t* tail;
 
@@ -99,20 +101,28 @@ uint64_t allocate_heap_memory(uint64_t size)
     return seg->data;
 }
 
-int init_heap(uint64_t addr, uint64_t pages)
+int init_heap(uint64_t start_addr, uint64_t end_addr, uint64_t initial_pages)
 {
-    uint64_t size = pages * SIZE_4KB;
-    uint64_t pages_paddr = request_pages(pages);
+    uint64_t size, pages_paddr;
+    
+    max_size = end_addr - start_addr;
+    size = initial_pages * SIZE_4KB;
+    if (size > max_size)
+    {
+        size = max_size;
+        initial_pages = ceil((double) size / SIZE_4KB);
+    }
+    pages_paddr = request_pages(initial_pages);
     
     if 
     (
         pages_paddr == 0 || 
-        paging_map_memory(pages_paddr, addr, size, PAGE_ACCESS_RW, PL0) < size
+        paging_map_memory(pages_paddr, start_addr, size, PAGE_ACCESS_RW, PL0) < size
     )
         return -1;
     
-    heap_start = addr;
-    heap_end = addr + size;
+    heap_start = start_addr;
+    heap_end = start_addr + size;
     
     head = (heap_segment_header_t*) heap_start;
     head->next = NULL;

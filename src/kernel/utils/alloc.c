@@ -1,7 +1,7 @@
 #include "alloc.h"
-#include "stddef.h"
-#include "mem.h"
-#include "../kernel/mem/heap.h"
+#include "../mem/heap.h"
+#include <stddef.h>
+#include <mem.h>
 
 void* kmalloc(uint64_t size)
 {

@@ -15,7 +15,7 @@
 #define PROC_DEFAULT_STACK_VADDR (PML4_VADDR - SIZE_4KB)
 #define PROC_DEFAULT_RFLAGS 0x202 /* Only interrupts enabled */
 
-static void process_init(process_t* ps, uint64_t pid)
+static void init_process(process_t* ps, uint64_t pid)
 {
     ps->pid = pid;
     ps->parent_pid = 0;
@@ -40,7 +40,7 @@ static void process_init(process_t* ps, uint64_t pid)
     ps->user_mode.regs.ss = get_user_ds() | PL3;
 }
 
-static int process_load_pml4(process_t* ps)
+static int init_process_pml4(process_t* ps)
 {
     uint64_t paddr, vaddr;
 
@@ -92,7 +92,7 @@ static int process_load_elf(process_t* ps, const process_file_t* file)
     return 0;
 }
 
-static int process_load_code(process_t* ps, const process_file_t* file)
+static int load_process_code(process_t* ps, const process_file_t* file)
 {
     switch (file->type)
     {
@@ -104,7 +104,7 @@ static int process_load_code(process_t* ps, const process_file_t* file)
     return -1;
 }
 
-static int process_load_stack(process_t* ps)
+static int init_process_stack(process_t* ps)
 {
     uint64_t paddr, bytes, size;
     segment_list_entry_t* stack_segments;
@@ -134,7 +134,7 @@ static int process_load_stack(process_t* ps)
     return 0;
 }
 
-static int process_load_kernel_stack(process_t* ps)
+static int init_process_kernel_stack(process_t* ps)
 {
     uint64_t pages, bytes, vaddr, paddr, size;
     segment_list_entry_t* kernel_stack_segments;
@@ -218,25 +218,33 @@ void delete_and_free_process(process_t* ps)
     kfree(ps);
 }
 
+static int setup_process_mailbox(process_t* ps)
+{
+    return 0;
+}
+
 process_t* create_process(const process_file_t* file, uint64_t pid)
 {
     process_t* ps = kmalloc(sizeof(process_t));
     if (ps == NULL)
         return NULL;
 
-    process_init(ps, pid);
+    init_process(ps, pid);
 
     if 
     (
-        process_load_pml4(ps) ||
-        process_load_code(ps, file) || 
-        process_load_stack(ps) || 
-        process_load_kernel_stack(ps)
+        init_process_pml4(ps) ||
+        load_process_code(ps, file) || 
+        init_process_stack(ps) || 
+        init_process_kernel_stack(ps) || 
+        setup_process_mailbox(ps)
     )
     {
         delete_and_free_process(ps);
         return NULL;
     }
+
+
 
     ps->current = ps->user_mode;
     return ps;
@@ -340,7 +348,7 @@ process_t* clone_process(process_t* parent, uint64_t id)
     if (child == NULL)
         return NULL;
     
-    process_init(child, id);
+    init_process(child, id);
 
     child->parent_pid = parent->pid;
     child->user_mode = parent->user_mode;
@@ -349,10 +357,10 @@ process_t* clone_process(process_t* parent, uint64_t id)
 
     if 
     (
-        process_load_pml4(child) ||
+        init_process_pml4(child) ||
         copy_segments_list(child->pml4, parent->code_start_vaddr, &parent->code_segments, &child->code_segments) ||
         copy_segments_list(child->pml4, parent->stack_start_vaddr, &parent->stack_segments, &child->stack_segments) ||
-        process_load_kernel_stack(child) || 
+        init_process_kernel_stack(child) || 
         copy_file_descriptors(parent->fds, child->fds)
     )
     {
