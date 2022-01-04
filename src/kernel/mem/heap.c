@@ -101,7 +101,8 @@ uint64_t allocate_kernel_heap_memory(uint64_t size)
     new->size = seg->size - size - sizeof(heap_segment_header_t);
     new->prev = seg;
     new->next = seg->next;
-    new->next->prev = new;
+    if (new->next != NULL)
+        new->next->prev = new;
     new->data = (uint64_t)(new + 1);
     if (seg == tail)
         tail = new;
@@ -132,6 +133,7 @@ uint64_t init_kernel_heap(uint64_t start_addr, uint64_t end_addr, uint64_t initi
 
     if (paging_map_memory(pages_paddr, start_addr, initial_size, PAGE_ACCESS_RW, PL0) < initial_size)
     {
+        paging_unmap_memory(start_addr, initial_size);
         free_pages(pages_paddr, initial_pages);
         return 0;
     }
@@ -256,7 +258,8 @@ uint64_t allocate_process_heap_memory(uint64_t size, process_t* ps)
     new->size = seg->size - size - sizeof(heap_segment_header_t);
     new->prev = seg;
     new->next = seg->next;
-    new->next->prev = new;
+    if (new->next != NULL)
+        new->next->prev = new;
     new->data = (uint64_t)(new + 1);
     if (seg == ps->heap.tail)
         ps->heap.tail = new;
@@ -285,8 +288,14 @@ uint64_t init_process_heap(uint64_t start_addr, uint64_t end_addr, uint64_t init
     if (pages_paddr == 0)
         return 0;
     
-    if (pml4_map_memory(ps->pml4, pages_paddr, start_addr, initial_size, PAGE_ACCESS_RW, PL3) < initial_size)
+    if 
+    (
+        pml4_map_memory(ps->pml4, pages_paddr, start_addr, initial_size, PAGE_ACCESS_RW, PL3) < initial_size ||
+        paging_map_memory(pages_paddr, start_addr, initial_size, PAGE_ACCESS_RW, PL0) < initial_size
+    )
     {
+        pml4_unmap_memory(ps->pml4, start_addr, initial_size);
+        paging_unmap_memory(start_addr, initial_size);
         free_pages(pages_paddr, initial_pages);
         return 0;
     }
@@ -304,6 +313,8 @@ uint64_t init_process_heap(uint64_t start_addr, uint64_t end_addr, uint64_t init
     ps->heap.head->free = 1;
 
     ps->heap.tail = ps->heap.head;
+
+    paging_unmap_memory(start_addr, initial_size);
 
     return initial_size;
 }

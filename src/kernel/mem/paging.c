@@ -3,9 +3,15 @@
 #include <math.h>
 #include <mem.h>
 
-static page_table_t current_pml4;
+static page_table_t kernel_pml4;
 static page_table_t kernel_tmp_pt;
 static uint64_t kernel_tmp_index;
+static uint64_t kernel_pml4_paddr;
+
+void load_kernel_pml4(void)
+{
+    load_pml4(kernel_pml4_paddr);
+}
 
 void set_pte_address(page_table_entry_t* entry, uint64_t addr)
 {
@@ -79,19 +85,20 @@ void paging_unmap_temporary_page(uint64_t vaddr)
 
 void init_paging(void)
 {
-    current_pml4 = (page_table_t) PML4_VADDR;
+    kernel_pml4 = (page_table_t) PML4_VADDR;
     kernel_tmp_pt = (page_table_t) VADDR_GET_TEMPORARY(1);
     kernel_tmp_index = 2;
+    kernel_pml4_paddr = paging_get_paddr(PML4_VADDR);
 }
 
 uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
 {
-    return pml4_map_memory(current_pml4, paddr, vaddr, size, access, privilege_level);
+    return pml4_map_memory(kernel_pml4, paddr, vaddr, size, access, privilege_level);
 }
 
 uint64_t paging_unmap_memory(uint64_t vaddr, uint64_t size)
 {
-    return pml4_unmap_memory(current_pml4, vaddr, size);
+    return pml4_unmap_memory(kernel_pml4, vaddr, size);
 }
 
 static uint64_t pt_unmap_memory
@@ -457,7 +464,7 @@ uint64_t pml4_map_memory
 
 uint64_t paging_get_next_vaddr(uint64_t size, uint64_t* vaddr_out)
 {
-    return pml4_get_next_vaddr(current_pml4, (uint64_t) &_end_vaddr, size, vaddr_out);
+    return pml4_get_next_vaddr(kernel_pml4, (uint64_t) &_end_vaddr, size, vaddr_out);
 }
 
 uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t size, uint64_t* vaddr_out)
@@ -559,7 +566,7 @@ uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t s
 
 uint64_t paging_get_paddr(uint64_t vaddr)
 {
-    return pml4_get_paddr(current_pml4, vaddr);
+    return pml4_get_paddr(kernel_pml4, vaddr);
 }
 
 uint64_t pml4_get_paddr(page_table_t pml4, uint64_t vaddr)
@@ -607,7 +614,7 @@ void delete_pml4(page_table_t pml4)
     pml4_paddr = paging_get_paddr((uint64_t) pml4);
     for (pml4_idx = 0; pml4_idx < MAX_PAGE_TABLE_ENTRIES; pml4_idx++)
     {
-        entry = pml4[pdp_idx];
+        entry = pml4[pml4_idx];
         if (entry.present)
         {
             pdp_paddr = get_pte_address(&entry);
@@ -736,5 +743,5 @@ static void merge_pml4_with_pml4(page_table_t src, page_table_t dest, uint64_t v
 
 void paging_inject_pml4(page_table_t pml4)
 {
-    merge_pml4_with_pml4(current_pml4, pml4, KERNEL_HEAP_START_ADDR);
+    merge_pml4_with_pml4(kernel_pml4, pml4, KERNEL_HEAP_START_ADDR);
 }

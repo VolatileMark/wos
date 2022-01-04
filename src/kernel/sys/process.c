@@ -1,4 +1,5 @@
 #include "process.h"
+#include "scheduler.h"
 #include "../cpu/gdt.h"
 #include "../utils/alloc.h"
 #include "../utils/constants.h"
@@ -195,7 +196,11 @@ void delete_process_resources(process_t* ps)
     uint64_t size, i;
 
     if (ps->pml4 != 0)
+    {
+        if (ps->pml4 == get_current_scheduled_process()->pml4)
+            load_kernel_pml4();
         delete_pml4(ps->pml4);
+    }
     
     if (ps->kernel_stack_start_vaddr != 0)
     {
@@ -241,7 +246,7 @@ process_t* create_process(const process_file_t* file, uint64_t pid)
         load_process_code(ps, file) || 
         init_process_stack(ps) || 
         init_process_kernel_stack(ps) || 
-        init_process_heap(PROC_DEFAULT_HEAP_VADDR, KERNEL_HEAP_START_ADDR, PROC_INITIAL_HEAP_PAGES, ps) ||
+        init_process_heap(PROC_DEFAULT_HEAP_VADDR, KERNEL_HEAP_START_ADDR, PROC_INITIAL_HEAP_PAGES, ps) < (PROC_INITIAL_HEAP_PAGES * SIZE_4KB) ||
         setup_process_mailbox(ps)
     )
     {

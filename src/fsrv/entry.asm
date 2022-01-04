@@ -8,6 +8,7 @@ _start:
     mov rax, 1
     mov rdi, rax
     call main
+    int 0x80
     push rax
     pop rbx
     jmp $

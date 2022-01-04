@@ -3,7 +3,7 @@
 #include <math.h>
 #include <mem.h>
 
-static page_table_t current_pml4;
+static page_table_t bootstrap_pml4;
 static page_table_t kernel_tmp_pt;
 static uint64_t kernel_tmp_index;
 
@@ -79,19 +79,19 @@ void paging_unmap_temporary_page(uint64_t vaddr)
 
 void init_paging(void)
 {
-    current_pml4 = (page_table_t) PML4_VADDR;
+    bootstrap_pml4 = (page_table_t) PML4_VADDR;
     kernel_tmp_pt = (page_table_t) VADDR_GET_TEMPORARY(1);
     kernel_tmp_index = 2;
 }
 
 uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
 {
-    return pml4_map_memory(current_pml4, paddr, vaddr, size, access, privilege_level);
+    return pml4_map_memory(bootstrap_pml4, paddr, vaddr, size, access, privilege_level);
 }
 
 uint64_t paging_unmap_memory(uint64_t vaddr, uint64_t size)
 {
-    return pml4_unmap_memory(current_pml4, vaddr, size);
+    return pml4_unmap_memory(bootstrap_pml4, vaddr, size);
 }
 
 static uint64_t pt_unmap_memory
@@ -457,7 +457,7 @@ uint64_t pml4_map_memory
 
 uint64_t paging_get_next_vaddr(uint64_t size, uint64_t* vaddr_out)
 {
-    return pml4_get_next_vaddr(current_pml4, (uint64_t) &_end_addr, size, vaddr_out);
+    return pml4_get_next_vaddr(bootstrap_pml4, (uint64_t) &_end_addr, size, vaddr_out);
 }
 
 uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t size, uint64_t* vaddr_out)
@@ -559,7 +559,7 @@ uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t s
 
 uint64_t paging_get_paddr(uint64_t vaddr)
 {
-    return pml4_get_paddr(current_pml4, vaddr);
+    return pml4_get_paddr(bootstrap_pml4, vaddr);
 }
 
 uint64_t pml4_get_paddr(page_table_t pml4, uint64_t vaddr)
