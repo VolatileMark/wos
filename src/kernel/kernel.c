@@ -56,7 +56,7 @@ void kernel_main(uint64_t multiboot_struct_addr, uint64_t fsrv_paddr, uint64_t f
     init_gdt(init_tss());
     init_idt();
     init_isr();
-    init_heap(HEAP_START_ADDR, PML4_VADDR - SIZE_4KB, 10);
+    init_kernel_heap(KERNEL_HEAP_START_ADDR, KERNEL_HEAP_END_ADDR, 10);
     init_pit();
     
     if (multiboot_struct_size == 0)

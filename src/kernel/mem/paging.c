@@ -736,5 +736,5 @@ static void merge_pml4_with_pml4(page_table_t src, page_table_t dest, uint64_t v
 
 void paging_inject_pml4(page_table_t pml4)
 {
-    merge_pml4_with_pml4(current_pml4, pml4, HEAP_START_ADDR);
+    merge_pml4_with_pml4(current_pml4, pml4, KERNEL_HEAP_START_ADDR);
 }

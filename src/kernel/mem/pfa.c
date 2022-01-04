@@ -11,6 +11,7 @@
 
 static bitmap_t page_bitmap;
 static uint64_t last_page_index;
+static uint64_t free_memory, used_memory;
 
 uint64_t request_page(void)
 {
@@ -54,13 +55,24 @@ uint64_t request_pages(uint64_t num)
 
 void lock_page(uint64_t page_addr)
 {
-    bitmap_set(&page_bitmap, PFA_GET_PAGE_IDX(page_addr), 1);
+    uint64_t index = PFA_GET_PAGE_IDX(page_addr);
+    if (!bitmap_get(&page_bitmap, index))
+    {
+        bitmap_set(&page_bitmap, PFA_GET_PAGE_IDX(page_addr), 1);
+        used_memory += SIZE_4KB;
+        free_memory -= SIZE_4KB;
+    }
 }
 
 void free_page(uint64_t page_addr)
 {
     uint64_t index = PFA_GET_PAGE_IDX(page_addr);
-    bitmap_set(&page_bitmap, index, 0);
+    if (bitmap_get(&page_bitmap, index))
+    {
+        bitmap_set(&page_bitmap, index, 0);
+        free_memory += SIZE_4KB;
+        used_memory -= SIZE_4KB;
+    }
     if (last_page_index > index)
         last_page_index = index;
 }
@@ -80,17 +92,23 @@ void free_pages(uint64_t page_addr, uint64_t num)
 void init_pfa(void)
 {
     uint64_t total_memory, bitmap_size, bitmap_paddr, bitmap_vaddr;
-    /* This method should allow at least 2TB of memory to be managed */
-    //last_page_index = alignu((uint64_t) &_end_paddr, SIZE_4KB) / SIZE_4KB;
+
     total_memory = get_total_memory_of_type(MULTIBOOT_MEMORY_AVAILABLE);
+    free_memory = total_memory;
+    used_memory = 0;
+
+    /* Initialize new bitmap */
     bitmap_size = ceil(((double) total_memory) / SIZE_4KB / 8.0);
     bitmap_paddr = request_pages(ceil((double) bitmap_size / SIZE_4KB));
-    //uint64_t bitmap_vaddr = (VADDR_GET(511, 510, 0, 0) + bitmap_paddr);
     paging_get_next_vaddr(bitmap_size, &bitmap_vaddr);
     paging_map_memory(bitmap_paddr, bitmap_vaddr, bitmap_size, PAGE_ACCESS_RW, PL0);
     memset((void*) bitmap_vaddr, 0, bitmap_size);
+
+    /* Copy the old bitmap over */
     free_pages(alignd((uint64_t) page_bitmap.buffer, SIZE_4KB), ceil((double) page_bitmap.size / SIZE_4KB));
     memcpy((void*) bitmap_vaddr, page_bitmap.buffer, page_bitmap.size);
+
+    /* Set new bitmap */
     page_bitmap.buffer = (uint8_t*) bitmap_vaddr;
     page_bitmap.size = bitmap_size;
 }

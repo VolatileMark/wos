@@ -5,7 +5,7 @@
 
 void* kmalloc(uint64_t size)
 {
-    return (void*) allocate_heap_memory(size);
+    return (void*) allocate_kernel_heap_memory(size);
 }
 
 void* kcalloc(uint64_t n, uint64_t size)
@@ -27,5 +27,5 @@ void* krealloc(void* src, uint64_t new_size)
 
 void kfree(void* ptr)
 {
-    free_heap_memory((uint64_t) ptr);
+    free_kernel_heap_memory((uint64_t) ptr);
 }

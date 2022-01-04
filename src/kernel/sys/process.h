@@ -1,8 +1,9 @@
 #ifndef __PROCESS_H__
 #define __PROCESS_H__
 
-#include <stdint.h>
 #include "../mem/paging.h"
+#include "../mem/heap.h"
+#include <stdint.h>
 
 #define PROCESS_MAX_FDS 64
 
@@ -62,6 +63,16 @@ typedef struct
 
 typedef struct
 {
+    uint64_t start_vaddr;
+    uint64_t end_vaddr;
+    uint64_t max_size;
+    heap_segment_header_t* head;
+    heap_segment_header_t* tail;
+    segment_list_t segments;
+} process_heap_t;
+
+typedef struct process
+{
     uint64_t pid;
     uint64_t parent_pid;
     page_table_t pml4;
@@ -75,6 +86,7 @@ typedef struct
     segment_list_t code_segments;
     segment_list_t stack_segments;
     segment_list_t kernel_stack_segments;
+    process_heap_t heap;
 } process_t;
 
 typedef struct 

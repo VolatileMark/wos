@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+struct process;
+
 struct heap_segment_header 
 {
     struct heap_segment_header* next;
@@ -13,8 +15,14 @@ struct heap_segment_header
 } __attribute__((packed));
 typedef struct heap_segment_header heap_segment_header_t;
 
-int init_heap(uint64_t start_addr, uint64_t end_addr, uint64_t pages);
-uint64_t allocate_heap_memory(uint64_t size);
-void free_heap_memory(uint64_t addr);
+uint64_t init_kernel_heap(uint64_t start_addr, uint64_t end_addr, uint64_t initial_pages);
+uint64_t allocate_kernel_heap_memory(uint64_t size);
+void free_kernel_heap_memory(uint64_t addr);
+
+#include "../sys/process.h"
+
+uint64_t init_process_heap(uint64_t start_addr, uint64_t end_addr, uint64_t initial_pages, struct process* ps);
+uint64_t allocate_process_heap_memory(uint64_t size, struct process* ps);
+void free_process_heap_memory(uint64_t addr, struct process* ps);
 
 #endif

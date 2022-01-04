@@ -11,8 +11,10 @@
 #include <math.h>
 
 #define PROC_INITIAL_STACK_PAGES 1
+#define PROC_INITIAL_HEAP_PAGES 10
 #define PROC_INITIAL_RSP (PML4_VADDR - sizeof(uint64_t))
 #define PROC_DEFAULT_STACK_VADDR (PML4_VADDR - SIZE_4KB)
+#define PROC_DEFAULT_HEAP_VADDR VADDR_GET(256, 0, 0, 0)
 #define PROC_DEFAULT_RFLAGS 0x202 /* Only interrupts enabled */
 
 static void init_process(process_t* ps, uint64_t pid)
@@ -31,6 +33,7 @@ static void init_process(process_t* ps, uint64_t pid)
     ps->stack_segments.head = NULL;
     ps->stack_segments.tail = NULL;
 
+    memset(&ps->heap, 0, sizeof(process_heap_t));
     memset(ps->fds, 0, PROCESS_MAX_FDS * sizeof(file_descriptor_t));
     memset(&ps->user_mode, 0, sizeof(cpu_state_t));
     memset(&ps->current, 0, sizeof(cpu_state_t));
@@ -202,6 +205,7 @@ void delete_process_resources(process_t* ps)
 
     delete_segments_list(&ps->code_segments);
     delete_segments_list(&ps->stack_segments);
+    delete_segments_list(&ps->heap.segments);
 
     for (i = 0; i < PROCESS_MAX_FDS; i++)
     {
@@ -237,14 +241,13 @@ process_t* create_process(const process_file_t* file, uint64_t pid)
         load_process_code(ps, file) || 
         init_process_stack(ps) || 
         init_process_kernel_stack(ps) || 
+        init_process_heap(PROC_DEFAULT_HEAP_VADDR, KERNEL_HEAP_START_ADDR, PROC_INITIAL_HEAP_PAGES, ps) ||
         setup_process_mailbox(ps)
     )
     {
         delete_and_free_process(ps);
         return NULL;
     }
-
-
 
     ps->current = ps->user_mode;
     return ps;
@@ -355,11 +358,18 @@ process_t* clone_process(process_t* parent, uint64_t id)
     child->code_start_vaddr = parent->code_start_vaddr;
     child->stack_start_vaddr = parent->stack_start_vaddr;
 
+    child->heap.start_vaddr = parent->heap.start_vaddr;
+    child->heap.end_vaddr = parent->heap.end_vaddr;
+    child->heap.max_size = parent->heap.max_size;
+    child->heap.head = parent->heap.head;
+    child->heap.tail = parent->heap.tail;
+
     if 
     (
         init_process_pml4(child) ||
         copy_segments_list(child->pml4, parent->code_start_vaddr, &parent->code_segments, &child->code_segments) ||
         copy_segments_list(child->pml4, parent->stack_start_vaddr, &parent->stack_segments, &child->stack_segments) ||
+        copy_segments_list(child->pml4, parent->heap.start_vaddr, &parent->heap.segments, &child->heap.segments) ||
         init_process_kernel_stack(child) || 
         copy_file_descriptors(parent->fds, child->fds)
     )
