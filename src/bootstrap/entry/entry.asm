@@ -2,13 +2,13 @@
 %include "entry/gdt.asm"
 %include "entry/checks.asm"
 %include "entry/paging.asm"
-%include "entry/sse.asm"
+%include "entry/fpu.asm"
 
 [section .text]
 [bits 32]
 
-[global _start]
-_start:
+[global _start32]
+_start32:
     ; Disable interrupt
     cli
     ; Set up new stack
@@ -30,6 +30,8 @@ _start:
     call check_for_long_mode
     ; Check for SSE
     call check_for_sse
+    ; Check if FXSAVE and FXRSTOR instructions are available
+    call check_for_ffxsr
     ; Make sure paging is disabled
     call disable_paging
     ; Initialize page tables
@@ -39,7 +41,7 @@ _start:
     ; Tweak the GDT to work in 64bit
     call edit_gdt
     ; Flush the CPU pipeline and enter LM
-    jmp CODE_SEGSEL:_start_long_mode
+    jmp CODE_SEGSEL:_start64
 
 
 
@@ -47,9 +49,11 @@ _start:
 
 [extern bootstrap_main]
 
-_start_long_mode:
+_start64:
     ; Enable SSE
     call enable_sse
+    ; Enable FFXSR
+    call enable_ffxsr
     ; Restore multiboot2 parameters
     pop rdi
     pop rsi

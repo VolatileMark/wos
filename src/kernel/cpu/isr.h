@@ -74,14 +74,13 @@ typedef struct interrupt_info interrupt_info_t;
 
 struct registers_state
 {
+    uint64_t rax;
+    uint64_t rbx;
+    uint64_t rcx;
+    uint64_t rdx;
     uint64_t rdi;
     uint64_t rsi;
     uint64_t rbp;
-    uint64_t rdx;
-    uint64_t rcx;
-    uint64_t rbx;
-    uint64_t rax;
-    uint64_t rsp;
     uint64_t r8;
     uint64_t r9;
     uint64_t r10;
@@ -95,19 +94,22 @@ typedef struct registers_state registers_state_t;
 
 struct stack_state
 {
-    uint64_t return_rip;
-    uint64_t return_cs;
+    uint64_t rip;
+    uint64_t cs;
     uint64_t rflags;
-    uint64_t return_rsp;
-    uint64_t return_ss;
+    uint64_t rsp;
+    uint64_t ss;
 } __attribute__((packed));
 typedef struct stack_state stack_state_t;
+
+typedef __attribute__((aligned(16))) uint8_t fpu_state_t[512];
 
 struct interrupt_frame
 {
     interrupt_info_t interrupt_info;
     registers_state_t registers_state;
     stack_state_t stack_state;
+    fpu_state_t fpu_state;
 } __attribute__((packed));
 typedef struct interrupt_frame interrupt_frame_t;
 

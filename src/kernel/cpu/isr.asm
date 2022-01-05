@@ -1,34 +1,36 @@
 [bits 64]
 
-[section .data]
+[section .bss]
 
 int_frame:
     int_info:
-        .int_num: dq 0
-        .err_code: dq 0
+        .int_num: resq 1
+        .err_code: resq 1
     cpu_state:
-        .rdi: dq 0
-        .rsi: dq 0
-        .rbp: dq 0
-        .rdx: dq 0
-        .rcx: dq 0
-        .rbx: dq 0
-        .rax: dq 0
-        .rsp: dq 0
-        .r8: dq 0
-        .r9: dq 0
-        .r10: dq 0
-        .r11: dq 0
-        .r12: dq 0
-        .r13: dq 0
-        .r14: dq 0
-        .r15: dq 0
+        .rax: resq 1
+        .rbx: resq 1
+        .rcx: resq 1
+        .rdx: resq 1
+        .rdi: resq 1
+        .rsi: resq 1
+        .rbp: resq 1
+        .r8: resq 1
+        .r9: resq 1
+        .r10: resq 1
+        .r11: resq 1
+        .r12: resq 1
+        .r13: resq 1
+        .r14: resq 1
+        .r15: resq 1
     stack_state:
-        .rip: dq 0
-        .cs: dq 0
-        .rflags: dq 0
-        .rsp_return: dq 0
-        .ss_return: dq 0
+        .rip: resq 1
+        .cs: resq 1
+        .rflags: resq 1
+        .rsp: resq 1
+        .ss: resq 1
+    align 16
+    fpu_state:
+        resb 512
 
 
 
@@ -107,7 +109,6 @@ int_frame:
     mov [cpu_state.rcx], rcx
     mov [cpu_state.rbx], rbx
     mov [cpu_state.rax], rax
-    mov [cpu_state.rsp], rsp
     mov [cpu_state.r8], r8
     mov [cpu_state.r9], r9
     mov [cpu_state.r10], r10
@@ -129,9 +130,11 @@ int_frame:
     mov rax, [rsp+8*4]
     mov [stack_state.rflags], rax
     mov rax, [rsp+8*5]
-    mov [stack_state.rsp_return], rax
+    mov [stack_state.rsp], rax
     mov rax, [rsp+8*6]
-    mov [stack_state.ss_return], rax
+    mov [stack_state.ss], rax
+
+    fxsave [fpu_state]
 %endmacro
 
 
@@ -158,7 +161,8 @@ common_stub:
     mov fs, bx
     mov gs, bx
     POPALL
-    add rsp, 0x10
+    fxrstor [fpu_state]
+    add rsp, 16
     iretq
 
 

@@ -39,9 +39,9 @@ static void init_process(process_t* ps, uint64_t pid)
     memset(&ps->user_mode, 0, sizeof(cpu_state_t));
     memset(&ps->current, 0, sizeof(cpu_state_t));
 
-    ps->user_mode.regs.rflags = PROC_DEFAULT_RFLAGS;
-    ps->user_mode.regs.cs = get_user_cs() | PL3;
-    ps->user_mode.regs.ss = get_user_ds() | PL3;
+    ps->user_mode.stack.rflags = PROC_DEFAULT_RFLAGS;
+    ps->user_mode.stack.cs = get_user_cs() | PL3;
+    ps->user_mode.stack.ss = get_user_ds() | PL3;
 }
 
 static int init_process_pml4(process_t* ps)
@@ -83,7 +83,7 @@ static int process_load_binary(process_t* ps, const process_file_t* file, uint64
 
     ps->code_segments.head = code_segments;
     ps->code_segments.tail = code_segments;
-    ps->user_mode.regs.rip = vaddr;
+    ps->user_mode.stack.rip = vaddr;
     ps->code_start_vaddr = vaddr;
     
     return 0;
@@ -133,7 +133,7 @@ static int init_process_stack(process_t* ps)
     ps->stack_segments.head = stack_segments;
     ps->stack_segments.tail = stack_segments;
     ps->stack_start_vaddr = PROC_DEFAULT_STACK_VADDR;
-    ps->user_mode.regs.rsp = PROC_INITIAL_RSP;
+    ps->user_mode.stack.rsp = PROC_INITIAL_RSP;
 
     return 0;
 }

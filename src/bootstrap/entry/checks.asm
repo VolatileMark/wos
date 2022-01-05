@@ -58,3 +58,13 @@ check_for_sse:
     ; Get fucked pt. 3
     .fail:
         jmp $
+
+check_for_ffxsr:
+    mov eax, 0x80000001
+    cpuid
+    test edx, 1 << 24
+    jz .fail
+    ret
+    ; Get fucked pt. 4
+    .fail:
+        jmp $

@@ -2,7 +2,7 @@ OUTPUT_FORMAT(elf64-x86-64)
 
 LOAD_ADDRESS = 0x00000000; /* Load at 0MB */
 
-ENTRY(_start)
+ENTRY(_start32)
 SECTIONS
 {
     . = LOAD_ADDRESS;

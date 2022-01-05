@@ -69,24 +69,24 @@ static void copy_common_registers(cpu_state_t* cpu, const registers_state_t* reg
     cpu->regs.rbp = regs->rbp;
     cpu->regs.rsi = regs->rsi;
     cpu->regs.rdi = regs->rdi;
-    cpu->regs.rip = stack->return_rip;
-    cpu->regs.rflags = stack->rflags;
-    cpu->regs.cs = stack->return_cs;
+    cpu->stack.rip = stack->rip;
+    cpu->stack.rflags = stack->rflags;
+    cpu->stack.cs = stack->cs;
 }
 
 static void update_user_registers(process_t* ps, const registers_state_t* regs, const stack_state_t* stack)
 {
     copy_common_registers(&ps->user_mode, regs, stack);
-    ps->user_mode.regs.rsp = stack->return_rsp;
-    ps->user_mode.regs.ss = stack->return_ss;
+    ps->user_mode.stack.rsp = stack->rsp;
+    ps->user_mode.stack.ss = stack->ss;
     ps->current = ps->user_mode;
 }
 
 static void update_kernel_registers(process_t* ps, const registers_state_t* regs, const stack_state_t* stack)
 {
     copy_common_registers(&ps->current, regs, stack);
-    ps->current.regs.rsp = regs->rsp + (3 * sizeof(uint64_t));
-    ps->current.regs.ss = get_kernel_ds();
+    ps->current.stack.rsp = stack->rsp + (3 * sizeof(uint64_t));
+    ps->current.stack.ss = get_kernel_ds();
 }
 
 static void schedule_on_interrupt(const registers_state_t* regs, const stack_state_t* stack, uint8_t interrupt_number)
@@ -94,7 +94,7 @@ static void schedule_on_interrupt(const registers_state_t* regs, const stack_sta
     process_t* ps;
     disable_interrupts();
     ps = get_current_scheduled_process();
-    if (stack->return_cs == (get_user_cs() | PL3))
+    if (stack->cs == (get_user_cs() | PL3))
         update_user_registers(ps, regs, stack);
     else
         update_kernel_registers(ps, regs, stack);
@@ -267,7 +267,7 @@ void run_scheduler(void)
     tss_set_kernel_stack(ps->kernel_stack_start_vaddr);
     load_process_pml4(ps);
 
-    if (ps->current.regs.cs == get_kernel_cs())
+    if (ps->current.stack.cs == get_kernel_cs())
         run_process_in_kernel_mode(&ps->current);
     else
         run_process_in_user_mode(&ps->current);
