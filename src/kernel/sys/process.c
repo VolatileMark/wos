@@ -365,7 +365,7 @@ process_t* clone_process(process_t* parent, uint64_t id)
 
     child->heap.start_vaddr = parent->heap.start_vaddr;
     child->heap.end_vaddr = parent->heap.end_vaddr;
-    child->heap.max_size = parent->heap.max_size;
+    child->heap.ceil_vaddr = parent->heap.ceil_vaddr;
     child->heap.head = parent->heap.head;
     child->heap.tail = parent->heap.tail;
 

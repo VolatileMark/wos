@@ -40,7 +40,7 @@ typedef struct
 {
     uint64_t start_vaddr;
     uint64_t end_vaddr;
-    uint64_t max_size;
+    uint64_t ceil_vaddr;
     heap_segment_header_t* head;
     heap_segment_header_t* tail;
     segment_list_t segments;

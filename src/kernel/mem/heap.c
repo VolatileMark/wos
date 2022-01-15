@@ -9,7 +9,7 @@
 
 #define MIN_SIZE 16
 
-static uint64_t heap_start, heap_end, max_size;
+static uint64_t heap_start, heap_end, heap_ceil;
 static heap_segment_header_t* head;
 static heap_segment_header_t* tail;
 
@@ -19,8 +19,8 @@ static uint64_t expand_kernel_heap(uint64_t size)
     heap_segment_header_t* new = (heap_segment_header_t*) heap_end;
     
     size = alignu(size + sizeof(heap_segment_header_t), SIZE_4KB);
-    if (size > max_size)
-        return 0;
+    if (heap_end + size > heap_ceil)
+        size = heap_ceil - heap_end;
     
     pages_count = size / SIZE_4KB;
     pages_paddr = request_pages(pages_count);
@@ -118,11 +118,11 @@ uint64_t init_kernel_heap(uint64_t start_addr, uint64_t end_addr, uint64_t initi
 {
     uint64_t initial_size, pages_paddr;
     
-    max_size = alignd(end_addr - start_addr, SIZE_4KB);
+    heap_ceil = alignd(end_addr, SIZE_4KB);
     initial_size = initial_pages * SIZE_4KB;
-    if (initial_size > max_size)
+    if (start_addr + initial_size > heap_ceil)
     {
-        initial_size = max_size;
+        initial_size = heap_ceil - start_addr;
         initial_pages = ceil((double) initial_size / SIZE_4KB);
         end_addr = start_addr + initial_size;
     }
@@ -174,8 +174,8 @@ static uint64_t expand_process_heap(uint64_t size, process_t* ps)
     heap_segment_header_t* new = (heap_segment_header_t*) ps->heap.end_vaddr;
     
     size = alignu(size + sizeof(heap_segment_header_t), SIZE_4KB);
-    if (size > ps->heap.max_size)
-        return 0;
+    if (ps->heap.end_vaddr + size > ps->heap.ceil_vaddr)
+        size = ps->heap.ceil_vaddr - ps->heap.end_vaddr;
     
     pages_count = size / SIZE_4KB;
     pages_paddr = request_pages(pages_count);
@@ -275,11 +275,11 @@ uint64_t init_process_heap(uint64_t start_addr, uint64_t end_addr, uint64_t init
 {
     uint64_t initial_size, pages_paddr;
 
-    ps->heap.max_size = alignd(end_addr - start_addr, SIZE_4KB);
+    ps->heap.ceil_vaddr = alignd(end_addr, SIZE_4KB);
     initial_size = initial_pages * SIZE_4KB;
-    if (initial_size > ps->heap.max_size)
+    if (start_addr + initial_size > ps->heap.ceil_vaddr)
     {
-        initial_size = ps->heap.max_size;
+        initial_size = ps->heap.ceil_vaddr - start_addr;
         initial_pages = ceil((double) initial_size / SIZE_4KB);
         end_addr = start_addr + initial_size;
     }

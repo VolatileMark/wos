@@ -2,7 +2,7 @@
 %include "entry/gdt.asm"
 %include "entry/checks.asm"
 %include "entry/paging.asm"
-%include "entry/fpu.asm"
+%include "entry/sse.asm"
 
 [section .text]
 [bits 32]
@@ -52,8 +52,6 @@ _start32:
 _start64:
     ; Enable SSE
     call enable_sse
-    ; Enable FFXSR
-    call enable_ffxsr
     ; Restore multiboot2 parameters
     pop rdi
     pop rsi
