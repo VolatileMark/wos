@@ -13,6 +13,7 @@
 #include "drivers/chips/pit.h"
 #include "sys/process.h"
 #include "sys/scheduler.h"
+#include "sys/syscall.h"
 #include <stdint.h>
 #include <mem.h>
 
@@ -20,7 +21,7 @@ void parse_multiboot_struct(uint64_t addr, uint64_t* out_size)
 {
     uint64_t size = (uint64_t) *((uint32_t*) addr);
     struct multiboot_tag* tag;
-    
+
     *out_size = size;
 
     for 
@@ -53,10 +54,12 @@ void kernel_main(uint64_t multiboot_struct_addr, uint64_t fsrv_paddr, uint64_t f
     restore_pfa(current_bitmap);
     parse_multiboot_struct(multiboot_struct_addr, &multiboot_struct_size);
     init_pfa();
-    init_gdt(init_tss());
+    init_tss();
+    init_gdt();
     init_idt();
     init_isr();
     init_kernel_heap(KERNEL_HEAP_START_ADDR, KERNEL_HEAP_END_ADDR, 10);
+    init_syscalls();
     init_pit();
     
     if (multiboot_struct_size == 0)

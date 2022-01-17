@@ -1,7 +1,7 @@
 #include "process.h"
 #include "scheduler.h"
 #include "../cpu/gdt.h"
-#include "../utils/alloc.h"
+#include "../utils/kalloc.h"
 #include "../utils/constants.h"
 #include "../mem/pfa.h"
 #include "../mem/paging.h"
@@ -34,6 +34,7 @@ static void init_process(process_t* ps, uint64_t pid)
     ps->stack_segments.head = NULL;
     ps->stack_segments.tail = NULL;
 
+    memset(&ps->flags, 0, sizeof(process_flags_t));
     memset(&ps->heap, 0, sizeof(process_heap_t));
     memset(ps->fds, 0, PROCESS_MAX_FDS * sizeof(file_descriptor_t));
     memset(&ps->user_mode, 0, sizeof(cpu_state_t));

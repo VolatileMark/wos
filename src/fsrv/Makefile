@@ -12,7 +12,7 @@ C_SRCS = $(shell find $(SOURCE_DIR) -name '*.c') $(shell find $(LIBC_DIR) -name 
 C_HDRS = $(shell find $(SOURCE_DIR) -name '*.h') $(shell find $(LIBC_DIR) -name '*.h')
 C_OBJS = $(patsubst $(SOURCE_DIR)%.c, $(BUILD_DIR)%.o, $(C_SRCS))
 
-ASM_SRCS = $(shell find $(SOURCE_DIR) -name '*.asm')
+ASM_SRCS = $(shell find $(SOURCE_DIR) -name '*.asm') $(shell find $(LIBC_DIR) -name '*.asm')
 ASM_OBJS = $(patsubst $(SOURCE_DIR)%.asm, $(BUILD_DIR)%_asm.o, $(ASM_SRCS))
 
 LDS = $(SOURCE_DIR)/Linker.ld

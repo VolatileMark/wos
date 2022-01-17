@@ -23,8 +23,9 @@ struct tss
 } __attribute__((packed));
 typedef struct tss tss_t;
 
-uint64_t init_tss(void);
+void init_tss(void);
 void tss_set_kernel_stack(uint64_t stack_vaddr);
+tss_t* get_tss(void);
 extern void load_tss(uint16_t tss_seg_sel);
 
 #endif

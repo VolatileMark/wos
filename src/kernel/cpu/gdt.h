@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-void init_gdt(uint64_t tss_addr);
+void init_gdt(void);
 uint16_t get_kernel_cs(void);
 uint16_t get_kernel_ds(void);
 uint16_t get_user_cs(void);

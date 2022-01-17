@@ -6,7 +6,7 @@
 #include "../utils/constants.h"
 #include "../drivers/chips/pic.h"
 #include "../drivers/chips/pit.h"
-#include "../utils/alloc.h"
+#include "../utils/kalloc.h"
 #include <stddef.h>
 #include <math.h>
 #include <mem.h>
@@ -195,8 +195,8 @@ static int remove_process(process_list_t* pss, uint64_t pid, uint8_t should_dele
 
 void terminate_process(process_t* ps)
 {
-    remove_process(&runnable_pss, ps->pid, 0);
     delete_process_resources(ps);
+    remove_process(&runnable_pss, ps->pid, 0);
     schedule_process(&zombie_pss, ps);
 }
 
@@ -261,6 +261,7 @@ static process_t* get_next_runnable_process(void)
 void run_scheduler(void)
 {
     process_t* ps = get_next_runnable_process();
+    
     if (ps == NULL)
         return;
     

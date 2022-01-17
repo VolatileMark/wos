@@ -1,6 +1,7 @@
-int main(int b)
+#include <syscall.h>
+
+void main(void)
 {
-    int a = 1;
-    a += b;
-    return a;
+    syscall(0);
+    while(1);
 }

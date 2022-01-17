@@ -122,13 +122,15 @@ static uint16_t create_tss_entry(uint16_t index, uint64_t addr)
     return (index * sizeof(gdt_entry_t));
 }
 
-void init_gdt(uint64_t tss_addr)
+void init_gdt(void)
 {
+    uint64_t tss_addr = (uint64_t) get_tss();
+
     create_gdt_entry(0, 0x00000000, 0x00000000, PL0, GDT_SEG_NULL);
     kernel_cs = create_gdt_entry(1, 0x00000000, 0xFFFFFFFF, PL0, GDT_SEG_CODE);
     kernel_ds = create_gdt_entry(2, 0x00000000, 0xFFFFFFFF, PL0, GDT_SEG_DATA);
-    user_cs = create_gdt_entry(3, 0x00000000, 0xFFFFFFFF, PL3, GDT_SEG_CODE);
-    user_ds = create_gdt_entry(4, 0x00000000, 0xFFFFFFFF, PL3, GDT_SEG_DATA);
+    user_cs = create_gdt_entry(4, 0x00000000, 0xFFFFFFFF, PL3, GDT_SEG_CODE);
+    user_ds = create_gdt_entry(3, 0x00000000, 0xFFFFFFFF, PL3, GDT_SEG_DATA);
     tss_ss = create_tss_entry(5, tss_addr);
 
     gdt_descriptor.size = (GDT_NUM_ENTRIES * sizeof(gdt_entry_t)) - 1;

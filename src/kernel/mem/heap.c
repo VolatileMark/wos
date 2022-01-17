@@ -2,7 +2,7 @@
 #include "pfa.h"
 #include "paging.h"
 #include "../utils/constants.h"
-#include "../utils/alloc.h"
+#include "../utils/kalloc.h"
 #include <mem.h>
 #include <math.h>
 #include <stddef.h>

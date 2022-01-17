@@ -5,7 +5,7 @@ SECTIONS
 
     .text :
     {
-        *(.entry)
+        *(.crt0)
         *(.text)
     }
 

@@ -46,22 +46,30 @@ typedef struct
     segment_list_t segments;
 } process_heap_t;
 
+typedef struct
+{
+    uint64_t exit : 1;
+    uint64_t exit_code : 8;
+    uint64_t reserved : 55;
+} process_flags_t;
+
 typedef struct process
 {
     uint64_t pid;
     uint64_t parent_pid;
     page_table_t pml4;
     uint64_t pml4_paddr;
-    cpu_state_t current;
-    cpu_state_t user_mode;
     uint64_t kernel_stack_start_vaddr;
     uint64_t stack_start_vaddr;
     uint64_t code_start_vaddr;
+    process_flags_t flags;
     file_descriptor_t fds[PROCESS_MAX_FDS];
     segment_list_t code_segments;
     segment_list_t stack_segments;
     segment_list_t kernel_stack_segments;
     process_heap_t heap;
+    cpu_state_t current;
+    cpu_state_t user_mode;
 } process_t;
 
 typedef struct 
