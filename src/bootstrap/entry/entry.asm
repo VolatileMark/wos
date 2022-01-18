@@ -2,7 +2,7 @@
 %include "entry/gdt.asm"
 %include "entry/checks.asm"
 %include "entry/paging.asm"
-%include "entry/sse.asm"
+%include "entry/extensions.asm"
 
 [section .text]
 [bits 32]

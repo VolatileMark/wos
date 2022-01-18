@@ -23,19 +23,18 @@ DBG_FLAGS = -ex "target remote localhost:1234" \
 			-ex "set disassemble-next-line on" \
 			-ex "set step-mode on" \
 			-ex "set disassembly-flavor intel" \
-			-ex "add-symbol-file $(BUILD_DIR)/kernel/kernel.elf" -ex "add-symbol-file $(BUILD_DIR)/fsrv/fsrv.elf" #-ex "add-symbol-file $(BUILD_DIR)/bootstrap/bootstrap.elf"
-
+			-ex "add-symbol-file $(BUILD_DIR)/kernel/kernel.elf" -ex "add-symbol-file $(BUILD_DIR)/init/init.elf" #-ex "add-symbol-file $(BUILD_DIR)/bootstrap/bootstrap.elf"
 
 
 all: build initrd iso
 
-build: build-bootstrap build-kernel build-fsrv
+build: build-bootstrap build-kernel build-init
 
 build-kernel:
 	$(MAKE) -C $(SOURCE_DIR)/kernel SOURCE_DIR="$(SOURCE_DIR)/kernel" BUILD_DIR="$(BUILD_DIR)/kernel"
 
-build-fsrv:
-	$(MAKE) -C $(SOURCE_DIR)/fsrv SOURCE_DIR="$(SOURCE_DIR)/fsrv" BUILD_DIR="$(BUILD_DIR)/fsrv"
+build-init:
+	$(MAKE) -C $(SOURCE_DIR)/init SOURCE_DIR="$(SOURCE_DIR)/init" BUILD_DIR="$(BUILD_DIR)/init"
 
 build-bootstrap:
 	$(MAKE) -C $(SOURCE_DIR)/bootstrap SOURCE_DIR="$(SOURCE_DIR)/bootstrap" BUILD_DIR="$(BUILD_DIR)/bootstrap"
@@ -50,7 +49,7 @@ initrd:
 	@mkdir -p $(BUILD_DIR)/initrd
 	@mkdir -p $(BUILD_DIR)/iso/boot
 #	cp -f $(DATA_DIR)/ttyfont.psf $(BUILD_DIR)/initrd
-	cp -f $(BUILD_DIR)/fsrv/fsrv.bin $(BUILD_DIR)/initrd/wfsrv.bin
+	cp -f $(BUILD_DIR)/init/init.bin $(BUILD_DIR)/initrd/winit.bin
 	cp -f $(BUILD_DIR)/kernel/kernel.elf $(BUILD_DIR)/initrd/wkernel.elf
 	cd $(BUILD_DIR)/initrd && tar --no-auto-compress --format=ustar --create --file=$(BUILD_DIR)/iso/boot/initrd.tar.gz .
 

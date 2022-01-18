@@ -42,17 +42,20 @@ void parse_multiboot_struct(uint64_t addr, uint64_t* out_size)
     }
 }
 
-void kernel_main(uint64_t multiboot_struct_addr, uint64_t fsrv_paddr, uint64_t fsrv_size, bitmap_t* current_bitmap)
+void kernel_main(uint64_t multiboot_struct_addr, uint64_t init_paddr, uint64_t init_size, bitmap_t* current_bitmap)
 {
     uint64_t multiboot_struct_size;
-    process_t* fsrv;
-    process_file_t file = { .paddr = fsrv_paddr, .size = fsrv_size, .type = PROC_EXEC_BIN };
+    process_t* init;
+    process_file_t file = { .paddr = init_paddr, .size = init_size, .type = PROC_EXEC_BIN };
 
     disable_interrupts();
 
     init_paging();
     restore_pfa(current_bitmap);
     parse_multiboot_struct(multiboot_struct_addr, &multiboot_struct_size);
+    if (multiboot_struct_size == 0)
+        goto HANG;
+    
     init_pfa();
     init_tss();
     init_gdt();
@@ -61,13 +64,10 @@ void kernel_main(uint64_t multiboot_struct_addr, uint64_t fsrv_paddr, uint64_t f
     init_kernel_heap(KERNEL_HEAP_START_ADDR, KERNEL_HEAP_END_ADDR, 10);
     init_syscalls();
     init_pit();
-    
-    if (multiboot_struct_size == 0)
-        goto HANG;
-
-    fsrv = create_process(&file, 0);
     init_scheduler();
-    schedule_runnable_process(fsrv);
+
+    init = create_process(&file, 0);
+    schedule_runnable_process(init);
     run_scheduler();
     
     HANG:

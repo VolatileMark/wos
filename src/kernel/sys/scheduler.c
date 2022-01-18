@@ -263,7 +263,7 @@ void run_scheduler(void)
     process_t* ps = get_next_runnable_process();
     
     if (ps == NULL)
-        return;
+        return; /* TODO: Launch init */
     
     tss_set_kernel_stack(ps->kernel_stack_start_vaddr);
     load_process_pml4(ps);

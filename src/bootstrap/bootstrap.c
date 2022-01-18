@@ -94,7 +94,7 @@ static int load_elf(uint64_t start_addr, uint64_t* entry_address, uint64_t* elf_
     return 0;
 }
 
-static bitmap_t* free_useless_pages(struct multiboot_tag_module* initrd, uint64_t kernel_start_paddr, uint64_t kernel_end_paddr, uint64_t fsrv_addr, uint64_t fsrv_size)
+static bitmap_t* free_useless_pages(struct multiboot_tag_module* initrd, uint64_t kernel_start_paddr, uint64_t kernel_end_paddr, uint64_t init_addr, uint64_t init_size)
 {
     page_table_t pml4, pdp, pd;
     page_table_entry_t entry;
@@ -108,7 +108,7 @@ static bitmap_t* free_useless_pages(struct multiboot_tag_module* initrd, uint64_
     free_pages(alignd(initrd->mod_start, SIZE_4KB), ceil((double) (initrd->mod_end - initrd->mod_start) / SIZE_4KB));
     
     lock_pages(alignd(kernel_start_paddr, SIZE_4KB), ceil((double) (kernel_end_paddr - kernel_start_paddr) / SIZE_4KB));
-    lock_pages(alignd(fsrv_addr, SIZE_4KB), ceil((double) (fsrv_addr + fsrv_size) / SIZE_4KB));
+    lock_pages(alignd(init_addr, SIZE_4KB), ceil((double) (init_addr + init_size) / SIZE_4KB));
     lock_pages(alignd((uint64_t) page_bitmap->buffer, SIZE_4KB), ceil((double) page_bitmap->size / SIZE_4KB));
     lock_page(get_current_pml4_paddr());
 
@@ -161,7 +161,7 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
     struct multiboot_tag_module* initrd;
     uint64_t multiboot_struct_size;
     uint64_t kernel_elf_addr, kernel_entry, kernel_start_paddr, kernel_end_paddr;
-    uint64_t fsrv_size, fsrv_addr, fsrv_new_addr;
+    uint64_t init_size, init_addr, init_new_addr;
     bitmap_t* new_bitmap;
 
     if 
@@ -193,18 +193,18 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
         goto HANG;
     
     {
-        fsrv_size = ustar_lookup("./wfsrv.bin", &fsrv_addr);
-        fsrv_new_addr = alignu(kernel_end_paddr, SIZE_4KB);
-        paging_map_memory(fsrv_addr, fsrv_addr, fsrv_size, PAGE_ACCESS_RO, PL0);
-        paging_map_memory(fsrv_new_addr, fsrv_new_addr, fsrv_size, PAGE_ACCESS_RW, PL0);
-        memcpy((void*) fsrv_new_addr, (void*) fsrv_addr, fsrv_size);
-        paging_unmap_memory(fsrv_addr, fsrv_size);
+        init_size = ustar_lookup("./winit.bin", &init_addr);
+        init_new_addr = alignu(kernel_end_paddr, SIZE_4KB);
+        paging_map_memory(init_addr, init_addr, init_size, PAGE_ACCESS_RO, PL0);
+        paging_map_memory(init_new_addr, init_new_addr, init_size, PAGE_ACCESS_RW, PL0);
+        memcpy((void*) init_new_addr, (void*) init_addr, init_size);
+        paging_unmap_memory(init_addr, init_size);
     }
 
-    new_bitmap = free_useless_pages(initrd, kernel_start_paddr, kernel_end_paddr, fsrv_new_addr, fsrv_size);
+    new_bitmap = free_useless_pages(initrd, kernel_start_paddr, kernel_end_paddr, init_new_addr, init_size);
 
     void (*kernel_main)(uint64_t, uint64_t, uint64_t, bitmap_t*) = ((__attribute__((sysv_abi)) void (*)(uint64_t, uint64_t, uint64_t, bitmap_t*)) kernel_entry);
-    kernel_main(multiboot_struct_addr, fsrv_new_addr, fsrv_size, new_bitmap);
+    kernel_main(multiboot_struct_addr, init_new_addr, init_size, new_bitmap);
 
     HANG:
         while (1);

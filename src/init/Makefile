@@ -6,7 +6,7 @@ BUILD_DIR ?= .
 SOURCE_DIR = .
 LIBC_DIR = $(SOURCE_DIR)/../libc
 
-TARGET = fsrv
+TARGET = init
 
 C_SRCS = $(shell find $(SOURCE_DIR) -name '*.c') $(shell find $(LIBC_DIR) -name '*.c')
 C_HDRS = $(shell find $(SOURCE_DIR) -name '*.h') $(shell find $(LIBC_DIR) -name '*.h')
@@ -18,7 +18,7 @@ ASM_OBJS = $(patsubst $(SOURCE_DIR)%.asm, $(BUILD_DIR)%_asm.o, $(ASM_SRCS))
 LDS = $(SOURCE_DIR)/Linker.ld
 
 AC_FLAGS = -I $(SOURCE_DIR) -f elf64 -F dwarf -g
-CC_FLAGS = -I $(LIBC_DIR) -g -std=c99 -m64 -Wall -Werror -ffreestanding -mcmodel=kernel -mno-red-zone -nostdinc -nostartfiles -nodefaultlibs -nostdlib
+CC_FLAGS = -I $(LIBC_DIR) -g -std=c99 -m64 -Wall -Werror -ffreestanding -mno-red-zone -nostdinc -nostartfiles -nodefaultlibs -nostdlib
 LD_FLAGS = -T $(LDS) -nostdlib
 
 

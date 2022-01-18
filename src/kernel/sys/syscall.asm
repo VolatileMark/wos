@@ -7,6 +7,10 @@
 [extern syscall_handler]
 [extern get_tss]
 
+[extern alignu]
+[extern kernel_stack_bottom]
+
+
 [global init_syscalls]
 init_syscalls:
     ; Set LSTAR register to syscall kernel entry point
@@ -67,6 +71,58 @@ restore_user_stack:
     mov rsp, [user_rsp]
     push rcx
     ret
+
+[global switch_to_kernel]
+switch_to_kernel:
+    ; Save registers
+    mov [rdi + 8*0], rax
+    mov [rdi + 8*1], rbx
+    mov [rdi + 8*2], rcx
+    mov [rdi + 8*3], rdx
+    mov [rdi + 8*4], rdi
+    mov [rdi + 8*5], rsi
+    mov [rdi + 8*6], rbp
+    mov [rdi + 8*7], r8
+    mov [rdi + 8*8], r9
+    mov [rdi + 8*9], r10
+    mov [rdi + 8*10], r11
+    mov [rdi + 8*11], r12
+    mov [rdi + 8*12], r13
+    mov [rdi + 8*13], r14
+    mov [rdi + 8*14], r15
+    ; Save CS, RSP, SS
+    mov [rdi + 8*16], cs
+    mov [rdi + 8*18], rsp
+    mov [rdi + 8*19], ss
+    ; Store FLAGS register
+    pushf
+    pop qword [rdi + 8*17]
+    ; Save FPU state
+    push rdi
+    add rdi, 8*20
+    mov rsi, 16
+    call alignu
+    fxsave [rax]
+    pop rdi
+
+    ; Load default kernel stack
+    pop rcx
+    mov [rdi + 8*15], rcx ; Save return RIP
+    call get_tss
+    mov qword [rax + 4], kernel_stack_bottom
+    mov rsp, [rax + 4]
+    mov rbp, rsp
+    push rcx
+
+    ; Load correct data registers
+    call get_kernel_ds
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    ret
+
 
 
 

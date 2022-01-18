@@ -5,7 +5,7 @@
 
 [global _start]
 _start:
-    mov rbp, stack_bottom
+    mov rbp, kernel_stack_bottom
     mov rsp, rbp
 
     jmp kernel_main
@@ -15,6 +15,8 @@ _start:
 
 %define KERNEL_STACK_SIZE 16384
 
-stack_top:
+[global kernel_stack_top]
+[global kernel_stack_bottom]
+kernel_stack_top:
     resb KERNEL_STACK_SIZE
-stack_bottom:
+kernel_stack_bottom:

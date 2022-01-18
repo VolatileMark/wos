@@ -12,4 +12,5 @@ _start:
 
 _exit:
     mov rdi, SYS_exit
-    syscall
+    mov rsi, rax
+    o64 syscall

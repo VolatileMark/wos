@@ -22,7 +22,7 @@ check_for_cpuid:
     ; If it didn't restore the original value of EFLAGS and return
     popfd
     ret
-    ; Get fucked
+    ; Get fucked pt. 1
     .fail:
         jmp $
 
