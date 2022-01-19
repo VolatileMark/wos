@@ -72,7 +72,7 @@ uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t s
 uint64_t paging_get_paddr(uint64_t vaddr);
 uint64_t pml4_get_paddr(page_table_t pml4, uint64_t vaddr);
 
-void delete_pml4(page_table_t pml4);
+uint64_t delete_pml4(page_table_t pml4, uint64_t pml4_paddr);
 void paging_inject_pml4(page_table_t pml4);
 void load_kernel_pml4(void);
 

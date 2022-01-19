@@ -90,7 +90,7 @@ uint64_t allocate_kernel_heap_memory(uint64_t size)
     heap_segment_header_t* seg;
     heap_segment_header_t* new;
 
-    size = alignu(size, MIN_SIZE) + sizeof(heap_segment_header_t);
+    size = ((size < MIN_SIZE) ? MIN_SIZE : size) + sizeof(heap_segment_header_t);
 
     seg = next_free_kernel_heap_segment(size);
     if (seg == NULL)

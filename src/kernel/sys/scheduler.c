@@ -7,6 +7,7 @@
 #include "../drivers/chips/pic.h"
 #include "../drivers/chips/pit.h"
 #include "../utils/kalloc.h"
+#include "../utils/elf.h"
 #include <stddef.h>
 #include <math.h>
 #include <mem.h>
@@ -27,6 +28,7 @@ typedef struct process_list
 } process_list_t;
 
 static uint64_t ms;
+static process_file_t init_file;
 static process_list_t runnable_pss, zombie_pss;
 
 extern void run_process_in_user_mode(cpu_state_t* cpu);
@@ -258,12 +260,26 @@ static process_t* get_next_runnable_process(void)
     return runnable_pss.head->ps;
 }
 
+static void launch_init(void)
+{
+    process_list_entry_t* ptr = zombie_pss.head;
+    while (ptr != NULL)
+    {
+        if (ptr->ps != NULL)
+            delete_and_free_process(ptr->ps);
+        ptr = ptr->next;
+    }
+
+    schedule_runnable_process(create_process(&init_file, get_next_pid()));
+    run_scheduler();
+}
+
 void run_scheduler(void)
 {
     process_t* ps = get_next_runnable_process();
     
     if (ps == NULL)
-        return; /* TODO: Launch init */
+        launch_init(); /* TODO: Launch init */
     
     tss_set_kernel_stack(ps->kernel_stack_start_vaddr);
     load_process_pml4(ps);
@@ -272,4 +288,25 @@ void run_scheduler(void)
         run_process_in_kernel_mode(&ps->current);
     else
         run_process_in_user_mode(&ps->current);
+}
+
+void set_init_exec_file(uint64_t exec_paddr, uint64_t exec_size)
+{
+    Elf64_Ehdr* ehdr = (Elf64_Ehdr*) paging_map_temporary_page(exec_paddr, PAGE_ACCESS_RO, PL0);
+
+    init_file.paddr = exec_paddr;
+    init_file.size = exec_size;
+
+    if 
+    (
+        ehdr->e_ident[EI_MAG0] == ELFMAG0 &&
+        ehdr->e_ident[EI_MAG1] == ELFMAG1 &&
+        ehdr->e_ident[EI_MAG2] == ELFMAG2 &&
+        ehdr->e_ident[EI_MAG3] == ELFMAG3
+    )
+        init_file.type = PROC_EXEC_ELF;
+    else
+        init_file.type = PROC_EXEC_BIN;
+
+    paging_unmap_temporary_page((uint64_t) ehdr);
 }
