@@ -266,11 +266,14 @@ static void launch_init(void)
     while (ptr != NULL)
     {
         if (ptr->ps != NULL)
-            delete_and_free_process(ptr->ps);
+        {
+            kfree(ptr->ps);
+            ptr->ps = NULL;
+        }
         ptr = ptr->next;
     }
 
-    schedule_runnable_process(create_process(&init_file, get_next_pid()));
+    schedule_runnable_process(create_process(&init_file, 0));
     run_scheduler();
 }
 

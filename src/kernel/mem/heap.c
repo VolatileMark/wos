@@ -20,9 +20,13 @@ static uint64_t expand_kernel_heap(uint64_t size)
     
     size = alignu(size + sizeof(heap_segment_header_t), SIZE_4KB);
     if (heap_end + size > heap_ceil)
+    {
+        if (heap_ceil - heap_end < size + sizeof(heap_segment_header_t))
+            return 0;
         size = heap_ceil - heap_end;
+    }
     
-    pages_count = size / SIZE_4KB;
+    pages_count = ceil((double) size / SIZE_4KB);
     pages_paddr = request_pages(pages_count);
     if (pages_paddr == 0)
         return 0;
@@ -37,7 +41,7 @@ static uint64_t expand_kernel_heap(uint64_t size)
     heap_end += mapped_size;
 
     new->free = 1;
-    new->size = size - sizeof(heap_segment_header_t*);
+    new->size = size;
     new->data = (uint64_t)(new + 1);
     new->prev = tail;
     new->next = tail->next;
@@ -73,7 +77,7 @@ static void combine_kernel_heap_forward(heap_segment_header_t* seg)
 
 static void combine_kernel_heap_backward(heap_segment_header_t* seg)
 {
-    if (seg->prev != NULL)
+    if (seg->prev != NULL && seg->prev->free)
         combine_kernel_heap_forward(seg->prev);
 }
 
@@ -90,11 +94,13 @@ uint64_t allocate_kernel_heap_memory(uint64_t size)
     heap_segment_header_t* seg;
     heap_segment_header_t* new;
 
-    size = ((size < MIN_SIZE) ? MIN_SIZE : size) + sizeof(heap_segment_header_t);
+    size = ((size < MIN_SIZE) ? MIN_SIZE : size);
 
-    seg = next_free_kernel_heap_segment(size);
-    if (seg == NULL)
-        return 0;
+    do {
+        seg = next_free_kernel_heap_segment(size + sizeof(heap_segment_header_t));
+        if (seg == NULL)
+            return 0;
+    } while (seg->size < size);
     
     new = (heap_segment_header_t*)(seg->data + size);
     new->free = 1;
@@ -106,7 +112,7 @@ uint64_t allocate_kernel_heap_memory(uint64_t size)
     new->data = (uint64_t)(new + 1);
     if (seg == tail)
         tail = new;
-    
+
     seg->free = 0;
     seg->size = size;
     seg->next = new;
@@ -175,7 +181,11 @@ static uint64_t expand_process_heap(uint64_t size, process_t* ps)
     
     size = alignu(size + sizeof(heap_segment_header_t), SIZE_4KB);
     if (ps->heap.end_vaddr + size > ps->heap.ceil_vaddr)
+    {
+        if (ps->heap.ceil_vaddr - ps->heap.end_vaddr < size + sizeof(heap_segment_header_t))
+            return 0;
         size = ps->heap.ceil_vaddr - ps->heap.end_vaddr;
+    }
     
     pages_count = size / SIZE_4KB;
     pages_paddr = request_pages(pages_count);
@@ -194,7 +204,7 @@ static uint64_t expand_process_heap(uint64_t size, process_t* ps)
     ps->heap.end_vaddr += mapped_size;
 
     new->free = 1;
-    new->size = size - sizeof(heap_segment_header_t*);
+    new->size = size - sizeof(heap_segment_header_t);
     new->data = (uint64_t)(new + 1);
     new->prev = ps->heap.tail;
     new->next = ps->heap.tail->next;
@@ -247,11 +257,13 @@ uint64_t allocate_process_heap_memory(uint64_t size, process_t* ps)
     heap_segment_header_t* seg;
     heap_segment_header_t* new;
 
-    size = alignu(size, MIN_SIZE) + sizeof(heap_segment_header_t);
+    size = ((size < MIN_SIZE) ? MIN_SIZE : size);
 
-    seg = next_free_process_heap_segment(size, ps);
-    if (seg == NULL)
-        return 0;
+    do {
+        seg = next_free_process_heap_segment(size + sizeof(heap_segment_header_t), ps);
+        if (seg == NULL)
+            return 0;
+    } while (seg->size < size);
     
     new = (heap_segment_header_t*)(seg->data + size);
     new->free = 1;
