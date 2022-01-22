@@ -8,6 +8,7 @@
 [extern get_tss]
 
 [extern alignu]
+[extern get_kernel_pml4_paddr]
 [extern kernel_stack_bottom]
 
 
@@ -60,8 +61,9 @@ load_kernel_stack:
     mov [user_rsp], rsp
     mov [user_rbp], rbp
     call get_tss
-    mov rbp, [rax + 4]
-    mov rsp, rbp
+    mov rsp, [rax + 4]
+    sub rsp, 8
+    mov rbp, rsp
     push rcx
     ret
 
@@ -105,21 +107,25 @@ switch_to_kernel:
     fxsave [rax]
     pop rdi
 
-    ; Load default kernel stack
-    pop rcx
-    mov [rdi + 8*15], rcx ; Save return RIP
-    call get_tss
-    mov qword [rax + 4], kernel_stack_bottom
-    mov rsp, [rax + 4]
-    mov rbp, rsp
-    push rcx
-
     ; Load correct data registers
     call get_kernel_ds
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
+
+    ; Load default kernel stack and pml4
+    pop rcx
+    mov [rdi + 8*15], rcx ; Save return RIP
+    call get_tss
+    mov rdi, rax
+    call get_kernel_pml4_paddr
+    mov qword [rdi + 4], kernel_stack_bottom
+    mov rsp, [rdi + 4]
+    sub rsp, 8
+    mov rbp, rsp
+    mov cr3, rax
+    push rcx
 
     ret
 

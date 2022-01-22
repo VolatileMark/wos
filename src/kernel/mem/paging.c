@@ -8,9 +8,9 @@ static page_table_t kernel_tmp_pt;
 static uint64_t kernel_tmp_index;
 static uint64_t kernel_pml4_paddr;
 
-void load_kernel_pml4(void)
+uint64_t get_kernel_pml4_paddr(void)
 {
-    load_pml4(kernel_pml4_paddr);
+    return kernel_pml4_paddr;
 }
 
 void set_pte_address(page_table_entry_t* entry, uint64_t addr)
@@ -294,7 +294,7 @@ static uint64_t pt_map_memory
     while (mapped_size < size && pt_idx < MAX_PAGE_TABLE_ENTRIES)
     {
         if (pt[pt_idx].present)
-            return mapped_size;
+            return 0;
         create_pte(pt, pt_idx, paddr, access, privilege_level);
 
         paddr += PT_ENTRY_SIZE;

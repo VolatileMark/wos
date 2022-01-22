@@ -260,8 +260,13 @@ static process_t* get_next_runnable_process(void)
     return runnable_pss.head->ps;
 }
 
+static int launches = 0;
 static void launch_init(void)
 {
+    launches++;
+
+    /* Delete all zombie processes */
+    process_list_entry_t* tmp;
     process_list_entry_t* ptr = zombie_pss.head;
     while (ptr != NULL)
     {
@@ -270,8 +275,12 @@ static void launch_init(void)
             kfree(ptr->ps);
             ptr->ps = NULL;
         }
-        ptr = ptr->next;
+        tmp = ptr->next;
+        kfree(ptr);
+        ptr = tmp;
+        zombie_pss.head = ptr;
     }
+    zombie_pss.tail = zombie_pss.head;
 
     schedule_runnable_process(create_process(&init_file, 0));
     run_scheduler();

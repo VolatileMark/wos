@@ -150,11 +150,13 @@ static int init_process_kernel_stack(process_t* ps)
         return -1;
     
     bytes = pages * SIZE_4KB;
-    size = paging_get_next_vaddr(bytes, &vaddr);
+    //size = paging_get_next_vaddr(bytes, &vaddr);
+    size = pml4_get_next_vaddr(ps->pml4, (uint64_t) &_end_vaddr, bytes, &vaddr);
     if (size < bytes)
         return -1;
     
-    size = paging_map_memory(paddr, vaddr, bytes, PAGE_ACCESS_RW, PL0);
+    //size = paging_map_memory(paddr, vaddr, bytes, PAGE_ACCESS_RW, PL0);
+    size = pml4_map_memory(ps->pml4, paddr, vaddr, bytes, PAGE_ACCESS_RW, PL0);
     if (size < bytes)
         return -1;
     
@@ -194,20 +196,21 @@ static uint64_t delete_segments_list(segment_list_t* list)
 
 void delete_process_resources(process_t* ps)
 {
-    uint64_t size, i;
+    //uint64_t size, i;
+    uint64_t i;
 
     if (ps->pml4 != 0)
     {
-        if (ps->pml4 == get_current_scheduled_process()->pml4)
-            load_kernel_pml4();
         if (delete_pml4(ps->pml4, ps->pml4_paddr) > KERNEL_HEAP_START_ADDR)
             return;
+        paging_unmap_memory((uint64_t) ps->pml4, SIZE_4KB);
     }
     
     if (ps->kernel_stack_start_vaddr != 0)
     {
-        size = delete_segments_list(&ps->kernel_stack_segments);
-        paging_unmap_memory(ps->kernel_stack_start_vaddr, size);
+        //size = delete_segments_list(&ps->kernel_stack_segments);
+        //paging_unmap_memory(ps->kernel_stack_start_vaddr, size);
+        delete_segments_list(&ps->kernel_stack_segments);
     }
 
     delete_segments_list(&ps->code_segments);
