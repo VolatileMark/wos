@@ -3,7 +3,6 @@
 
 #include "../cpu/isr.h"
 #include "../mem/paging.h"
-#include "../mem/heap.h"
 #include <stdint.h>
 
 #define PROCESS_MAX_FDS 64
@@ -38,16 +37,6 @@ typedef struct
 
 typedef struct
 {
-    uint64_t start_vaddr;
-    uint64_t end_vaddr;
-    uint64_t ceil_vaddr;
-    heap_segment_header_t* head;
-    heap_segment_header_t* tail;
-    segment_list_t segments;
-} process_heap_t;
-
-typedef struct
-{
     uint64_t exit : 1;
     uint64_t exit_code : 8;
     uint64_t reserved : 55;
@@ -62,12 +51,13 @@ typedef struct process
     uint64_t kernel_stack_start_vaddr;
     uint64_t stack_start_vaddr;
     uint64_t code_start_vaddr;
+    uint64_t heap_start_vaddr;
     process_flags_t flags;
     file_descriptor_t fds[PROCESS_MAX_FDS];
     segment_list_t code_segments;
     segment_list_t stack_segments;
     segment_list_t kernel_stack_segments;
-    process_heap_t heap;
+    segment_list_t heap_segments;
     cpu_state_t current;
     cpu_state_t user_mode;
 } process_t;

@@ -3,6 +3,8 @@
 #include <math.h>
 #include <mem.h>
 
+#define KERNEL_PML4_VADDR VADDR_GET_TEMPORARY(0)
+
 static page_table_t kernel_pml4;
 static page_table_t kernel_tmp_pt;
 static uint64_t kernel_tmp_index;
@@ -11,6 +13,11 @@ static uint64_t kernel_pml4_paddr;
 uint64_t get_kernel_pml4_paddr(void)
 {
     return kernel_pml4_paddr;
+}
+
+page_table_t get_kernel_pml4(void)
+{
+    return kernel_pml4;
 }
 
 void set_pte_address(page_table_entry_t* entry, uint64_t addr)
@@ -85,10 +92,10 @@ void paging_unmap_temporary_page(uint64_t vaddr)
 
 void init_paging(void)
 {
-    kernel_pml4 = (page_table_t) PML4_VADDR;
+    kernel_pml4 = (page_table_t) KERNEL_PML4_VADDR;
     kernel_tmp_pt = (page_table_t) VADDR_GET_TEMPORARY(1);
     kernel_tmp_index = 2;
-    kernel_pml4_paddr = paging_get_paddr(PML4_VADDR);
+    kernel_pml4_paddr = paging_get_paddr(KERNEL_PML4_VADDR);
 }
 
 uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
@@ -687,7 +694,10 @@ static void merge_pt_with_pt(page_table_t src, page_table_t dest, uint64_t vaddr
         {
             dest_entry = dest[idx];
             if (!dest_entry.present)
+            {
                 dest[idx] = src_entry;
+                dest[idx].accessed = 0;
+            }
         }
     }
 }
@@ -713,7 +723,10 @@ static void merge_pd_with_pd(page_table_t src, page_table_t dest, uint64_t vaddr
                 paging_unmap_temporary_page((uint64_t) dest_pt);
             }
             else
+            {
                 dest[idx] = src_entry;
+                dest[idx].accessed = 0;
+            }
             vaddr += PD_ENTRY_SIZE;
         }
     }
@@ -740,7 +753,10 @@ static void merge_pdp_with_pdp(page_table_t src, page_table_t dest, uint64_t vad
                 paging_unmap_temporary_page((uint64_t) dest_pd);
             }
             else
+            {
                 dest[idx] = src_entry;
+                dest[idx].accessed = 0;
+            }
             vaddr += PDP_ENTRY_SIZE;
         }
     }
@@ -767,7 +783,10 @@ static void merge_pml4_with_pml4(page_table_t src, page_table_t dest, uint64_t v
                 paging_unmap_temporary_page((uint64_t) dest_pdp);
             }
             else
+            {
                 dest[idx] = src_entry;
+                dest[idx].accessed = 0;
+            }
             vaddr += PML4_ENTRY_SIZE;
         }
     }

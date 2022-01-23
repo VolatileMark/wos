@@ -1,9 +1,9 @@
 #include "pit.h"
 #include "../io/ports.h"
 #include "../../cpu/interrupts.h"
-#include "../../utils/kalloc.h"
 #include <stddef.h>
 #include <mem.h>
+#include <alloc.h>
 
 #define PIT_BASE_FREQUENCY 1193182
 
@@ -43,7 +43,7 @@ int register_pit_callback(isr_handler_t handler)
 {
     if (callbacks.start == NULL)
     {
-        callbacks.start = kcalloc(1, sizeof(pit_callback_t));
+        callbacks.start = calloc(1, sizeof(pit_callback_t));
         if (callbacks.start == NULL)
             return 1;
         callbacks.end = callbacks.start;
@@ -51,7 +51,7 @@ int register_pit_callback(isr_handler_t handler)
     }
     else
     {
-        callbacks.end->next = kcalloc(1, sizeof(pit_callback_t));
+        callbacks.end->next = calloc(1, sizeof(pit_callback_t));
         if (callbacks.end->next == NULL)
             return 2;
         callbacks.end = callbacks.end->next;
@@ -75,5 +75,5 @@ void init_pit(void)
     memset(&callbacks, 0, sizeof(pit_callback_list_t));   
     ports_write_byte(PIT_COMM, PIT_CONFIG);
     ports_wait();
-    register_isr_handler(IRQ(0), &pit_handler);
+    register_isr_handler(IRQ(0), pit_handler);
 }

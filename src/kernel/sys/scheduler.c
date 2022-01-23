@@ -6,11 +6,11 @@
 #include "../utils/constants.h"
 #include "../drivers/chips/pic.h"
 #include "../drivers/chips/pit.h"
-#include "../utils/kalloc.h"
 #include "../utils/elf.h"
 #include <stddef.h>
 #include <math.h>
 #include <mem.h>
+#include <alloc.h>
 
 #define SCHEDULER_PIT_INTERVAL 2 /* ms */
 #define SCHEDULER_TIME_SLICE (5 * SCHEDULER_PIT_INTERVAL)
@@ -139,7 +139,7 @@ process_t* get_current_scheduled_process(void)
 
 static int schedule_process(process_list_t* pss, process_t* ps)
 {
-    process_list_entry_t* entry = kmalloc(sizeof(process_list_entry_t));
+    process_list_entry_t* entry = malloc(sizeof(process_list_entry_t));
     if (entry == NULL)
         return -1;
     
@@ -183,7 +183,7 @@ static int remove_process(process_list_t* pss, uint64_t pid, uint8_t should_dele
             if (should_delete)
                 delete_and_free_process(current->ps);
             
-            kfree(current);
+            free(current);
             
             return 0;
         }
@@ -269,11 +269,11 @@ static void launch_init(void)
     {
         if (ptr->ps != NULL)
         {
-            kfree(ptr->ps);
+            free(ptr->ps);
             ptr->ps = NULL;
         }
         tmp = ptr->next;
-        kfree(ptr);
+        free(ptr);
         ptr = tmp;
         zombie_pss.head = ptr;
     }

@@ -1,7 +1,6 @@
 #include "process.h"
 #include "scheduler.h"
 #include "../cpu/gdt.h"
-#include "../utils/kalloc.h"
 #include "../utils/constants.h"
 #include "../mem/pfa.h"
 #include "../mem/paging.h"
@@ -10,12 +9,11 @@
 #include <stddef.h>
 #include <mem.h>
 #include <math.h>
+#include <alloc.h>
 
 #define PROC_INITIAL_STACK_PAGES 1
-#define PROC_INITIAL_HEAP_PAGES 10
-#define PROC_INITIAL_RSP (PML4_VADDR - sizeof(uint64_t))
-#define PROC_DEFAULT_STACK_VADDR (PML4_VADDR - SIZE_4KB)
-#define PROC_DEFAULT_HEAP_VADDR VADDR_GET(256, 0, 0, 0)
+#define PROC_INITIAL_RSP (VADDR_GET_TEMPORARY(0) - sizeof(uint64_t))
+#define PROC_DEFAULT_STACK_VADDR (VADDR_GET_TEMPORARY(0) - SIZE_4KB)
 #define PROC_DEFAULT_RFLAGS 0x202 /* Only interrupts enabled */
 
 static void init_process(process_t* ps, uint64_t pid)
@@ -35,7 +33,6 @@ static void init_process(process_t* ps, uint64_t pid)
     ps->stack_segments.tail = NULL;
 
     memset(&ps->flags, 0, sizeof(process_flags_t));
-    memset(&ps->heap, 0, sizeof(process_heap_t));
     memset(ps->fds, 0, PROCESS_MAX_FDS * sizeof(file_descriptor_t));
     memset(&ps->user_mode, 0, sizeof(cpu_state_t));
     memset(&ps->current, 0, sizeof(cpu_state_t));
@@ -74,7 +71,7 @@ static int process_load_binary(process_t* ps, const process_file_t* file, uint64
     if (size < file->size)
         return -1;
     
-    code_segments = kmalloc(sizeof(segment_list_entry_t));
+    code_segments = malloc(sizeof(segment_list_entry_t));
     if (code_segments == NULL)
         return -1;
     
@@ -123,7 +120,7 @@ static int init_process_stack(process_t* ps)
     if (size < bytes)
         return -1;
 
-    stack_segments = kmalloc(sizeof(segment_list_entry_t));
+    stack_segments = malloc(sizeof(segment_list_entry_t));
     if (stack_segments == NULL)
         return -1;
     
@@ -151,7 +148,7 @@ static int init_process_kernel_stack(process_t* ps)
     
     bytes = pages * SIZE_4KB;
     //size = paging_get_next_vaddr(bytes, &vaddr);
-    size = pml4_get_next_vaddr(ps->pml4, (uint64_t) &_end_vaddr, bytes, &vaddr);
+    size = paging_get_next_vaddr(bytes, &vaddr);
     if (size < bytes)
         return -1;
     
@@ -160,7 +157,7 @@ static int init_process_kernel_stack(process_t* ps)
     if (size < bytes)
         return -1;
     
-    kernel_stack_segments = kmalloc(sizeof(segment_list_entry_t));
+    kernel_stack_segments = malloc(sizeof(segment_list_entry_t));
     if (kernel_stack_segments == NULL)
         return -1;
     
@@ -187,7 +184,7 @@ static uint64_t delete_segments_list(segment_list_t* list)
         pages += current->pages;
         tmp = current->next;
         free_pages(current->paddr, current->pages);
-        kfree(current);
+        free(current);
         current = tmp;
     }
 
@@ -215,7 +212,7 @@ void delete_process_resources(process_t* ps)
 
     delete_segments_list(&ps->code_segments);
     delete_segments_list(&ps->stack_segments);
-    delete_segments_list(&ps->heap.segments);
+    delete_segments_list(&ps->heap_segments);
 
     for (i = 0; i < PROCESS_MAX_FDS; i++)
     {
@@ -229,12 +226,12 @@ void delete_process_resources(process_t* ps)
 void delete_and_free_process(process_t* ps)
 {
     delete_process_resources(ps);
-    kfree(ps);
+    free(ps);
 }
 
 process_t* create_process(const process_file_t* file, uint64_t pid)
 {
-    process_t* ps = kmalloc(sizeof(process_t));
+    process_t* ps = malloc(sizeof(process_t));
     if (ps == NULL)
         return NULL;
 
@@ -317,7 +314,7 @@ static int copy_segments_list(page_table_t pml4, uint64_t vaddr, segment_list_t*
         memcpy((void*) kernel_vaddr, (void*) vaddr, bytes);
         paging_unmap_memory(kernel_vaddr, bytes);
         
-        segment = kmalloc(sizeof(segment_list_entry_t));
+        segment = malloc(sizeof(segment_list_entry_t));
         if (segment == NULL)
         {
             free_pages(paddr, ptr->pages);
@@ -337,7 +334,7 @@ static int copy_segments_list(page_table_t pml4, uint64_t vaddr, segment_list_t*
         size = pml4_map_memory(pml4, paddr, vaddr, bytes, PAGE_ACCESS_RW, PL3);
         if (size < bytes)
         {
-            kfree(segment);
+            free(segment);
             free_pages(paddr, ptr->pages);
             return -1;
         }
@@ -351,7 +348,7 @@ static int copy_segments_list(page_table_t pml4, uint64_t vaddr, segment_list_t*
 
 process_t* clone_process(process_t* parent, uint64_t id)
 {
-    process_t* child = kmalloc(sizeof(process_t));
+    process_t* child = malloc(sizeof(process_t));
     if (child == NULL)
         return NULL;
     
@@ -362,18 +359,13 @@ process_t* clone_process(process_t* parent, uint64_t id)
     child->code_start_vaddr = parent->code_start_vaddr;
     child->stack_start_vaddr = parent->stack_start_vaddr;
 
-    child->heap.start_vaddr = parent->heap.start_vaddr;
-    child->heap.end_vaddr = parent->heap.end_vaddr;
-    child->heap.ceil_vaddr = parent->heap.ceil_vaddr;
-    child->heap.head = parent->heap.head;
-    child->heap.tail = parent->heap.tail;
 
     if 
     (
         init_process_pml4(child) ||
         copy_segments_list(child->pml4, parent->code_start_vaddr, &parent->code_segments, &child->code_segments) ||
         copy_segments_list(child->pml4, parent->stack_start_vaddr, &parent->stack_segments, &child->stack_segments) ||
-        copy_segments_list(child->pml4, parent->heap.start_vaddr, &parent->heap.segments, &child->heap.segments) ||
+        copy_segments_list(child->pml4, parent->heap_start_vaddr, &parent->heap_segments, &child->heap_segments) ||
         init_process_kernel_stack(child) || 
         copy_file_descriptors(parent->fds, child->fds)
     )

@@ -1,21 +1,19 @@
 #include "scheduler.h"
+#include "../mem/kheap.h"
 #include <stdint.h>
-#include <stdarg.h>
-#include <syscall.h>
 
-#define NUM_SYSCALLS 1
+#define POP_STACK(T, stack) *((T*) stack++)
+#define NUM_SYSCALLS 2
 #define INVALID_SYSCALL -128
 
-typedef int (*syscall_handler_t)(process_t* ps, va_list ap);
+typedef int (*syscall_handler_t)(process_t* ps, uint64_t* stack_ptr);
 
 extern void switch_to_kernel(cpu_state_t* state);
 
-static int sysexit(process_t* ps, va_list ap)
+static int sysexit(process_t* ps, uint64_t* stack)
 {
     static int exit_code;
-    
-    exit_code = va_arg(ap, int);
-    va_end(ap);
+    exit_code = POP_STACK(int, stack);
     
     switch_to_kernel(&ps->user_mode);
     
@@ -28,18 +26,24 @@ static int sysexit(process_t* ps, va_list ap)
     return -1;
 }
 
+static int sysexpheap(process_t* ps, uint64_t* stack)
+{
+    heap_t* heap = POP_STACK(heap_t*, stack);
+    uint64_t size = POP_STACK(uint64_t, stack);
+    uint64_t* out_size = POP_STACK(uint64_t*, stack);
+    *out_size = expand_process_heap(ps, heap, size);
+    return 0;
+}
+
 static syscall_handler_t handlers[NUM_SYSCALLS] = {
-    sysexit
+    sysexit,
+    sysexpheap
 };
 
-int syscall_handler(uint64_t num, ...)
+int syscall_handler(uint64_t num, uint64_t* stack)
 {
-    int return_code = INVALID_SYSCALL;
     process_t* ps = get_current_scheduled_process();
-    va_list ap;
-    va_start(ap, num);
     if (num < NUM_SYSCALLS)
-        return_code = handlers[num](ps, ap);
-    va_end(ap);
-    return return_code;
+        return handlers[num](ps, stack);
+    return INVALID_SYSCALL;
 }

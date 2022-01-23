@@ -1,7 +1,7 @@
 #include "external/multiboot2.h"
 #include "mem/mmap.h"
 #include "mem/pfa.h"
-#include "mem/heap.h"
+#include "mem/kheap.h"
 #include "mem/paging.h"
 #include "cpu/gdt.h"
 #include "cpu/idt.h"
@@ -59,7 +59,7 @@ void kernel_main(uint64_t multiboot_struct_addr, uint64_t init_exec_file_paddr, 
     init_gdt();
     init_idt();
     init_isr();
-    init_kernel_heap(KERNEL_HEAP_START_ADDR, KERNEL_HEAP_END_ADDR, 10);
+    init_kernel_heap(KERNEL_HEAP_START_ADDR, KERNEL_HEAP_CEIL_ADDR, SIZE_4KB);
     init_syscalls();
     init_pit();
     init_scheduler();
