@@ -260,11 +260,8 @@ static process_t* get_next_runnable_process(void)
     return runnable_pss.head->ps;
 }
 
-static int launches = 0;
 static void launch_init(void)
 {
-    launches++;
-
     /* Delete all zombie processes */
     process_list_entry_t* tmp;
     process_list_entry_t* ptr = zombie_pss.head;
@@ -291,7 +288,7 @@ void run_scheduler(void)
     process_t* ps = get_next_runnable_process();
     
     if (ps == NULL)
-        launch_init(); /* TODO: Launch init */
+        launch_init();
     
     tss_set_kernel_stack(ps->kernel_stack_start_vaddr);
     load_process_pml4(ps);
