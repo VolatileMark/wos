@@ -290,7 +290,7 @@ void run_scheduler(void)
     if (ps == NULL)
         launch_init();
     
-    tss_set_kernel_stack(ps->kernel_stack_start_vaddr);
+    tss_set_kernel_stack(ps->kernel_stack_start_vaddr + PROC_INITIAL_STACK_SIZE - sizeof(uint64_t));
     load_process_pml4(ps);
 
     if (ps->current.stack.cs == get_kernel_cs())

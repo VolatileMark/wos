@@ -62,7 +62,6 @@ load_kernel_stack:
     mov [user_rbp], rbp
     call get_tss
     mov rsp, [rax + 4]
-    sub rsp, 8
     mov rbp, rsp
     push rcx
     ret
@@ -120,9 +119,8 @@ switch_to_kernel:
     call get_tss
     mov rdi, rax
     call get_kernel_pml4_paddr
-    mov qword [rdi + 4], kernel_stack_bottom
+    mov qword [rdi + 4], (kernel_stack_bottom - 8)
     mov rsp, [rdi + 4]
-    sub rsp, 8
     mov rbp, rsp
     mov cr3, rax
     push rcx

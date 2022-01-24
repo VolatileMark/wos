@@ -12,7 +12,7 @@ _start32:
     ; Disable interrupt
     cli
     ; Set up new stack
-    mov esp, stack_top
+    mov esp, (stack_bottom - 8)
     mov ebp, esp
     ; Save multiboot2 parameters
     push 0
@@ -64,6 +64,6 @@ _start64:
 
 %define INITIAL_STACK_SIZE 16384
 
-stack_bottom:
-    resb INITIAL_STACK_SIZE
 stack_top:
+    resb INITIAL_STACK_SIZE
+stack_bottom:

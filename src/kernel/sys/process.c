@@ -11,11 +11,6 @@
 #include <math.h>
 #include <alloc.h>
 
-#define PROC_INITIAL_STACK_PAGES 1
-#define PROC_INITIAL_RSP (VADDR_GET_TEMPORARY(0) - sizeof(uint64_t))
-#define PROC_DEFAULT_STACK_VADDR (VADDR_GET_TEMPORARY(0) - SIZE_4KB)
-#define PROC_DEFAULT_RFLAGS 0x202 /* Only interrupts enabled */
-
 static void init_process(process_t* ps, uint64_t pid)
 {
     ps->pid = pid;
@@ -25,15 +20,18 @@ static void init_process(process_t* ps, uint64_t pid)
     ps->kernel_stack_start_vaddr = 0;
     ps->code_start_vaddr = 0;
     ps->stack_start_vaddr = PROC_DEFAULT_STACK_VADDR;
+    ps->heap_start_vaddr = PROC_DEFAULT_HEAP_VADDR;
     ps->kernel_stack_segments.head = NULL;
     ps->kernel_stack_segments.tail = NULL;
     ps->code_segments.head = NULL;
     ps->code_segments.tail = NULL;
     ps->stack_segments.head = NULL;
     ps->stack_segments.tail = NULL;
+    ps->heap_segments.head = NULL;
+    ps->heap_segments.tail = NULL;
 
     memset(&ps->flags, 0, sizeof(process_flags_t));
-    memset(ps->fds, 0, PROCESS_MAX_FDS * sizeof(file_descriptor_t));
+    memset(ps->fds, 0, PROC_MAX_FDS * sizeof(file_descriptor_t));
     memset(&ps->user_mode, 0, sizeof(cpu_state_t));
     memset(&ps->current, 0, sizeof(cpu_state_t));
 
@@ -108,14 +106,15 @@ static int load_process_code(process_t* ps, const process_file_t* file)
 
 static int init_process_stack(process_t* ps)
 {
-    uint64_t paddr, bytes, size;
+    uint64_t paddr, bytes, pages, size;
     segment_list_entry_t* stack_segments;
 
-    paddr = request_pages(PROC_INITIAL_STACK_PAGES);
+    pages = ceil((double) PROC_INITIAL_STACK_SIZE / SIZE_4KB);
+    paddr = request_pages(PROC_INITIAL_STACK_SIZE);
     if (paddr == 0)
         return -1;
     
-    bytes = PROC_INITIAL_STACK_PAGES * SIZE_4KB;
+    bytes = pages * SIZE_4KB;
     size = pml4_map_memory(ps->pml4, paddr, PROC_DEFAULT_STACK_VADDR, bytes, PAGE_ACCESS_RW, PL3);
     if (size < bytes)
         return -1;
@@ -125,7 +124,7 @@ static int init_process_stack(process_t* ps)
         return -1;
     
     stack_segments->paddr = paddr;
-    stack_segments->pages = bytes;
+    stack_segments->pages = pages;
     stack_segments->next = NULL;
 
     ps->stack_segments.head = stack_segments;
@@ -141,7 +140,7 @@ static int init_process_kernel_stack(process_t* ps)
     uint64_t pages, bytes, vaddr, paddr, size;
     segment_list_entry_t* kernel_stack_segments;
 
-    pages = ceil((double) KERNEL_STACK_SIZE / SIZE_4KB);
+    pages = ceil((double) PROC_INITIAL_STACK_SIZE / SIZE_4KB);
     paddr = request_pages(pages);
     if (paddr == 0)
         return -1;
@@ -167,7 +166,7 @@ static int init_process_kernel_stack(process_t* ps)
 
     ps->kernel_stack_segments.head = kernel_stack_segments;
     ps->kernel_stack_segments.tail = kernel_stack_segments;
-    ps->kernel_stack_start_vaddr = vaddr + bytes - sizeof(uint64_t);
+    ps->kernel_stack_start_vaddr = vaddr;
 
     return 0;
 }
@@ -214,7 +213,7 @@ void delete_process_resources(process_t* ps)
     delete_segments_list(&ps->stack_segments);
     delete_segments_list(&ps->heap_segments);
 
-    for (i = 0; i < PROCESS_MAX_FDS; i++)
+    for (i = 0; i < PROC_MAX_FDS; i++)
     {
         if (ps->fds[i] != 0)
         {
@@ -257,7 +256,7 @@ process_t* create_process(const process_file_t* file, uint64_t pid)
 static int copy_file_descriptors(file_descriptor_t* from, file_descriptor_t* to)
 {
     uint64_t i;
-    for (i = 0; i < PROCESS_MAX_FDS; i++)
+    for (i = 0; i < PROC_MAX_FDS; i++)
     {
         if (from[i] != 0)
         {

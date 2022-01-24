@@ -5,7 +5,12 @@
 #include "../mem/paging.h"
 #include <stdint.h>
 
-#define PROCESS_MAX_FDS 64
+#define PROC_MAX_FDS 64
+#define PROC_INITIAL_RSP (VADDR_GET_TEMPORARY(0) - sizeof(uint64_t))
+#define PROC_INITIAL_STACK_SIZE SIZE_4KB
+#define PROC_DEFAULT_STACK_VADDR (VADDR_GET_TEMPORARY(0) - SIZE_4KB)
+#define PROC_DEFAULT_RFLAGS 0x202 /* Only interrupts enabled */
+#define PROC_DEFAULT_HEAP_VADDR 0xFFFF800000000000
 
 typedef enum
 {
@@ -53,7 +58,7 @@ typedef struct process
     uint64_t code_start_vaddr;
     uint64_t heap_start_vaddr;
     process_flags_t flags;
-    file_descriptor_t fds[PROCESS_MAX_FDS];
+    file_descriptor_t fds[PROC_MAX_FDS];
     segment_list_t code_segments;
     segment_list_t stack_segments;
     segment_list_t kernel_stack_segments;
