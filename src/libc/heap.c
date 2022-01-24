@@ -17,8 +17,6 @@ static uint64_t default_expand_heap(heap_t* heap, uint64_t size)
 
 int init_heap(expand_heap_func_t expand_heap_func, uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t initial_size, PRIVILEGE_LEVEL privilege_level)
 {
-    //heap_segment_header_t* first;
-
     if (initial_size > ceil_vaddr - start_vaddr || initial_size < sizeof(heap_segment_header_t))
         return -1;
     
@@ -33,36 +31,6 @@ int init_heap(expand_heap_func_t expand_heap_func, uint64_t start_vaddr, uint64_
     heap_state.head = heap_state.tail;
 
     return 0;
-
-    /*
-    pages = ceil((double) initial_size / SIZE_4KB);
-    paddr = request_pages(pages);
-    if (paddr == 0)
-        return 0;
-    
-    heap->ceil_vaddr = ceil_vaddr;
-    heap->start_vaddr = start_vaddr;
-    heap->end_vaddr = start_vaddr + initial_size;
-    heap->privilege_level = privilege_level;
-
-    if (pml4_map_memory(pml4, paddr, heap->start_vaddr, initial_size, PAGE_ACCESS_RW, heap->privilege_level) < initial_size)
-    {
-        free_pages(paddr, pages);
-        return 0;
-    }
-
-    first = (heap_segment_header_t*) heap->start_vaddr;
-    first->size = initial_size - sizeof(heap_segment_header_t);
-    first->free = 1;
-    first->data = (uint64_t) (first + 1);
-    first->next = NULL;
-    first->prev = NULL;
-
-    heap->head = first;
-    heap->tail = first;
-
-    return paddr;
-    */
 }
 
 static heap_segment_header_t* next_free_heap_segment(uint64_t size)

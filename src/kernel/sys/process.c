@@ -48,8 +48,8 @@ static int init_process_pml4(process_t* ps)
     if 
     (
         paddr == 0 || 
-        paging_get_next_vaddr(SIZE_4KB, &vaddr) < SIZE_4KB ||
-        paging_map_memory(paddr, vaddr, SIZE_4KB, PAGE_ACCESS_RW, PL0) < SIZE_4KB
+        kernel_get_next_vaddr(SIZE_4KB, &vaddr) < SIZE_4KB ||
+        kernel_map_memory(paddr, vaddr, SIZE_4KB, PAGE_ACCESS_RW, PL0) < SIZE_4KB
     )
         return -1;
 
@@ -146,12 +146,10 @@ static int init_process_kernel_stack(process_t* ps)
         return -1;
     
     bytes = pages * SIZE_4KB;
-    //size = paging_get_next_vaddr(bytes, &vaddr);
-    size = paging_get_next_vaddr(bytes, &vaddr);
+    size = kernel_get_next_vaddr(bytes, &vaddr);
     if (size < bytes)
         return -1;
     
-    //size = paging_map_memory(paddr, vaddr, bytes, PAGE_ACCESS_RW, PL0);
     size = pml4_map_memory(ps->pml4, paddr, vaddr, bytes, PAGE_ACCESS_RW, PL0);
     if (size < bytes)
         return -1;
@@ -192,22 +190,17 @@ static uint64_t delete_segments_list(segment_list_t* list)
 
 void delete_process_resources(process_t* ps)
 {
-    //uint64_t size, i;
     uint64_t i;
 
     if (ps->pml4 != 0)
     {
         if (delete_pml4(ps->pml4, ps->pml4_paddr) > KERNEL_HEAP_START_ADDR)
             return;
-        paging_unmap_memory((uint64_t) ps->pml4, SIZE_4KB);
+        kernel_unmap_memory((uint64_t) ps->pml4, SIZE_4KB);
     }
     
     if (ps->kernel_stack_start_vaddr != 0)
-    {
-        //size = delete_segments_list(&ps->kernel_stack_segments);
-        //paging_unmap_memory(ps->kernel_stack_start_vaddr, size);
         delete_segments_list(&ps->kernel_stack_segments);
-    }
 
     delete_segments_list(&ps->code_segments);
     delete_segments_list(&ps->stack_segments);
@@ -242,7 +235,6 @@ process_t* create_process(const process_file_t* file, uint64_t pid)
         load_process_code(ps, file) || 
         init_process_stack(ps) || 
         init_process_kernel_stack(ps) 
-        //init_process_heap(PROC_DEFAULT_HEAP_VADDR, KERNEL_HEAP_START_ADDR, PROC_INITIAL_HEAP_PAGES, ps) < (PROC_INITIAL_HEAP_PAGES * SIZE_4KB) ||
     )
     {
         delete_and_free_process(ps);
@@ -295,23 +287,23 @@ static int copy_segments_list(page_table_t pml4, uint64_t vaddr, segment_list_t*
         
         bytes = ptr->pages * SIZE_4KB;
         
-        size = paging_get_next_vaddr(bytes, &kernel_vaddr);
+        size = kernel_get_next_vaddr(bytes, &kernel_vaddr);
         if (size < bytes)
         {
             free_pages(paddr, ptr->pages);
             return -1;
         }
         
-        size = paging_map_memory(paddr, kernel_vaddr, bytes, PAGE_ACCESS_RW, PL0);
+        size = kernel_map_memory(paddr, kernel_vaddr, bytes, PAGE_ACCESS_RW, PL0);
         if (size < bytes)
         {
-            paging_unmap_memory(kernel_vaddr, bytes);
+            kernel_unmap_memory(kernel_vaddr, bytes);
             free_pages(paddr, ptr->pages);
             return -1;
         }
         
         memcpy((void*) kernel_vaddr, (void*) vaddr, bytes);
-        paging_unmap_memory(kernel_vaddr, bytes);
+        kernel_unmap_memory(kernel_vaddr, bytes);
         
         segment = malloc(sizeof(segment_list_entry_t));
         if (segment == NULL)
@@ -378,6 +370,6 @@ process_t* clone_process(process_t* parent, uint64_t id)
 
 void load_process_pml4(process_t* ps)
 {
-    paging_inject_pml4(ps->pml4);
+    kernel_inject_pml4(ps->pml4);
     load_pml4(ps->pml4_paddr);
 }

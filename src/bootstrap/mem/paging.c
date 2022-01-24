@@ -4,8 +4,8 @@
 #include <mem.h>
 
 static page_table_t bootstrap_pml4;
-static page_table_t kernel_tmp_pt;
-static uint64_t kernel_tmp_index;
+static page_table_t bootstrap_tmp_pt;
+static uint64_t bootstrap_tmp_index;
 
 void set_pte_address(page_table_entry_t* entry, uint64_t addr)
 {
@@ -31,14 +31,14 @@ uint64_t get_pte_address(page_table_entry_t* entry)
 
 static uint64_t get_next_tmp_index(void)
 {
-    if (kernel_tmp_index >= MAX_PAGE_TABLE_ENTRIES)
+    if (bootstrap_tmp_index >= MAX_PAGE_TABLE_ENTRIES)
         return 0;
-    uint64_t index = kernel_tmp_index++;
+    uint64_t index = bootstrap_tmp_index++;
     for 
     (
         ; 
-        kernel_tmp_pt[kernel_tmp_index].present; 
-        kernel_tmp_index++
+        bootstrap_tmp_pt[bootstrap_tmp_index].present; 
+        bootstrap_tmp_index++
     );
     return index;
 }
@@ -56,7 +56,7 @@ static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, PAGE_
 uint64_t paging_map_temporary_page(uint64_t paddr, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
 {
     uint64_t index = get_next_tmp_index();
-    page_table_entry_t* entry = &kernel_tmp_pt[index];
+    page_table_entry_t* entry = &bootstrap_tmp_pt[index];
     PTE_CLEAR(entry);
     entry->present = 1;
     entry->allow_writes = 1;
@@ -71,17 +71,17 @@ void paging_unmap_temporary_page(uint64_t vaddr)
     if (!VADDR_IS_TEMPORARY(vaddr))
         return;
     index = VADDR_TO_PT_IDX(vaddr);
-    if (kernel_tmp_index > index)
-        kernel_tmp_index = index;
-    PTE_CLEAR(&kernel_tmp_pt[index]);
+    if (bootstrap_tmp_index > index)
+        bootstrap_tmp_index = index;
+    PTE_CLEAR(&bootstrap_tmp_pt[index]);
     invalidate_pte(vaddr);
 }
 
 void init_paging(void)
 {
     bootstrap_pml4 = (page_table_t) PML4_VADDR;
-    kernel_tmp_pt = (page_table_t) VADDR_GET_TEMPORARY(1);
-    kernel_tmp_index = 2;
+    bootstrap_tmp_pt = (page_table_t) VADDR_GET_TEMPORARY(1);
+    bootstrap_tmp_index = 2;
 }
 
 uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)

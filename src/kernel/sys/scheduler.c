@@ -301,7 +301,7 @@ void run_scheduler(void)
 
 void set_init_exec_file(uint64_t exec_paddr, uint64_t exec_size)
 {
-    Elf64_Ehdr* ehdr = (Elf64_Ehdr*) paging_map_temporary_page(exec_paddr, PAGE_ACCESS_RO, PL0);
+    Elf64_Ehdr* ehdr = (Elf64_Ehdr*) kernel_map_temporary_page(exec_paddr, PAGE_ACCESS_RO, PL0);
 
     init_file.paddr = exec_paddr;
     init_file.size = exec_size;
@@ -317,5 +317,5 @@ void set_init_exec_file(uint64_t exec_paddr, uint64_t exec_size)
     else
         init_file.type = PROC_EXEC_BIN;
 
-    paging_unmap_temporary_page((uint64_t) ehdr);
+    kernel_unmap_temporary_page((uint64_t) ehdr);
 }

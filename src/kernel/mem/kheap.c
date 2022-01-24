@@ -46,17 +46,6 @@ static uint64_t expand_heap(heap_t* heap, page_table_t pml4, uint64_t* in_out_si
         *in_out_size = 0;
         return 0;
     }
-    /*
-    if (pml4 != get_kernel_pml4())
-    {
-        page_table_t pdp = (page_table_t) paging_map_temporary_page(get_pte_address(&pml4[256]), PAGE_ACCESS_RO, PL0);
-        page_table_t pd = (page_table_t) paging_map_temporary_page(get_pte_address(&pdp[0]), PAGE_ACCESS_RO, PL0);
-        page_table_t pt = (page_table_t) paging_map_temporary_page(get_pte_address(&pd[0]), PAGE_ACCESS_RO, PL0);
-        page_table_entry_t entry = pt[0];
-        get_kernel_pml4_paddr();
-        (void)(entry);
-    }
-    */
 
     heap->end_vaddr += mapped_size;
 

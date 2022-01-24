@@ -55,17 +55,23 @@ extern void invalidate_pte(uint64_t vaddr);
 
 void set_pte_address(page_table_entry_t* entry, uint64_t addr);
 uint64_t get_pte_address(page_table_entry_t* entry);
+
 void init_paging(void);
+
 uint64_t pml4_map_memory(page_table_t pml4, uint64_t paddr, uint64_t vaddr, uint64_t size, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level);
 uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level);
 uint64_t paging_map_temporary_page(uint64_t paddr, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level);
+
 uint64_t pml4_unmap_memory(page_table_t pml4, uint64_t vaddr, uint64_t size);
 uint64_t paging_unmap_memory(uint64_t vaddr, uint64_t size);
 void paging_unmap_temporary_page(uint64_t vaddr);
+
 uint64_t paging_get_next_vaddr(uint64_t size, uint64_t* vaddr_out);
 uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t size, uint64_t* vaddr_out);
+
 uint64_t paging_get_paddr(uint64_t vaddr);
 uint64_t pml4_get_paddr(page_table_t pml4, uint64_t vaddr);
+
 void delete_pml4(page_table_t pml4);
 
 #endif
