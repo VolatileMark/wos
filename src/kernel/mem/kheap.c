@@ -7,6 +7,15 @@
 #include <mem.h>
 #include <alloc.h>
 
+extern int init_alloc
+(
+    expand_heap_func_t expand_heap_func, 
+    uint64_t start_vaddr, 
+    uint64_t ceil_vaddr, 
+    uint64_t initial_size, 
+    PRIVILEGE_LEVEL privilege_level
+);
+
 static void record_segment(segment_list_t* sl, uint64_t paddr, uint64_t pages)
 {
     segment_list_entry_t* entry = malloc(sizeof(segment_list_entry_t));
@@ -72,7 +81,7 @@ static uint64_t expand_kernel_heap(heap_t* heap, uint64_t size)
 
 int init_kernel_heap(uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t inital_size)
 {
-     return init_heap(expand_kernel_heap, start_vaddr, ceil_vaddr, inital_size, PL0);
+     return init_alloc(expand_kernel_heap, start_vaddr, ceil_vaddr, inital_size, PL0);
 }
 
 uint64_t expand_process_heap(process_t* ps, heap_t* heap, uint64_t size)

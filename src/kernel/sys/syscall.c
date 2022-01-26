@@ -1,5 +1,6 @@
 #include "scheduler.h"
 #include "../mem/kheap.h"
+#include "../utils/macros.h"
 #include <stdint.h>
 
 #define POP_STACK(T, stack) *((T*) stack++)
@@ -12,17 +13,10 @@ extern void switch_to_kernel(cpu_state_t* state);
 
 static int sysexit(process_t* ps, uint64_t* stack)
 {
-    static int exit_code;
-    exit_code = POP_STACK(int, stack);
-    
+    UNUSED(stack);
     switch_to_kernel(&ps->user_mode);
-    
-    ps = get_current_scheduled_process();
-    ps->user_mode.regs.rax = exit_code;
-    
-    terminate_process(ps);
+    terminate_process(get_current_scheduled_process());
     run_scheduler();
-    
     return -1;
 }
 

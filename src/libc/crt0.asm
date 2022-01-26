@@ -7,7 +7,7 @@
 %define HEAP_CEIL_VADDR 0xFFFFc00000000000
 
 [extern main]
-[extern init_heap]
+[extern init_alloc]
 
 [global _start]
 _start:
@@ -16,6 +16,10 @@ _start:
     call _exit
 
 _init:
+    push rdi
+    push rsi
+    push rdx
+    
     mov rdi, 0
     mov rsi, HEAP_START_VADDR
     mov rdx, HEAP_CEIL_VADDR
@@ -23,7 +27,12 @@ _init:
     mov ax, ds
     and rax, 0x0000000000000003
     mov r8, rax
-    call init_heap
+    call init_alloc
+
+    pop rdx
+    pop rsi
+    pop rdi
+
     cmp rax, 0
     je .success
     sub rax, 800
@@ -33,5 +42,4 @@ _init:
 
 _exit:
     mov rdi, SYS_exit
-    mov rsi, rax
     o64 syscall

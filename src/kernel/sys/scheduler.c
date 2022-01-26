@@ -6,6 +6,7 @@
 #include "../utils/constants.h"
 #include "../drivers/chips/pic.h"
 #include "../drivers/chips/pit.h"
+#include "../utils/multiboot.h"
 #include "../utils/elf.h"
 #include <stddef.h>
 #include <math.h>

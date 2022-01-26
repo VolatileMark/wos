@@ -29,9 +29,8 @@ typedef struct heap
     expand_heap_func_t expand;
 } heap_t;
 
-heap_t* get_heap(void);
-int init_heap(expand_heap_func_t expand_heap_func, uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t initial_size, PRIVILEGE_LEVEL privilege_level);
-uint64_t allocate_heap_memory(uint64_t size);
-void free_heap_memory(uint64_t addr);
+int init_heap(heap_t* heap, expand_heap_func_t expand_heap_func, uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t initial_size, PRIVILEGE_LEVEL privilege_level);
+uint64_t allocate_heap_memory(heap_t* heap, uint64_t size);
+void free_heap_memory(heap_t* heap, uint64_t addr);
 
 #endif

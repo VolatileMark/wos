@@ -5,9 +5,16 @@
 #include "mem.h"
 #include "heap.h"
 
+static heap_t heap_state;
+
+int init_alloc(expand_heap_func_t expand_heap_func, uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t initial_size, PRIVILEGE_LEVEL privilege_level)
+{
+    return init_heap(&heap_state, expand_heap_func, start_vaddr, ceil_vaddr, initial_size, privilege_level);
+}
+
 void* malloc(uint64_t size)
 {
-    return (void*) allocate_heap_memory(size);
+    return (void*) allocate_heap_memory(&heap_state, size);
 }
 
 void* calloc(uint64_t n, uint64_t size)
@@ -29,7 +36,7 @@ void* realloc(void* src, uint64_t new_size)
 
 void free(void* ptr)
 {
-    free_heap_memory((uint64_t) ptr);
+    free_heap_memory(&heap_state, (uint64_t) ptr);
 }
 
 #endif

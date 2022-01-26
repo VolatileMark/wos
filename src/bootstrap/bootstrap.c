@@ -29,7 +29,7 @@ static int parse_multiboot_struct(uint64_t addr, uint64_t* out_size, struct mult
         switch (tag->type)
         {
         case MULTIBOOT_TAG_TYPE_MMAP:
-            if (mmap_init((struct multiboot_tag_mmap*) tag))
+            if (init_mmap((struct multiboot_tag_mmap*) tag))
                 return -1;
             break;
         case MULTIBOOT_TAG_TYPE_MODULE:

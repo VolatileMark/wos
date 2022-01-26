@@ -60,9 +60,13 @@ load_kernel_stack:
     pop rcx
     mov [user_rsp], rsp
     mov [user_rbp], rbp
+    push rax
     call get_tss
-    mov rsp, [rax + 4]
+    mov rbx, rax
+    pop rax
+    mov rsp, [rbx + 4]
     mov rbp, rsp
+    mov rbx, 0
     push rcx
     ret
 

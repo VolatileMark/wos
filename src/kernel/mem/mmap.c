@@ -4,7 +4,7 @@
 static uint64_t memory_segment_sizes[5];
 static struct multiboot_mmap_entry* largest_segments[5];
 
-void mmap_init(struct multiboot_tag_mmap* tag)
+void init_mmap(struct multiboot_tag_mmap* tag)
 {
     uint32_t entries = (tag->size - (((uint64_t) tag) - ((uint64_t) &tag->entries))) / tag->entry_size;
     uint32_t i;
