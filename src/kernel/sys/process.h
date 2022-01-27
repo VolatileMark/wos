@@ -57,25 +57,28 @@ typedef struct process
     uint64_t stack_start_vaddr;
     uint64_t code_start_vaddr;
     uint64_t heap_start_vaddr;
+    uint64_t args_start_vaddr;
     process_flags_t flags;
     file_descriptor_t fds[PROC_MAX_FDS];
     segment_list_t code_segments;
     segment_list_t stack_segments;
     segment_list_t kernel_stack_segments;
     segment_list_t heap_segments;
+    segment_list_t args_segments;
     cpu_state_t current;
     cpu_state_t user_mode;
 } process_t;
 
 typedef struct 
 {
-    PROC_EXEC_TYPE type;
-    uint64_t paddr;
-    uint64_t size;
-} process_file_t;
+    PROC_EXEC_TYPE exec_type;
+    uint64_t exec_paddr;
+    uint64_t exec_size;
+    char* cmdline;
+} process_descriptor_t;
 
-process_t* create_process(const process_file_t* file, uint64_t pid);
-process_t* create_replacement_process(process_t* parent, const process_file_t* file);
+process_t* create_process(const process_descriptor_t* file, uint64_t pid);
+process_t* create_replacement_process(process_t* parent, const process_descriptor_t* file);
 process_t* clone_process(process_t* parent, uint64_t id);
 void delete_and_free_process(process_t* ps);
 void delete_process_resources(process_t* ps);

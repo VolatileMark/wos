@@ -29,7 +29,7 @@ typedef struct process_list
 } process_list_t;
 
 static uint64_t ms;
-static process_file_t init_file;
+static process_descriptor_t init_proc_descriptor;
 static process_list_t runnable_pss, zombie_pss;
 
 extern void run_process_in_user_mode(cpu_state_t* cpu);
@@ -280,7 +280,7 @@ static void launch_init(void)
     }
     zombie_pss.tail = zombie_pss.head;
 
-    schedule_runnable_process(create_process(&init_file, 0));
+    schedule_runnable_process(create_process(&init_proc_descriptor, 0));
     run_scheduler();
 }
 
@@ -304,8 +304,8 @@ void set_init_exec_file(uint64_t exec_paddr, uint64_t exec_size)
 {
     Elf64_Ehdr* ehdr = (Elf64_Ehdr*) kernel_map_temporary_page(exec_paddr, PAGE_ACCESS_RO, PL0);
 
-    init_file.paddr = exec_paddr;
-    init_file.size = exec_size;
+    init_proc_descriptor.exec_paddr = exec_paddr;
+    init_proc_descriptor.exec_size = exec_size;
 
     if 
     (
@@ -314,9 +314,11 @@ void set_init_exec_file(uint64_t exec_paddr, uint64_t exec_size)
         ehdr->e_ident[EI_MAG2] == ELFMAG2 &&
         ehdr->e_ident[EI_MAG3] == ELFMAG3
     )
-        init_file.type = PROC_EXEC_ELF;
+        init_proc_descriptor.exec_type = PROC_EXEC_ELF;
     else
-        init_file.type = PROC_EXEC_BIN;
+        init_proc_descriptor.exec_type = PROC_EXEC_BIN;
+    
+    init_proc_descriptor.cmdline = NULL;
 
     kernel_unmap_temporary_page((uint64_t) ehdr);
 }
