@@ -134,6 +134,6 @@ switch_to_kernel:
 
 
 
-[section .data]
-user_rsp: dq 0
-user_rbp: dq 0
+[section .bss]
+user_rsp: resq 1
+user_rbp: resq 1

@@ -578,32 +578,32 @@ uint64_t kernel_get_paddr(uint64_t vaddr)
 
 uint64_t pml4_get_paddr(page_table_t pml4, uint64_t vaddr)
 {
-    page_table_t pt;
-    uint64_t idx;
+    page_table_t pdp, pd, pt;
+    uint64_t pml4_idx, pdp_idx, pd_idx, pt_idx;
     page_table_entry_t entry;
 
-    idx = VADDR_TO_PML4_IDX(vaddr);
-    entry = pml4[idx];
+    pml4_idx = VADDR_TO_PML4_IDX(vaddr);
+    entry = pml4[pml4_idx];
     if (!entry.present)    
         return 0;
     
-    idx = VADDR_TO_PDP_IDX(vaddr);
-    pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RO, PL0);
-    entry = pt[idx];
-    kernel_unmap_temporary_page((uint64_t) pt);
+    pdp_idx = VADDR_TO_PDP_IDX(vaddr);
+    pdp = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RO, PL0);
+    entry = pdp[pdp_idx];
+    kernel_unmap_temporary_page((uint64_t) pdp);
     if (!entry.present)
         return 0;
     
-    idx = VADDR_TO_PD_IDX(vaddr);
-    pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RO, PL0);
-    entry = pt[idx];
-    kernel_unmap_temporary_page((uint64_t) pt);
+    pd_idx = VADDR_TO_PD_IDX(vaddr);
+    pd = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RO, PL0);
+    entry = pd[pd_idx];
+    kernel_unmap_temporary_page((uint64_t) pd);
     if (!entry.present)
         return 0;
     
-    idx = VADDR_TO_PT_IDX(vaddr);
+    pt_idx = VADDR_TO_PT_IDX(vaddr);
     pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RO, PL0);
-    entry = pt[idx];
+    entry = pt[pt_idx];
     kernel_unmap_temporary_page((uint64_t) pt);
     if (!entry.present)
         return 0;

@@ -49,5 +49,5 @@ void kernel_main
     
     HANG:
         while (1)
-            __asm__("hlt");
+            __asm__ ("hlt");
 }
