@@ -1,6 +1,6 @@
 #include "isr.h"
 #include "idt.h"
-#include "../drivers/chips/pic.h"
+#include "../chips/pic.h"
 #include <stddef.h>
 #include <mem.h>
 

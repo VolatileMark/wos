@@ -1,7 +1,7 @@
 #include "idt.h"
 #include "isr.h"
 #include "gdt.h"
-#include "../drivers/chips/pic.h"
+#include "../chips/pic.h"
 #include "../sys/scheduler.h"
 #include "../utils/constants.h"
 
@@ -39,8 +39,6 @@ typedef struct idt64_entry idt64_entry_t;
 
 static idt64_entry_t idt[IDT_NUM_ENTRIES];
 static idt64_descriptor_t idt_descriptor;
-
-
 
 extern void load_idt(uint64_t idt); /* ASM call */
 
