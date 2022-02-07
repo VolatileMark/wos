@@ -1,3 +1,4 @@
+#include "kernel.h"
 #include "mem/mmap.h"
 #include "mem/pfa.h"
 #include "mem/kheap.h"
@@ -63,12 +64,12 @@ void kernel_main
     
     init_descriptor.exec_paddr = init_exec_file_paddr;
     init_descriptor.exec_size = init_exec_file_size;
-    init_descriptor.exec_type = PROC_EXEC_BIN;
+    init_descriptor.exec_type = PROC_EXEC_ELF;
     init_descriptor.cmdline = NULL;
 
     fsrv_descriptor.exec_paddr = fsrv_exec_file_paddr;
     fsrv_descriptor.exec_size = fsrv_exec_file_size;
-    fsrv_descriptor.exec_type = PROC_EXEC_BIN;
+    fsrv_descriptor.exec_type = PROC_EXEC_ELF;
     fsrv_descriptor.cmdline = NULL;
 
     launch_init();

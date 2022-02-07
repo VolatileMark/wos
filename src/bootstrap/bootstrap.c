@@ -168,11 +168,11 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
         multiboot2_magic != MULTIBOOT2_BOOTLOADER_MAGIC /* Check if the magic number is correct */ ||
         multiboot_struct_addr & 0x0000000000000007 /* Check if the info struct is aligned to 4KB */
     )
-        goto HANG;
+        return;
 
     /* Parse the multiboot struct */
     if (parse_multiboot_struct(multiboot_struct_addr, &multiboot_struct_size, &initrd))
-        goto HANG;
+        return;
     
     /* Initialize the page frame allocator */
     init_pfa();
@@ -189,7 +189,7 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
     
     ustar_lookup(KERNEL_ELF_PATH, &kernel_elf_addr);
     if (load_elf(kernel_elf_addr, &kernel_entry, &kernel_start_paddr, &kernel_end_paddr))
-        goto HANG;
+        return;
     lock_pages(alignd(kernel_start_paddr, SIZE_4KB), ceil((double) (kernel_end_paddr - kernel_start_paddr) / SIZE_4KB));
     
     /* Relocate init executable */
@@ -218,7 +218,4 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
 
     void (*kernel_main)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, bitmap_t*) = ((__attribute__((sysv_abi)) void (*)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, bitmap_t*)) kernel_entry);
     kernel_main(multiboot_struct_addr, init_exec_file_new_addr, init_exec_file_size, fsrv_exec_file_new_addr, fsrv_exec_file_size, new_bitmap);
-
-    HANG:
-        while (1);
 }

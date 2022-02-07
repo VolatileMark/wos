@@ -56,7 +56,8 @@ _start64:
     pop rdi
     pop rsi
     ; Jump to C
-    jmp bootstrap_main
+    call bootstrap_main
+    jmp $
 
 
 

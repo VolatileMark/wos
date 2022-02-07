@@ -8,8 +8,8 @@
 #define INITRD_RELOC_ADDR (SIZE_1MB * 12)
 
 #define KERNEL_ELF_PATH "./wkernel.elf"
-#define FSRV_EXEC_FILE_PATH "./wfsrv.bin"
-#define INIT_EXEC_FILE_PATH "./winit.bin"
+#define FSRV_EXEC_FILE_PATH "./wfsrv.elf"
+#define INIT_EXEC_FILE_PATH "./winit.elf"
 
 typedef enum 
 {

@@ -39,7 +39,7 @@ static int sys_execve(uint64_t* stack)
     return 0;
 }
 
-static int sys_expheap(uint64_t* stack)
+static int sys_heap_expand(uint64_t* stack)
 {
     heap_t* heap = POP_STACK(heap_t*, stack);
     uint64_t size = POP_STACK(uint64_t, stack);
@@ -48,7 +48,7 @@ static int sys_expheap(uint64_t* stack)
     return 0;
 }
 
-static int sys_sppreg(uint64_t* stack)
+static int sys_spp_expose(uint64_t* stack)
 {
     uint64_t fn_addr = POP_STACK(uint64_t, stack);
     const char* fn_name = POP_STACK(const char*, stack);
@@ -58,8 +58,8 @@ static int sys_sppreg(uint64_t* stack)
 static syscall_handler_t handlers[NUM_SYSCALLS] = {
     sys_exit,
     sys_execve,
-    sys_expheap,
-    sys_sppreg
+    sys_heap_expand,
+    sys_spp_expose
 };
 
 int syscall_handler(uint64_t num, uint64_t* stack)

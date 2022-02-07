@@ -22,7 +22,7 @@ LDS = $(SOURCE_DIR)/Linker.ld
 
 AC_FLAGS = -I $(SOURCE_DIR) -f elf64 -F dwarf -g
 CC_FLAGS = -I $(LIBC_INCLUDE) -g -std=c99 -m64 -Wall -Werror -ffreestanding -mcmodel=kernel -mno-red-zone -nostdinc -nostartfiles -nodefaultlibs -nostdlib
-LD_FLAGS = -T $(LDS) -nostdlib
+LD_FLAGS = -T $(LDS) -nostdlib -z max-page-size=4096
 
 
 

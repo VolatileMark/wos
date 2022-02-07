@@ -9,7 +9,7 @@
 static uint64_t default_expand_heap(heap_t* heap, uint64_t size)
 {
     uint64_t heap_size;
-    syscall(SYS_expheap, heap, size, &heap_size);
+    syscall(SYS_heap_expand, heap, size, &heap_size);
     return heap_size;
 }
 

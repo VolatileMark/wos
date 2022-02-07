@@ -1,5 +1,6 @@
 #include "process.h"
 #include "scheduler.h"
+#include "../kernel.h"
 #include "../cpu/gdt.h"
 #include "../utils/constants.h"
 #include "../mem/pfa.h"
@@ -100,8 +101,58 @@ static int process_load_binary(process_t* ps, const process_descriptor_t* desc, 
 
 static int process_load_elf(process_t* ps, const process_descriptor_t* desc)
 {
-    UNUSED(ps);
-    UNUSED(desc);
+    uint64_t phdrs_offset, phdrs_total_size, paddr, tmp_vaddr;
+    Elf64_Phdr* phdr;
+    Elf64_Ehdr* ehdr;
+
+    if (kernel_get_next_vaddr(desc->exec_size, &tmp_vaddr) < desc->exec_size)
+        return -1;
+    if (kernel_map_memory(desc->exec_paddr, tmp_vaddr, desc->exec_size, PAGE_ACCESS_RO, PL0) < desc->exec_size)
+    {
+        kernel_unmap_memory(tmp_vaddr, desc->exec_size);
+        return -1;
+    }
+
+    ehdr = (Elf64_Ehdr*) tmp_vaddr;
+
+    if 
+    (
+        ehdr->e_ident[EI_MAG0] != ELFMAG0 ||
+        ehdr->e_ident[EI_MAG1] != ELFMAG1 ||
+        ehdr->e_ident[EI_MAG2] != ELFMAG2 ||
+        ehdr->e_ident[EI_MAG3] != ELFMAG3 ||
+        ehdr->e_ident[EI_CLASS] != ELFCLASS64 ||
+        ehdr->e_ident[EI_DATA] != ELFDATA2LSB ||
+        ehdr->e_ident[EI_OSABI] != ELFOSABI_SYSV ||
+        ehdr->e_ident[EI_VERSION] != EV_CURRENT ||
+        ehdr->e_machine != EM_X86_64 ||
+        ehdr->e_type != ET_EXEC
+    )
+        return -1;
+
+    phdrs_offset = (((uint64_t) ehdr) + ehdr->e_phoff);
+    phdrs_total_size = ehdr->e_phentsize * ehdr->e_phnum;
+
+    for
+    (
+        phdr = (Elf64_Phdr*) phdrs_offset;
+        phdr < (Elf64_Phdr*) (((uint64_t) phdrs_offset) + phdrs_total_size);
+        phdr = (Elf64_Phdr*) (((uint64_t) phdr) + ehdr->e_phentsize)
+    )
+    {
+        switch (phdr->p_type)
+        {
+        case PT_LOAD:
+            paddr = desc->exec_paddr + phdr->p_offset;
+            if (pml4_map_memory(ps->pml4, paddr, phdr->p_vaddr, phdr->p_memsz, PAGE_ACCESS_RW, PL3) < phdr->p_memsz)
+                return -1;
+            memcpy((void*) phdr->p_vaddr, (void*) (((uint64_t) ehdr) + phdr->p_offset), phdr->p_filesz);
+            break;
+        }
+    }
+    
+    kernel_unmap_memory(tmp_vaddr, desc->exec_size);
+
     return 0;
 }
 

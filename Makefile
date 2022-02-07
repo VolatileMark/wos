@@ -68,8 +68,8 @@ initrd:
 	@mkdir -p $(BUILD_DIR)/initrd
 	@mkdir -p $(BUILD_DIR)/iso/boot
 #	cp -f $(DATA_DIR)/ttyfont.psf $(BUILD_DIR)/initrd
-	cp -f $(BUILD_DIR)/init/init.bin $(BUILD_DIR)/initrd/winit.bin
-	cp -f $(BUILD_DIR)/fsrv/fsrv.bin $(BUILD_DIR)/initrd/wfsrv.bin
+	cp -f $(BUILD_DIR)/init/init.elf $(BUILD_DIR)/initrd/winit.elf
+	cp -f $(BUILD_DIR)/fsrv/fsrv.elf $(BUILD_DIR)/initrd/wfsrv.elf
 	cp -f $(BUILD_DIR)/kernel/kernel.elf $(BUILD_DIR)/initrd/wkernel.elf
 	cd $(BUILD_DIR)/initrd && tar --no-auto-compress --format=ustar --create --file=$(BUILD_DIR)/iso/boot/initrd.tar.gz .
 
