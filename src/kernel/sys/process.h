@@ -47,7 +47,7 @@ typedef struct
     uint64_t reserved : 55;
 } process_flags_t;
 
-typedef struct process
+typedef struct
 {
     uint64_t pid;
     uint64_t parent_pid;
@@ -82,6 +82,5 @@ process_t* create_replacement_process(process_t* parent, const process_descripto
 process_t* clone_process(process_t* parent, uint64_t id);
 void delete_and_free_process(process_t* ps);
 void delete_process_resources(process_t* ps);
-void load_process_pml4(process_t* ps);
 
 #endif

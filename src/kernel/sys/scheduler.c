@@ -1,4 +1,5 @@
 #include "scheduler.h"
+#include "../kernel.h"
 #include "../cpu/gdt.h"
 #include "../cpu/isr.h"
 #include "../cpu/tss.h"
@@ -29,11 +30,11 @@ typedef struct process_list
 } process_list_t;
 
 static uint64_t ms;
-static process_descriptor_t init_proc_descriptor;
 static process_list_t runnable_pss, zombie_pss;
 
 extern void run_process_in_user_mode(cpu_state_t* cpu);
 extern void run_process_in_kernel_mode(cpu_state_t* cpu);
+extern void switch_pml4_and_stack(uint64_t pml4_paddr);
 
 static uint64_t max_id_in_process_list(process_list_t* pss)
 {
@@ -261,7 +262,7 @@ static process_t* get_next_runnable_process(void)
     return runnable_pss.head->ps;
 }
 
-static void launch_init(void)
+void delete_zombie_processes(void)
 {
     /* Delete all zombie processes */
     process_list_entry_t* tmp;
@@ -279,9 +280,6 @@ static void launch_init(void)
         zombie_pss.head = ptr;
     }
     zombie_pss.tail = zombie_pss.head;
-
-    schedule_runnable_process(create_process(&init_proc_descriptor, 0));
-    run_scheduler();
 }
 
 void run_scheduler(void)
@@ -289,36 +287,14 @@ void run_scheduler(void)
     process_t* ps = get_next_runnable_process();
     
     if (ps == NULL)
-        launch_init();
+        launch_init(); /* Set a default launch function */
     
     tss_set_kernel_stack(ps->kernel_stack_start_vaddr + PROC_INITIAL_STACK_SIZE - sizeof(uint64_t));
-    load_process_pml4(ps);
+    kernel_inject_pml4(ps->pml4);
+    switch_pml4_and_stack(ps->pml4_paddr);
 
     if (ps->current.stack.cs == get_kernel_cs())
         run_process_in_kernel_mode(&ps->current);
     else
         run_process_in_user_mode(&ps->current);
-}
-
-void set_init_exec_file(uint64_t exec_paddr, uint64_t exec_size)
-{
-    Elf64_Ehdr* ehdr = (Elf64_Ehdr*) kernel_map_temporary_page(exec_paddr, PAGE_ACCESS_RO, PL0);
-
-    init_proc_descriptor.exec_paddr = exec_paddr;
-    init_proc_descriptor.exec_size = exec_size;
-
-    if 
-    (
-        ehdr->e_ident[EI_MAG0] == ELFMAG0 &&
-        ehdr->e_ident[EI_MAG1] == ELFMAG1 &&
-        ehdr->e_ident[EI_MAG2] == ELFMAG2 &&
-        ehdr->e_ident[EI_MAG3] == ELFMAG3
-    )
-        init_proc_descriptor.exec_type = PROC_EXEC_ELF;
-    else
-        init_proc_descriptor.exec_type = PROC_EXEC_BIN;
-    
-    init_proc_descriptor.cmdline = NULL;
-
-    kernel_unmap_temporary_page((uint64_t) ehdr);
 }

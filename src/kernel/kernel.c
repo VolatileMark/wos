@@ -14,24 +14,20 @@
 #include "sys/process.h"
 #include "sys/scheduler.h"
 #include "sys/syscall.h"
+#include "sys/ipc/spp.h"
 #include <stdint.h>
+#include <stddef.h>
 #include <mem.h>
 
-void kernel_main
-(
-    uint64_t multiboot_struct_addr, 
-    uint64_t init_exec_file_paddr, 
-    uint64_t init_exec_file_size, 
-    bitmap_t* current_bitmap
-)
-{
-    disable_interrupts();
+static process_descriptor_t init_descriptor, fsrv_descriptor;
 
+static void kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
+{
     init_paging();
     restore_pfa(current_bitmap);
     parse_multiboot_struct(multiboot_struct_addr);
     if (get_multiboot_struct_size() == 0)
-        goto HANG;
+        HALT();
     
     init_mmap(get_multiboot_tag_mmap());
     init_pfa();
@@ -43,11 +39,37 @@ void kernel_main
     init_syscalls();
     init_pit();
     init_scheduler();
+    init_spp();
+}
 
-    set_init_exec_file(init_exec_file_paddr, init_exec_file_size);
+void launch_init(void)
+{
+    delete_zombie_processes();
+    schedule_runnable_process(create_process(&init_descriptor, 0));
+    schedule_runnable_process(create_process(&fsrv_descriptor, 1));
     run_scheduler();
+}
+
+void kernel_main
+(
+    uint64_t multiboot_struct_addr, 
+    uint64_t init_exec_file_paddr, uint64_t init_exec_file_size, 
+    uint64_t fsrv_exec_file_paddr, uint64_t fsrv_exec_file_size, 
+    bitmap_t* current_bitmap
+)
+{
+    disable_interrupts();
+    kernel_init(multiboot_struct_addr, current_bitmap);
     
-    HANG:
-        while (1)
-            __asm__ ("hlt");
+    init_descriptor.exec_paddr = init_exec_file_paddr;
+    init_descriptor.exec_size = init_exec_file_size;
+    init_descriptor.exec_type = PROC_EXEC_BIN;
+    init_descriptor.cmdline = NULL;
+
+    fsrv_descriptor.exec_paddr = fsrv_exec_file_paddr;
+    fsrv_descriptor.exec_size = fsrv_exec_file_size;
+    fsrv_descriptor.exec_type = PROC_EXEC_BIN;
+    fsrv_descriptor.cmdline = NULL;
+
+    launch_init();
 }

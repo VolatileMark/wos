@@ -7,6 +7,7 @@ SECTIONS
     {
         *(.crt0)
         *(.text)
+        
     }
 
     .data :
@@ -26,10 +27,16 @@ SECTIONS
         *(.shstrtab*)
     }
 
-    .bss : 
+    .bss :
     {
         *(.bss)
         *(COMMON)
+    }
+
+    .text :
+    {
+        . = ALIGN(4K);
+        *(.exposed)
     }
 
     /DISCARD/ :

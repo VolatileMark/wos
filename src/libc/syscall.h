@@ -4,7 +4,7 @@
 #include "stdint.h"
 
 #define SYS_exit 0
-#define SYS_expheap 1
+#define SYS_expheap 2
 
 extern int syscall(uint64_t code, ...);
 

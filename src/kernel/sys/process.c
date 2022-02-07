@@ -12,6 +12,8 @@
 #include <alloc.h>
 #include <string.h>
 
+extern void switch_pml4(uint64_t pml4_paddr);
+
 static void init_process(process_t* ps, uint64_t pid)
 {
     ps->pid = pid;
@@ -356,13 +358,12 @@ void delete_process_resources(process_t* ps)
     
     if (ps->kernel_stack_start_vaddr != 0)
         delete_segments_list(&ps->kernel_stack_segments);
+    if (ps->args_start_vaddr != 0)
+        delete_segments_list(&ps->args_segments);
 
     delete_segments_list(&ps->code_segments);
     delete_segments_list(&ps->stack_segments);
     delete_segments_list(&ps->heap_segments);
-    
-    if (ps->args_start_vaddr != 0)
-        delete_segments_list(&ps->args_segments);
 
     for (i = 0; i < PROC_MAX_FDS; i++)
     {
@@ -528,10 +529,4 @@ process_t* clone_process(process_t* parent, uint64_t id)
     }
 
     return child;
-}
-
-void load_process_pml4(process_t* ps)
-{
-    kernel_inject_pml4(ps->pml4);
-    load_pml4(ps->pml4_paddr);
 }

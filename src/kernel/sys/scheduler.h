@@ -9,6 +9,7 @@ uint64_t get_next_pid(void);
 
 int init_scheduler(void);
 void run_scheduler(void);
+void delete_zombie_processes(void);
 process_t* get_current_scheduled_process(void);
 
 int schedule_runnable_process(process_t* ps);

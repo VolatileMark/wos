@@ -3,6 +3,22 @@
 
 [extern run_scheduler]
 [extern alignu]
+[extern get_tss]
+
+[global switch_pml4_and_stack]
+switch_pml4_and_stack:
+    call get_tss
+    pop rcx
+    pop rdx
+    pop rdx
+    mov rsp, [rax + 4]
+    mov rbp, rsp
+    mov cr3, rdi
+    push 0
+    push rbp
+    push rdx
+    push rcx
+    ret
 
 [global run_process_in_user_mode]
 align 8

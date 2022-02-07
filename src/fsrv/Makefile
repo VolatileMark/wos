@@ -9,7 +9,7 @@ LIBC_VAR = full
 LIBC_PATH = $(abspath $(BUILD_DIR)/../libc/var-$(LIBC_VAR))
 LIBC_INCLUDE = $(SOURCE_DIR)/../libc
 
-TARGET = init
+TARGET = fsrv
 
 C_SRCS = $(shell find $(SOURCE_DIR) -name '*.c')
 C_HDRS = $(shell find $(SOURCE_DIR) -name '*.h')
