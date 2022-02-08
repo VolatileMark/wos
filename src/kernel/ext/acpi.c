@@ -1,5 +1,6 @@
 #include "acpi.h"
-#include "../../utils/mb2utils.h"
+#include "../mem/paging.h"
+#include "../utils/helpers/mb2utils.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -30,6 +31,7 @@ typedef struct rsdp_descriptor_v2 rsdp_descriptor_v2_t;
 typedef struct
 {
     sdt_header_t* header;
+    uint64_t header_paddr;
     uint64_t pointer_size;
     uint64_t entries;
 } sdt_t;
@@ -58,11 +60,9 @@ static void calculate_sdt_entries(sdt_t* sdt)
 
 static int init_old_acpi(rsdp_descriptor_v1_t* rsdp)
 {
-    if (strncmp(rsdp->signature, RSDP_SIG, 8))
-        return -1;
     if (!checksum(rsdp, sizeof(rsdp_descriptor_v1_t)))
         return -1;
-    main_sdt.header = (sdt_header_t*) ((uint64_t) rsdp->rsdt_address);
+    main_sdt.header_paddr = (uint64_t) rsdp->rsdt_address;
     main_sdt.pointer_size = sizeof(uint32_t);
     calculate_sdt_entries(&main_sdt);
     return 0;
@@ -70,24 +70,38 @@ static int init_old_acpi(rsdp_descriptor_v1_t* rsdp)
 
 static int init_new_acpi(rsdp_descriptor_v2_t* rsdp)
 {
-    if (strncmp(rsdp->v1.signature, RSDP_SIG, 8))
-        return -1;
     if (!checksum(rsdp, sizeof(rsdp_descriptor_v2_t)))
         return -1;
-    main_sdt.header = (sdt_header_t*) rsdp->xsdt_address;
+    main_sdt.header_paddr = rsdp->xsdt_address;
     main_sdt.pointer_size = sizeof(uint64_t);
-    calculate_sdt_entries(&main_sdt);
     return 0;
 }
 
 int init_acpi(void)
 {
+    uint64_t sdt_vaddr, sdt_size;
+    sdt_header_t* mapped_sdt_header;
     rsdp_descriptor_v1_t* rsdp = get_rsdp();
-    if (rsdp->revision == ACPI_REV_OLD)
-        return init_old_acpi(rsdp);
-    else if (rsdp->revision == ACPI_REV_NEW)
-        return init_new_acpi((rsdp_descriptor_v2_t*) rsdp);
-    return -1;
+
+    if 
+    (
+        strncmp(rsdp->signature, RSDP_SIG, 8) ||
+        (rsdp->revision == ACPI_REV_OLD && init_old_acpi(rsdp)) ||
+        (rsdp->revision == ACPI_REV_NEW && init_new_acpi((rsdp_descriptor_v2_t*) rsdp))
+    )
+        return -1;
+    
+    mapped_sdt_header = (sdt_header_t*) kernel_map_temporary_page(main_sdt.header_paddr, PAGE_ACCESS_RO, PL0);
+    sdt_size = (uint64_t) mapped_sdt_header->length;
+    kernel_unmap_temporary_page((uint64_t) mapped_sdt_header);
+    if (kernel_get_next_vaddr(sdt_size, &sdt_vaddr) < sdt_size)
+        return -1;
+    kernel_map_memory(main_sdt.header_paddr, sdt_vaddr, sdt_size, PAGE_ACCESS_RO, PL0);
+    main_sdt.header = (sdt_header_t*) sdt_vaddr;
+
+    calculate_sdt_entries(&main_sdt);
+    
+    return 0;
 }
 
 sdt_header_t* find_acpi_table(const char* signature)

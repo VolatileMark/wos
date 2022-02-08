@@ -6,25 +6,25 @@ align SIZE_4KB
 pml4: resb SIZE_4KB
 
 align SIZE_4KB
-pdp_0: resb SIZE_4KB
+pdp_000: resb SIZE_4KB
 
 align SIZE_4KB
 pdp_511: resb SIZE_4KB
 
 align SIZE_4KB
-pd_0_0: resb SIZE_4KB
+pd_000_000: resb SIZE_4KB
 
 align SIZE_4KB
 pd_511_510: resb SIZE_4KB
 
 align SIZE_4KB
-pt_0_0_0: resb SIZE_4KB
+pt_000_000_000: resb SIZE_4KB
 
 align SIZE_4KB
-pt_0_0_1: resb SIZE_4KB
+pt_000_000_001: resb SIZE_4KB
 
 align SIZE_4KB
-pt_511_510_0: resb SIZE_4KB
+pt_511_510_000: resb SIZE_4KB
 
 
 
@@ -41,30 +41,30 @@ init_basic_paging:
     mov cr3, edi
     ; Zero out pml4
     call clear_table
-    ; Set entry 0 of pml4 to point to pdp_0
-    mov edi, pdp_0
+    ; Set entry 0 of pml4 to point to pdp_000
+    mov edi, pdp_000
     call clear_table
     or edi, PTE_FLAGS
     mov [pml4], edi
-    ; Set entry 0 of pdp_0 to point to pd_0_0
-    mov edi, pd_0_0
+    ; Set entry 0 of pdp_000 to point to pd_000_000
+    mov edi, pd_000_000
     call clear_table
     or edi, PTE_FLAGS
-    mov [pdp_0], edi
-    ; Set entry 0 of pd_0_0 to point to pt_0_0_0
-    mov edi, pt_0_0_0
+    mov [pdp_000], edi
+    ; Set entry 0 of pd_000_000 to point to pt_000_000_000
+    mov edi, pt_000_000_000
     or edi, PTE_FLAGS
-    mov [pd_0_0 + 8*0], edi
+    mov [pd_000_000 + 8*0], edi
     ; Map the first 2MB of memory
-    mov edi, pt_0_0_0
+    mov edi, pt_000_000_000
     mov eax, 0x00000000
     call fill_table
-    ; Set entry 0 of pd_0_0 to point to pt_0_0_1
-    mov edi, pt_0_0_1
+    ; Set entry 0 of pd_000_000 to point to pt_000_000_001
+    mov edi, pt_000_000_001
     or edi, PTE_FLAGS
-    mov [pd_0_0 + 8*1], edi
+    mov [pd_000_000 + 8*1], edi
     ; Map the next 2MB of memory
-    mov edi, pt_0_0_1
+    mov edi, pt_000_000_001
     mov eax, 0x00200000
     call fill_table
     ; Map PML4 and tmp PT
@@ -75,22 +75,21 @@ map_tmp:
     mov edi, pdp_511
     call clear_table
     or edi, PTE_FLAGS
-    mov [pml4 + 511 * 8], edi
+    mov [pml4 + 8*511], edi
     mov edi, pd_511_510
     call clear_table
     or edi, PTE_FLAGS
-    mov [pdp_511 + 510 * 8], edi
-    mov edi, pt_511_510_0
+    mov [pdp_511 + 8*510], edi
+    mov edi, pt_511_510_000
     call clear_table
     or edi, PTE_FLAGS
-    mov [pd_511_510], edi
+    mov [pd_511_510 + 8*0], edi
     mov edi, pml4
     or edi, PTE_FLAGS
-    mov [pt_511_510_0], edi
-    mov edi, pt_511_510_0
+    mov [pt_511_510_000 + 8*0], edi
+    mov edi, pt_511_510_000
     or edi, PTE_FLAGS
-    or edi, 0b00010000
-    mov [pt_511_510_0 + 8], edi
+    mov [pt_511_510_000 + 8*1], edi
     ret
 
 fill_table:

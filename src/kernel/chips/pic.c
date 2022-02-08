@@ -1,6 +1,6 @@
 #include "pic.h"
-#include "../io/ports.h"
-#include "../../cpu/isr.h"
+#include "../cpu/io.h"
+#include "../cpu/isr.h"
 
 #define PIC1 0x20
 #define PIC2 0xA0

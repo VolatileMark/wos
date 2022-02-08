@@ -2,23 +2,26 @@
 #include <stddef.h>
 #include <math.h>
 #include <mem.h>
-#include "utils/multiboot2.h"
 #include "mem/mmap.h"
 #include "mem/pfa.h"
 #include "mem/paging.h"
+#include "utils/multiboot2.h"
 #include "utils/constants.h"
+#include "utils/config.h"
 #include "utils/elf.h"
-#include "utils/bitmap.h"
-#include "utils/ustar.h"
+#include "utils/helpers/bitmap.h"
+#include "drivers/fs/ustar.h"
+#include "ext/acpi.h"
 
-static int parse_multiboot_struct(uint64_t addr, uint64_t* out_size, struct multiboot_tag_module** out_module)
+static int parse_multiboot_struct(uint64_t addr, uint64_t* out_size, uint64_t* out_rsdp_paddr, struct multiboot_tag_module** out_module)
 {
     uint64_t size = (uint64_t) *((uint32_t*) addr);
     struct multiboot_tag* tag;
     
     *out_size = size;
+    *out_rsdp_paddr = 0;
     *out_module = NULL;
-
+    
     for 
     (
         tag = (struct multiboot_tag*) alignu(addr + sizeof(struct multiboot_tag), MULTIBOOT_TAG_ALIGN);
@@ -34,6 +37,10 @@ static int parse_multiboot_struct(uint64_t addr, uint64_t* out_size, struct mult
             break;
         case MULTIBOOT_TAG_TYPE_MODULE:
             *out_module = (struct multiboot_tag_module*) tag;
+            break;
+        case MULTIBOOT_TAG_TYPE_ACPI_NEW:
+        case MULTIBOOT_TAG_TYPE_ACPI_OLD:
+            *out_rsdp_paddr = (uint64_t) ((struct multiboot_tag_old_acpi*) tag)->rsdp;
             break;
         }
     }
@@ -150,6 +157,7 @@ static void relocate_initrd(struct multiboot_tag_module* initrd)
     paging_map_memory(INITRD_RELOC_ADDR, INITRD_RELOC_ADDR, size, PAGE_ACCESS_RW, PL0);
     memcpy((void*) INITRD_RELOC_ADDR, (void*) ((uint64_t) initrd->mod_start), size);
     paging_unmap_memory(initrd->mod_start, size);
+    free_pages(initrd->mod_start, ceil((double) size / SIZE_4KB));
     initrd->mod_start = INITRD_RELOC_ADDR;
     initrd->mod_end = INITRD_RELOC_ADDR + size;
     lock_pages(initrd->mod_start, ceil((double) size / SIZE_4KB));
@@ -162,6 +170,7 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
     uint64_t kernel_elf_addr, kernel_entry, kernel_start_paddr, kernel_end_paddr;
     uint64_t init_exec_file_size, init_exec_file_addr, init_exec_file_new_addr;
     uint64_t fsrv_exec_file_size, fsrv_exec_file_addr, fsrv_exec_file_new_addr;
+    uint64_t rsdp_paddr;
     bitmap_t* new_bitmap;
 
     if 
@@ -172,18 +181,27 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
         return;
 
     /* Parse the multiboot struct */
-    if (parse_multiboot_struct(multiboot_struct_addr, &multiboot_struct_size, &initrd))
+    if 
+    (
+        parse_multiboot_struct(multiboot_struct_addr, &multiboot_struct_size, &rsdp_paddr, &initrd) ||
+        multiboot_struct_size == 0 ||
+        rsdp_paddr == 0 ||
+        initrd == NULL
+    )
         return;
-    
+
     /* Initialize the page frame allocator */
     init_pfa();
-    lock_pages(alignd((uint64_t) &_start_addr, SIZE_4KB), ceil((double) (((uint64_t) &_end_addr) - ((uint64_t) &_start_addr)) / SIZE_4KB));
-    lock_pages(alignd(multiboot_struct_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB));
-    lock_pages(alignd(initrd->mod_start, SIZE_4KB), ceil((double) (initrd->mod_end - initrd->mod_start) / SIZE_4KB));
 
     /* Initialize paging helper */
     init_paging();
 
+    lock_pages(alignd((uint64_t) &_start_addr, SIZE_4KB), ceil((double) (((uint64_t) &_end_addr) - ((uint64_t) &_start_addr)) / SIZE_4KB));
+    lock_pages(alignd(multiboot_struct_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB));
+    lock_pages(alignd(initrd->mod_start, SIZE_4KB), ceil((double) (initrd->mod_end - initrd->mod_start) / SIZE_4KB));
+    if (lock_acpi_sdt_pages(rsdp_paddr))
+        return;
+    
     /* Relocate initrd */
     relocate_initrd(initrd);
     ustar_set_address(initrd->mod_start);

@@ -70,12 +70,7 @@ static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, PAGE_
 uint64_t kernel_map_temporary_page(uint64_t paddr, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
 {
     uint64_t index = get_next_tmp_index();
-    page_table_entry_t* entry = &kernel_tmp_pt[index];
-    PTE_CLEAR(entry);
-    entry->present = 1;
-    entry->allow_writes = 1;
-    entry->allow_user_access = 1;
-    set_pte_address(entry, paddr);
+    create_pte(kernel_tmp_pt, index, paddr, access, privilege_level);
     return VADDR_GET_TEMPORARY(index);
 }
 

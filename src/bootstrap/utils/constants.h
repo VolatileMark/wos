@@ -4,13 +4,6 @@
 #define SIZE_4KB 0x1000
 #define SIZE_1MB 0x100000
 
-#define MIN_MEMORY (SIZE_1MB * 16)
-#define INITRD_RELOC_ADDR (SIZE_1MB * 12)
-
-#define KERNEL_ELF_PATH "./wkernel.elf"
-#define FSRV_EXEC_FILE_PATH "./wfsrv.elf"
-#define INIT_EXEC_FILE_PATH "./winit.elf"
-
 typedef enum 
 {
     PL0 = 0x00,

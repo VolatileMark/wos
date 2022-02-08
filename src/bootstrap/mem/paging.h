@@ -48,8 +48,6 @@ typedef enum
 #define PML4_ENTRY_SIZE (PDP_ENTRY_SIZE * MAX_PAGE_TABLE_ENTRIES)
 #define PML4_VADDR VADDR_GET_TEMPORARY(0)
 
-extern void load_pml4(uint64_t pml4_paddr);
-extern void flush_tlb(void);
 extern uint64_t get_current_pml4_paddr(void);
 extern void invalidate_pte(uint64_t vaddr);
 
