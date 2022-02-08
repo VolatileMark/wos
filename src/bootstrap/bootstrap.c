@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include <math.h>
 #include <mem.h>
-#include "external/multiboot2.h"
+#include "utils/multiboot2.h"
 #include "mem/mmap.h"
 #include "mem/pfa.h"
 #include "mem/paging.h"

@@ -1,4 +1,4 @@
-#include "multiboot.h"
+#include "mb2utils.h"
 #include <mem.h>
 
 static uint64_t struct_size;

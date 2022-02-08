@@ -1,5 +1,5 @@
 #include "acpi.h"
-#include "../../utils/multiboot.h"
+#include "../../utils/mb2utils.h"
 #include <stdint.h>
 
 struct rsdp_descriptor_v1

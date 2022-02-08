@@ -6,10 +6,10 @@
 #define PIC2 0xA0
 
 #define PIC1_COMM PIC1
-#define PIC1_DATA PIC1 + 1
+#define PIC1_DATA (PIC1 + 1)
 
 #define PIC2_COMM PIC2
-#define PIC2_DATA PIC2 + 1
+#define PIC2_DATA (PIC2 + 1)
 
 /**
  *  Bit 0: If 1, the PIC expects ICW4.

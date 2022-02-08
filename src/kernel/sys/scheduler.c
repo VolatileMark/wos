@@ -5,9 +5,9 @@
 #include "../cpu/tss.h"
 #include "../cpu/interrupts.h"
 #include "../utils/constants.h"
-#include "../drivers/chips/pic.h"
-#include "../drivers/chips/pit.h"
-#include "../utils/multiboot.h"
+#include "../external/chips/pic.h"
+#include "../external/chips/pit.h"
+#include "../utils/mb2utils.h"
 #include "../utils/elf.h"
 #include <stddef.h>
 #include <math.h>

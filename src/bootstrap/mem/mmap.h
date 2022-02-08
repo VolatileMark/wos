@@ -1,7 +1,7 @@
 #ifndef __MMAP_H__
 #define __MMAP_H__
 
-#include "../external/multiboot2.h"
+#include "../utils/multiboot2.h"
 #include <stdint.h>
 
 int init_mmap(struct multiboot_tag_mmap* tag);
