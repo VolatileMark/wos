@@ -1,7 +1,7 @@
 #include "idt.h"
 #include "isr.h"
 #include "gdt.h"
-#include "../chips/pic.h"
+#include "../drivers/chips/pic.h"
 #include "../sys/scheduler.h"
 #include "../utils/constants.h"
 

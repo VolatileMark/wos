@@ -11,7 +11,7 @@
 #include "utils/bitmap.h"
 #include "utils/macros.h"
 #include "utils/multiboot.h"
-#include "chips/pit.h"
+#include "drivers/chips/pit.h"
 #include "sys/process.h"
 #include "sys/scheduler.h"
 #include "sys/syscall.h"

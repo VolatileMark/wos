@@ -1,6 +1,6 @@
 #include "pit.h"
-#include "../cpu/io.h"
-#include "../cpu/interrupts.h"
+#include "../io/ports.h"
+#include "../../cpu/interrupts.h"
 #include <stddef.h>
 #include <mem.h>
 #include <alloc.h>
