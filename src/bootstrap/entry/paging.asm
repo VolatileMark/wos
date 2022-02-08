@@ -54,7 +54,7 @@ init_basic_paging:
     ; Set entry 0 of pd_0_0 to point to pt_0_0_0
     mov edi, pt_0_0_0
     or edi, PTE_FLAGS
-    mov [pd_0_0], edi
+    mov [pd_0_0 + 8*0], edi
     ; Map the first 2MB of memory
     mov edi, pt_0_0_0
     mov eax, 0x00000000
@@ -62,7 +62,7 @@ init_basic_paging:
     ; Set entry 0 of pd_0_0 to point to pt_0_0_1
     mov edi, pt_0_0_1
     or edi, PTE_FLAGS
-    mov [pd_0_0 + 8], edi
+    mov [pd_0_0 + 8*1], edi
     ; Map the next 2MB of memory
     mov edi, pt_0_0_1
     mov eax, 0x00200000

@@ -12,6 +12,7 @@
 #include "utils/macros.h"
 #include "utils/mb2utils.h"
 #include "external/chips/pit.h"
+#include "external/io/acpi.h"
 #include "sys/process.h"
 #include "sys/scheduler.h"
 #include "sys/syscall.h"
@@ -38,6 +39,9 @@ static void kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap
     init_gdt();
     init_idt();
     init_isr();
+    if (init_acpi())
+        HALT();
+
     init_kernel_heap(KERNEL_HEAP_START_ADDR, KERNEL_HEAP_CEIL_ADDR, SIZE_4KB);
     init_syscalls();
     init_pit();

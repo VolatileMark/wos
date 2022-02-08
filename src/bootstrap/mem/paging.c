@@ -7,6 +7,13 @@ static page_table_t bootstrap_pml4;
 static page_table_t bootstrap_tmp_pt;
 static uint64_t bootstrap_tmp_index;
 
+void init_paging(void)
+{
+    bootstrap_pml4 = (page_table_t) PML4_VADDR;
+    bootstrap_tmp_pt = (page_table_t) VADDR_GET_TEMPORARY(1);
+    bootstrap_tmp_index = 2;
+}
+
 void set_pte_address(page_table_entry_t* entry, uint64_t addr)
 {
     addr >>= 12;
@@ -75,13 +82,6 @@ void paging_unmap_temporary_page(uint64_t vaddr)
         bootstrap_tmp_index = index;
     PTE_CLEAR(&bootstrap_tmp_pt[index]);
     invalidate_pte(vaddr);
-}
-
-void init_paging(void)
-{
-    bootstrap_pml4 = (page_table_t) PML4_VADDR;
-    bootstrap_tmp_pt = (page_table_t) VADDR_GET_TEMPORARY(1);
-    bootstrap_tmp_index = 2;
 }
 
 uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
@@ -287,7 +287,7 @@ static uint64_t pt_map_memory
     while (mapped_size < size && pt_idx < MAX_PAGE_TABLE_ENTRIES)
     {
         if (pt[pt_idx].present)
-            return mapped_size;
+            return 0;
         create_pte(pt, pt_idx, paddr, access, privilege_level);
 
         paddr += PT_ENTRY_SIZE;
@@ -453,185 +453,4 @@ uint64_t pml4_map_memory
     }
 
     return total_mapped_size;
-}
-
-uint64_t paging_get_next_vaddr(uint64_t size, uint64_t* vaddr_out)
-{
-    return pml4_get_next_vaddr(bootstrap_pml4, (uint64_t) &_end_addr, size, vaddr_out);
-}
-
-uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t size, uint64_t* vaddr_out)
-{
-    uint64_t pml4_idx, pdp_idx, pd_idx, pt_idx;
-    uint64_t total_size_found = 0;
-    page_table_t pdp, pd, pt;
-    page_table_entry_t entry;
-
-    size = alignu(size, SIZE_4KB);
-    vaddr_start = alignd(vaddr_start, PT_ENTRY_SIZE);
-
-    pml4_idx = VADDR_TO_PML4_IDX(vaddr_start);
-    pdp_idx = VADDR_TO_PDP_IDX(vaddr_start);
-    pd_idx = VADDR_TO_PD_IDX(vaddr_start);
-    pt_idx = VADDR_TO_PT_IDX(vaddr_start);
-
-    for
-    (
-        ;
-        total_size_found < size && pml4_idx < MAX_PAGE_TABLE_ENTRIES;
-        pml4_idx++
-    )
-    {
-        entry = pml4[pml4_idx];
-        if (entry.present)
-        {
-            pdp = (page_table_t) paging_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RO, PL0);
-            for
-            (
-                ;
-                total_size_found < size && pdp_idx < MAX_PAGE_TABLE_ENTRIES;
-                pdp_idx++
-            )
-            {
-                entry = pdp[pdp_idx];
-                if (entry.present)
-                {
-                    pd = (page_table_t) paging_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RO, PL0);
-                    for
-                    (
-                        ;
-                        total_size_found < size && pd_idx < MAX_PAGE_TABLE_ENTRIES;
-                        pd_idx++
-                    )
-                    {
-                        entry = pd[pd_idx];
-                        if (entry.present)
-                        {
-                            pt = (page_table_t) paging_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RO, PL0);
-                            for
-                            (
-                                ;
-                                total_size_found < size && pt_idx < MAX_PAGE_TABLE_ENTRIES;
-                                pt_idx++
-                            )
-                            {
-                                entry = pt[pt_idx];
-                                if (entry.present)
-                                    total_size_found = 0;
-                                else
-                                    total_size_found += SIZE_4KB;
-                            }
-                            paging_unmap_temporary_page((uint64_t) pt);
-                            if (total_size_found < size)
-                                pt_idx = 0;
-                            else
-                                --pt_idx;
-                        }
-                        else
-                            total_size_found += PD_ENTRY_SIZE;
-                    }
-                    paging_unmap_temporary_page((uint64_t) pd);
-                    if (total_size_found < size)
-                        pd_idx = 0;
-                    else
-                        --pd_idx;
-                }
-                else
-                    total_size_found += PDP_ENTRY_SIZE;
-            }
-            paging_unmap_temporary_page((uint64_t) pdp);
-            if (total_size_found < size)
-                pdp_idx = 0;
-            else
-                --pdp_idx;
-        }
-        else
-            total_size_found += PML4_ENTRY_SIZE;
-    }
-    if (total_size_found < size)
-        pml4_idx = 0;
-    else
-        --pml4_idx;
-    
-    *vaddr_out = VADDR_GET(pml4_idx, pdp_idx, pd_idx, pt_idx);
-    return total_size_found;
-}
-
-uint64_t paging_get_paddr(uint64_t vaddr)
-{
-    return pml4_get_paddr(bootstrap_pml4, vaddr);
-}
-
-uint64_t pml4_get_paddr(page_table_t pml4, uint64_t vaddr)
-{
-    page_table_t pt;
-    uint64_t idx;
-    page_table_entry_t entry;
-
-    idx = VADDR_TO_PML4_IDX(vaddr);
-    entry = pml4[idx];
-    if (!entry.present)    
-        return 0;
-    
-    idx = VADDR_TO_PDP_IDX(vaddr);
-    pt = (page_table_t) paging_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RO, PL0);
-    entry = pt[idx];
-    paging_unmap_temporary_page((uint64_t) pt);
-    if (!entry.present)
-        return 0;
-    
-    idx = VADDR_TO_PD_IDX(vaddr);
-    pt = (page_table_t) paging_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RO, PL0);
-    entry = pt[idx];
-    paging_unmap_temporary_page((uint64_t) pt);
-    if (!entry.present)
-        return 0;
-    
-    idx = VADDR_TO_PT_IDX(vaddr);
-    pt = (page_table_t) paging_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RO, PL0);
-    entry = pt[idx];
-    paging_unmap_temporary_page((uint64_t) pt);
-    if (!entry.present)
-        return 0;
-    
-    return (get_pte_address(&entry) + (vaddr & 0x0000000000000FFF));
-}
-
-void delete_pml4(page_table_t pml4)
-{
-    uint64_t pml4_idx, pdp_idx, pd_idx;
-    uint64_t pml4_paddr, pdp_paddr, pd_paddr;
-    page_table_entry_t entry;
-    page_table_t pdp, pd;
-
-    pml4_paddr = paging_get_paddr((uint64_t) pml4);
-    for (pml4_idx = 0; pml4_idx < MAX_PAGE_TABLE_ENTRIES; pml4_idx++)
-    {
-        entry = pml4[pdp_idx];
-        if (entry.present)
-        {
-            pdp_paddr = get_pte_address(&entry);
-            pdp = (page_table_t) paging_map_temporary_page(pdp_paddr, PAGE_ACCESS_RO, PL0);
-            for (pdp_idx = 0; pdp_idx < MAX_PAGE_TABLE_ENTRIES; pdp_idx++)
-            {
-                entry = pdp[pdp_idx];
-                if (entry.present)
-                {
-                    pd_paddr = get_pte_address(&entry);
-                    pd = (page_table_t) paging_map_temporary_page(pd_paddr, PAGE_ACCESS_RO, PL0);
-                    for (pd_idx = 0; pd_idx < MAX_PAGE_TABLE_ENTRIES; pd_idx++)
-                    {
-                        entry = pd[pd_idx];
-                        if (entry.present)
-                            free_page(get_pte_address(&entry));
-                    }
-                    paging_unmap_temporary_page((uint64_t) pd);
-                    free_page(pd_paddr);
-                }
-            }
-            paging_unmap_temporary_page((uint64_t) pdp);
-            free_page(pdp_paddr);
-        }
-    }
-    free_page(pml4_paddr);
 }

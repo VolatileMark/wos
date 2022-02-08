@@ -1,16 +1,24 @@
 #include "mb2utils.h"
 #include <mem.h>
+#include <stddef.h>
 
 static uint64_t struct_size;
 static struct multiboot_tag_mmap* mmap;
 static struct multiboot_tag_module* initrd;
 static struct multiboot_tag_framebuffer* framebuffer;
 static struct multiboot_tag_new_acpi* new_acpi;
+static struct multiboot_tag_old_acpi* old_acpi;
 
 void parse_multiboot_struct(uint64_t addr)
 {
     struct multiboot_tag* tag;
     struct_size = (uint64_t) *((uint32_t*) addr);
+
+    mmap = NULL;
+    initrd = NULL;
+    framebuffer = NULL;
+    new_acpi = NULL;
+    old_acpi = NULL;
 
     for 
     (
@@ -32,6 +40,9 @@ void parse_multiboot_struct(uint64_t addr)
             break;
         case MULTIBOOT_TAG_TYPE_ACPI_NEW:
             new_acpi = (struct multiboot_tag_new_acpi*) tag;
+            break;
+        case MULTIBOOT_TAG_TYPE_ACPI_OLD:
+            old_acpi = (struct multiboot_tag_old_acpi*) tag;
             break;
         }
     }
@@ -59,4 +70,9 @@ struct multiboot_tag_framebuffer* get_multiboot_tag_framebuffer(void)
 struct multiboot_tag_new_acpi* get_multiboot_tag_new_acpi(void)
 {
     return new_acpi;
+}
+
+struct multiboot_tag_old_acpi* get_multiboot_tag_old_acpi(void)
+{
+    return old_acpi;
 }
