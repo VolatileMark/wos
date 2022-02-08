@@ -5,6 +5,7 @@ static uint64_t struct_size;
 static struct multiboot_tag_mmap* mmap;
 static struct multiboot_tag_module* initrd;
 static struct multiboot_tag_framebuffer* framebuffer;
+static struct multiboot_tag_new_acpi* new_acpi;
 
 void parse_multiboot_struct(uint64_t addr)
 {
@@ -29,6 +30,9 @@ void parse_multiboot_struct(uint64_t addr)
         case MULTIBOOT_TAG_TYPE_FRAMEBUFFER:
             framebuffer = (struct multiboot_tag_framebuffer*) tag;
             break;
+        case MULTIBOOT_TAG_TYPE_ACPI_NEW:
+            new_acpi = (struct multiboot_tag_new_acpi*) tag;
+            break;
         }
     }
 }
@@ -50,4 +54,9 @@ struct multiboot_tag_module* get_multiboot_tag_initrd(void)
 struct multiboot_tag_framebuffer* get_multiboot_tag_framebuffer(void)
 {
     return framebuffer;
+}
+
+struct multiboot_tag_new_acpi* get_multiboot_tag_new_acpi(void)
+{
+    return new_acpi;
 }

@@ -18,6 +18,8 @@
 #include "sys/ipc/spp.h"
 #include <stdint.h>
 #include <stddef.h>
+#include <alloc.h>
+#include <string.h>
 #include <mem.h>
 
 static process_descriptor_t init_descriptor, fsrv_descriptor;
@@ -61,7 +63,7 @@ void kernel_main
 {
     disable_interrupts();
     kernel_init(multiboot_struct_addr, current_bitmap);
-    
+
     init_descriptor.exec_paddr = init_exec_file_paddr;
     init_descriptor.exec_size = init_exec_file_size;
     init_descriptor.exec_type = PROC_EXEC_ELF;
