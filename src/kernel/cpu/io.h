@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-extern void write_port(uint16_t portAddress, uint8_t dataByte);
-extern uint8_t read_port(uint16_t portAddress);
+extern void write_to_port(uint16_t port_address, uint8_t data);
+extern uint8_t read_from_port(uint16_t port_address);
 extern void wait_for_ports(void);
 
 #endif

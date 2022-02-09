@@ -18,5 +18,6 @@ struct sdt_header
 typedef struct sdt_header sdt_header_t;
 
 int init_acpi(void);
+sdt_header_t* find_acpi_table(const char* signature);
 
 #endif

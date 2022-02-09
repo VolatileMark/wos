@@ -53,66 +53,82 @@ static int checksum(void* rsdp, uint64_t size)
     return (checksum == 0);
 }
 
-static void calculate_sdt_entries(sdt_t* sdt)
-{
-    sdt->entries = (sdt->header->length - sizeof(sdt_header_t)) / sdt->pointer_size;
-}
-
-static int init_old_acpi(rsdp_descriptor_v1_t* rsdp)
-{
-    if (!checksum(rsdp, sizeof(rsdp_descriptor_v1_t)))
-        return -1;
-    main_sdt.header_paddr = (uint64_t) rsdp->rsdt_address;
-    main_sdt.pointer_size = sizeof(uint32_t);
-    calculate_sdt_entries(&main_sdt);
-    return 0;
-}
-
-static int init_new_acpi(rsdp_descriptor_v2_t* rsdp)
-{
-    if (!checksum(rsdp, sizeof(rsdp_descriptor_v2_t)))
-        return -1;
-    main_sdt.header_paddr = rsdp->xsdt_address;
-    main_sdt.pointer_size = sizeof(uint64_t);
-    return 0;
-}
-
 int init_acpi(void)
 {
-    uint64_t sdt_vaddr, sdt_size;
+    uint64_t sdt_vaddr, sdt_size, sdt_addr_offset;
     sdt_header_t* mapped_sdt_header;
     rsdp_descriptor_v1_t* rsdp = get_rsdp();
 
-    if 
-    (
-        strncmp(rsdp->signature, RSDP_SIG, 8) ||
-        (rsdp->revision == ACPI_REV_OLD && init_old_acpi(rsdp)) ||
-        (rsdp->revision == ACPI_REV_NEW && init_new_acpi((rsdp_descriptor_v2_t*) rsdp))
-    )
+    if (strncmp(rsdp->signature, RSDP_SIG, 8))
+        return -1;
+    if (rsdp->revision == ACPI_REV_OLD && checksum(rsdp, sizeof(rsdp_descriptor_v1_t)))
+    {
+        main_sdt.header_paddr = (uint64_t) rsdp->rsdt_address;
+        main_sdt.pointer_size = sizeof(uint32_t);
+    }
+    else if (rsdp->revision >= ACPI_REV_NEW && checksum(rsdp, sizeof(rsdp_descriptor_v2_t)))
+    {
+        main_sdt.header_paddr = ((rsdp_descriptor_v2_t*) rsdp)->xsdt_address;
+        main_sdt.pointer_size = sizeof(uint64_t);
+    }
+    else
         return -1;
     
-    mapped_sdt_header = (sdt_header_t*) kernel_map_temporary_page(main_sdt.header_paddr, PAGE_ACCESS_RO, PL0);
+    sdt_addr_offset = GET_ADDR_OFFSET(main_sdt.header_paddr);
+    
+    mapped_sdt_header = (sdt_header_t*) (kernel_map_temporary_page(main_sdt.header_paddr, PAGE_ACCESS_RO, PL0) + sdt_addr_offset);
     sdt_size = (uint64_t) mapped_sdt_header->length;
     kernel_unmap_temporary_page((uint64_t) mapped_sdt_header);
+    
     if (kernel_get_next_vaddr(sdt_size, &sdt_vaddr) < sdt_size)
         return -1;
+    sdt_vaddr += sdt_addr_offset;
+    
     kernel_map_memory(main_sdt.header_paddr, sdt_vaddr, sdt_size, PAGE_ACCESS_RO, PL0);
     main_sdt.header = (sdt_header_t*) sdt_vaddr;
 
-    calculate_sdt_entries(&main_sdt);
+    main_sdt.entries = (main_sdt.header->length - sizeof(sdt_header_t)) / main_sdt.pointer_size;
     
     return 0;
+}
+
+static uint64_t get_next_entry_pointer(sdt_t* sdt, uint64_t index)
+{
+    uint64_t entries_array = (uint64_t) (sdt->header + 1);
+    uint64_t entry_offset = index * sdt->pointer_size;
+    uint64_t entry_pointer, byte_offset, byte;
+    for 
+    (
+        byte = sdt->pointer_size, entry_pointer = 0; 
+        byte > 0;
+        byte--
+    )
+    {
+        byte_offset = byte - 1;
+        entry_pointer |= *((uint8_t*) (entries_array + entry_offset + byte_offset)) << (8 * byte_offset);
+    }
+    return entry_pointer;
 }
 
 sdt_header_t* find_acpi_table(const char* signature)
 {
     sdt_header_t* header;
-    uint64_t i;
-    for (i = 0; i < main_sdt.entries; i++)
+    uint64_t entry_paddr, entry_vaddr, entry_size, entry;
+    for (entry = 0; entry < main_sdt.entries; entry++)
     {
-        header = (sdt_header_t*) (((uint64_t) (main_sdt.header + 1)) + (i * main_sdt.pointer_size));
+        entry_paddr = get_next_entry_pointer(&main_sdt, entry);
+        header = (sdt_header_t*) (kernel_map_temporary_page(entry_paddr, PAGE_ACCESS_RO, PL0) + GET_ADDR_OFFSET(entry_paddr));
         if (!strncmp(header->signature, signature, 4))
-            return header;
+        {
+            entry_size = header->length;
+            kernel_unmap_temporary_page((uint64_t) header);
+            if (kernel_get_next_vaddr(entry_size, &entry_vaddr) < entry_size)
+                return NULL;
+            entry_vaddr += GET_ADDR_OFFSET(entry_paddr);
+            kernel_map_memory(entry_paddr, entry_vaddr, entry_size, PAGE_ACCESS_RO, PL0);
+            return ((sdt_header_t*) entry_vaddr);
+        }
+        kernel_unmap_temporary_page((uint64_t) header);
     }
     return NULL;
 }

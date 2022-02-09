@@ -1,9 +1,12 @@
 #include "acpi.h"
 #include "../mem/pfa.h"
 #include "../mem/paging.h"
+#include <math.h>
+#include <string.h>
 
 #define ACPI_REV_OLD 0
 #define ACPI_REV_NEW 2
+#define RSDP_SIG "RSD PTR "
 
 struct rsdp_descriptor_v1
 {
@@ -39,21 +42,85 @@ struct sdt_header
 } __attribute__((packed));
 typedef struct sdt_header sdt_header_t;
 
+typedef struct
+{
+    sdt_header_t* header;
+    uint64_t header_paddr;
+    uint64_t pointer_size;
+    uint64_t entries;
+} sdt_t;
+
+static int checksum(void* rsdp, uint64_t size)
+{
+    uint64_t i;
+    uint8_t checksum;
+    for (i = 0, checksum = 0; i < size; i++)
+        checksum += ((char*) rsdp)[i];
+    return (checksum == 0);
+}
+
+static uint64_t get_next_entry_pointer(sdt_t* sdt, uint64_t index)
+{
+    uint64_t entries_array = (uint64_t) (sdt->header + 1);
+    uint64_t entry_offset = index * sdt->pointer_size;
+    uint64_t entry_pointer, byte_offset, byte;
+    for 
+    (
+        byte = sdt->pointer_size, entry_pointer = 0; 
+        byte > 0;
+        byte--
+    )
+    {
+        byte_offset = byte - 1;
+        entry_pointer |= *((uint8_t*) (entries_array + entry_offset + byte_offset)) << (8 * byte_offset);
+    }
+    return entry_pointer;
+}
+
 int lock_acpi_sdt_pages(uint64_t rsdp_paddr)
 {
-    uint64_t sdt_header_paddr, sdt_header_vaddr;
+    sdt_t sdt;
+    sdt_header_t* highest_header;
+    uint64_t min_addr, max_addr, addr, entry;
     rsdp_descriptor_v1_t* rsdp = (rsdp_descriptor_v1_t*) rsdp_paddr;
     
-    if (rsdp->revision == ACPI_REV_OLD)
-        sdt_header_paddr = (uint64_t) rsdp->rsdt_address;
-    else if (rsdp->revision == ACPI_REV_NEW)
-        sdt_header_paddr = ((rsdp_descriptor_v2_t*) rsdp)->xsdt_address;
+    if (strncmp(rsdp->signature, RSDP_SIG, 8))
+        return -1;
+    if (rsdp->revision == ACPI_REV_OLD && checksum(rsdp, sizeof(rsdp_descriptor_v1_t)))
+    {
+        sdt.header_paddr = (uint64_t) rsdp->rsdt_address;
+        sdt.pointer_size = sizeof(uint32_t);
+    }
+    else if (rsdp->revision >= ACPI_REV_NEW && checksum(rsdp, sizeof(rsdp_descriptor_v2_t)))
+    {
+        sdt.header_paddr = ((rsdp_descriptor_v2_t*) rsdp)->xsdt_address;
+        sdt.pointer_size = sizeof(uint64_t);
+    }
     else
         return -1;
 
-    sdt_header_vaddr = paging_map_temporary_page(sdt_header_paddr, PAGE_ACCESS_RO, PL0);
-    lock_pages(sdt_header_paddr, (uint64_t) ((sdt_header_t*) sdt_header_vaddr)->length);
-    paging_unmap_temporary_page(sdt_header_vaddr);
+    sdt.header = (sdt_header_t*) (paging_map_temporary_page(sdt.header_paddr, PAGE_ACCESS_RO, PL0) + GET_ADDR_OFFSET(sdt.header_paddr));
+    sdt.entries = (sdt.header->length - sizeof(sdt_header_t)) / sdt.pointer_size;
+    
+    for 
+    (
+        entry = 0, min_addr = sdt.header_paddr, max_addr = sdt.header_paddr; 
+        entry < sdt.entries; 
+        entry++
+    )
+    {
+        addr = get_next_entry_pointer(&sdt, entry);
+        if (addr > max_addr)
+            max_addr = addr;
+        if (addr < min_addr)
+            min_addr = addr;
+    }
+    paging_unmap_temporary_page((uint64_t) sdt.header);
+    
+    highest_header = (sdt_header_t*) (paging_map_temporary_page(max_addr, PAGE_ACCESS_RO, PL0) + GET_ADDR_OFFSET(max_addr));
+    max_addr += highest_header->length;
+    lock_pages(min_addr, ceil((double) (max_addr - min_addr) / SIZE_4KB));
+    paging_unmap_temporary_page((uint64_t) highest_header);
 
     return 0;
 }

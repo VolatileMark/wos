@@ -13,6 +13,7 @@
 #include "utils/helpers/mb2utils.h"
 #include "chips/pit.h"
 #include "ext/acpi.h"
+#include "ext/pci.h"
 #include "sys/process.h"
 #include "sys/scheduler.h"
 #include "sys/syscall.h"
@@ -24,6 +25,13 @@
 #include <mem.h>
 
 static process_descriptor_t init_descriptor, fsrv_descriptor;
+
+static void gather_system_info(void)
+{
+    if (init_acpi())
+        HALT();
+    scan_pci();
+}
 
 static void kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
@@ -39,8 +47,7 @@ static void kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap
     init_gdt();
     init_idt();
     init_isr();
-    if (init_acpi())
-        HALT();
+    gather_system_info();
 
     init_kernel_heap(KERNEL_HEAP_START_ADDR, KERNEL_HEAP_CEIL_ADDR, SIZE_4KB);
     init_syscalls();

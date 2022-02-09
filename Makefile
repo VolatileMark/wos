@@ -23,7 +23,7 @@ DBG_FLAGS = -ex "target remote localhost:1234" \
 			-ex "set disassemble-next-line on" \
 			-ex "set step-mode on" \
 			-ex "set disassembly-flavor intel" \
-			-ex "add-symbol-file $(BUILD_DIR)/bootstrap/bootstrap.elf" #-ex "add-symbol-file $(BUILD_DIR)/kernel/kernel.elf" -ex "add-symbol-file $(BUILD_DIR)/fsrv/fsrv.elf" #-ex "add-symbol-file $(BUILD_DIR)/bootstrap/bootstrap.elf"
+			-ex "add-symbol-file $(BUILD_DIR)/bootstrap/bootstrap.elf" -ex "add-symbol-file $(BUILD_DIR)/kernel/kernel.elf" #-ex "add-symbol-file $(BUILD_DIR)/fsrv/fsrv.elf"
 
 
 

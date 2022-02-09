@@ -64,16 +64,16 @@ void set_pit_interval(uint64_t interval)
 {
     uint64_t frequency = 1000 / interval;
     uint16_t divider = (uint16_t) (PIT_BASE_FREQUENCY / frequency);
-    write_port(PIT_CH0, (uint8_t) divider);
+    write_to_port(PIT_CH0, (uint8_t) divider);
     wait_for_ports();
-    write_port(PIT_CH0, (uint8_t) (divider >> 8));
+    write_to_port(PIT_CH0, (uint8_t) (divider >> 8));
     wait_for_ports();
 }
 
 void init_pit(void)
 {
     memset(&callbacks, 0, sizeof(pit_callback_list_t));   
-    write_port(PIT_COMM, PIT_CONFIG);
+    write_to_port(PIT_COMM, PIT_CONFIG);
     wait_for_ports();
     register_isr_handler(IRQ(0), pit_handler);
 }

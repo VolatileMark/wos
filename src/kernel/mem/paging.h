@@ -42,6 +42,7 @@ typedef enum
 #define VADDR_TO_PD_IDX(addr) ((addr >> 21) & 0x1FF)
 #define VADDR_TO_PT_IDX(addr) ((addr >> 12) & 0x1FF)
 #define VADDR_GET_TEMPORARY(idx) VADDR_GET(511, 510, 0, idx)
+#define GET_ADDR_OFFSET(addr) (addr & 0x0000000000000FFF)
 
 #define MAX_PAGE_TABLE_ENTRIES 512
 #define PT_ENTRY_SIZE ((uint64_t) SIZE_4KB)
