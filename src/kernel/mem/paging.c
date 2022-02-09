@@ -243,7 +243,7 @@ uint64_t pml4_unmap_memory
     uint64_t i;
     uint64_t pdp_paddr, pdp_vaddr;
     uint64_t unmapped_size = 0, total_unmapped_size = 0;
-    size = alignu(size, PT_ENTRY_SIZE);
+    size = alignu(size + (vaddr - alignd(vaddr, SIZE_4KB)), PT_ENTRY_SIZE);
 
     while (total_unmapped_size < size && pml4_idx < MAX_PAGE_TABLE_ENTRIES)
     {
@@ -427,7 +427,7 @@ uint64_t pml4_map_memory
     page_table_entry_t entry;
     uint64_t pdp_paddr, pdp_vaddr;
     uint64_t mapped_size = 0, total_mapped_size = 0;
-    size = alignu(size, PT_ENTRY_SIZE);
+    size = alignu(size + (paddr - alignd(paddr, SIZE_4KB)), PT_ENTRY_SIZE);
 
     while (total_mapped_size < size && pml4_idx < MAX_PAGE_TABLE_ENTRIES)
     {

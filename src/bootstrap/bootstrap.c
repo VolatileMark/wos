@@ -156,7 +156,6 @@ static void relocate_initrd(struct multiboot_tag_module* initrd)
     paging_map_memory(initrd->mod_start, initrd->mod_start, size, PAGE_ACCESS_RO, PL0);
     paging_map_memory(INITRD_RELOC_ADDR, INITRD_RELOC_ADDR, size, PAGE_ACCESS_RW, PL0);
     memcpy((void*) INITRD_RELOC_ADDR, (void*) ((uint64_t) initrd->mod_start), size);
-    paging_unmap_memory(initrd->mod_start, size);
     free_pages(initrd->mod_start, ceil((double) size / SIZE_4KB));
     initrd->mod_start = INITRD_RELOC_ADDR;
     initrd->mod_end = INITRD_RELOC_ADDR + size;

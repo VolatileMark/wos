@@ -47,13 +47,14 @@ static void kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap
     init_gdt();
     init_idt();
     init_isr();
-    gather_system_info();
 
     init_kernel_heap(KERNEL_HEAP_START_ADDR, KERNEL_HEAP_CEIL_ADDR, SIZE_4KB);
     init_syscalls();
     init_pit();
     init_scheduler();
     init_spp();
+
+    gather_system_info();
 }
 
 void launch_init(void)
