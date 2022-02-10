@@ -1,7 +1,7 @@
 #ifndef __PROCESS_H__
 #define __PROCESS_H__
 
-#include "../cpu/isr.h"
+#include "../sys/cpu/isr.h"
 #include "../mem/paging.h"
 #include <heap.h>
 #include <stdint.h>

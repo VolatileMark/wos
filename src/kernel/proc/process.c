@@ -1,12 +1,12 @@
 #include "process.h"
 #include "scheduler.h"
 #include "../kernel.h"
-#include "../cpu/gdt.h"
 #include "../utils/constants.h"
 #include "../mem/pfa.h"
 #include "../mem/paging.h"
 #include "../utils/elf.h"
 #include "../utils/macros.h"
+#include "../sys/cpu/gdt.h"
 #include <stddef.h>
 #include <mem.h>
 #include <math.h>
