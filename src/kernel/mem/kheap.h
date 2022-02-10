@@ -1,7 +1,7 @@
 #ifndef __KHEAP_H__
 #define __KHEAP_H__
 
-#include "../sys/process.h"
+#include "../proc/process.h"
 #include <heap.h>
 #include <stdint.h>
 

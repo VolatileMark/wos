@@ -2,7 +2,7 @@
 #include "ipc/spp.h"
 #include "../mem/kheap.h"
 #include "../utils/macros.h"
-#include "../ext/pci.h"
+#include "../sys/pci.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <alloc.h>

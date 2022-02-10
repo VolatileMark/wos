@@ -106,7 +106,7 @@ static uint64_t get_function_size(uint64_t func_addr)
     return 0;
 }
 
-int expose_function(process_t* ps, uint64_t func_addr, const char* func_name)
+int expose_function(process_t* ps, uint64_t func_vaddr, const char* func_name)
 {
     exposed_function_properties_t* fn;
     processes_list_entry_t* entry = get_process_list_entry(ps);
@@ -117,11 +117,11 @@ int expose_function(process_t* ps, uint64_t func_addr, const char* func_name)
     
     fn = &entry->exposed_funcs[entry->num_exposed_funcs];
     
-    fn->size = get_function_size(func_addr);
+    fn->size = get_function_size(func_vaddr);
     if (fn->size == 0)
         return -1;
 
-    fn->paddr = pml4_get_paddr(ps->pml4, func_addr);
+    fn->paddr = pml4_get_paddr(ps->pml4, func_vaddr);
     if (fn->paddr == 0)
         return -1;
 
@@ -181,7 +181,7 @@ uint64_t request_func(process_t* ps, const char* name)
                     pml4_map_memory(ps->pml4, fn->paddr, fn_vaddr, fn->size, PAGE_ACCESS_RO, PL3) < fn->size
                 )
                     return 0;
-                return fn_vaddr;
+                return (fn_vaddr + GET_ADDR_OFFSET(fn->paddr));
             }
         }
         entry = entry->next;

@@ -604,7 +604,7 @@ uint64_t pml4_get_paddr(page_table_t pml4, uint64_t vaddr)
     if (!entry.present)
         return 0;
     
-    return (get_pte_address(&entry) + (vaddr & 0x0000000000000FFF));
+    return (get_pte_address(&entry) + GET_ADDR_OFFSET(vaddr));
 }
 
 static void delete_pd(page_table_t pd, uint64_t pd_paddr, uint64_t pdp_idx, uint64_t pml4_idx)

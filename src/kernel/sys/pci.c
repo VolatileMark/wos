@@ -90,7 +90,7 @@ pci_devices_list_t* find_pci_devices(uint8_t class, uint8_t subclass, uint8_t pr
     {
         if (entry->header_paddr != 0)
         {
-            header = (pci_header_common_t*) kernel_map_temporary_page(entry->header_paddr, PAGE_ACCESS_RO, PL0);
+            header = (pci_header_common_t*) (kernel_map_temporary_page(entry->header_paddr, PAGE_ACCESS_RO, PL0) + GET_ADDR_OFFSET(entry->header_paddr));
             if 
             (
                 header->class_code == class &&
@@ -125,7 +125,7 @@ pci_devices_list_t* find_pci_devices(uint8_t class, uint8_t subclass, uint8_t pr
 void delete_devices_list(pci_devices_list_t* list)
 {
     pci_devices_list_entry_t* tmp;
-    pci_devices_list_entry_t* entry = devices_list.head;
+    pci_devices_list_entry_t* entry = list->head;
     while (entry != NULL)
     {
         tmp = entry->next;

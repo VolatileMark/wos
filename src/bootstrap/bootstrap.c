@@ -11,7 +11,7 @@
 #include "utils/elf.h"
 #include "utils/helpers/bitmap.h"
 #include "drivers/fs/ustar.h"
-#include "ext/acpi.h"
+#include "sys/acpi.h"
 
 static int parse_multiboot_struct(uint64_t addr, uint64_t* out_size, uint64_t* out_rsdp_paddr, struct multiboot_tag_module** out_module)
 {

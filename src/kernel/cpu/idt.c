@@ -2,7 +2,7 @@
 #include "isr.h"
 #include "gdt.h"
 #include "../chips/pic.h"
-#include "../sys/scheduler.h"
+#include "../proc/scheduler.h"
 #include "../utils/constants.h"
 
 #define SET_ISR(index) set_idt_gate(index, (uint64_t) &isr##index, get_kernel_cs(), PL0, IDT_INTERRUPT_GATE, 1)
