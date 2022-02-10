@@ -84,10 +84,10 @@ int init_kernel_heap(uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t inital_
      return init_alloc(expand_kernel_heap, start_vaddr, ceil_vaddr, inital_size, PL0);
 }
 
-uint64_t expand_process_heap(process_t* ps, heap_t* heap, uint64_t size)
+uint64_t expand_process_heap(process_t* ps, uint64_t size)
 {
     uint64_t pages_num = ceil((double) size / SIZE_4KB);
-    uint64_t pages_paddr = expand_heap(heap, ps->pml4, &size);
+    uint64_t pages_paddr = expand_heap(ps->heap, ps->pml4, &size);
     record_segment(&ps->heap_segments, pages_paddr, pages_num);
     return size;
 }

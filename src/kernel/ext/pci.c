@@ -78,10 +78,13 @@ void scan_pci(void)
 
 pci_devices_list_t* find_pci_devices(uint8_t class, uint8_t subclass, uint8_t program_interface)
 {
-    pci_devices_list_t* devices_found = calloc(1, sizeof(pci_devices_list_t));
     pci_devices_list_entry_t* entry = devices_list.head;
     pci_devices_list_entry_t* new;
     pci_header_common_t* header;
+    pci_devices_list_t* devices_found = calloc(1, sizeof(pci_devices_list_t));
+
+    if (devices_found == NULL)
+        return NULL;
 
     while (entry != NULL)
     {
@@ -96,6 +99,13 @@ pci_devices_list_t* find_pci_devices(uint8_t class, uint8_t subclass, uint8_t pr
             )
             {
                 new = malloc(sizeof(pci_devices_list_entry_t));
+                if (new == NULL)
+                {
+                    kernel_unmap_temporary_page((uint64_t) header);
+                    delete_devices_list(devices_found);
+                    free(devices_found);
+                    return NULL;
+                }
                 new->next = NULL;
                 new->header_paddr = entry->header_paddr;
                 if (devices_found->tail == NULL)

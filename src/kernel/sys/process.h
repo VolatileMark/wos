@@ -3,6 +3,7 @@
 
 #include "../cpu/isr.h"
 #include "../mem/paging.h"
+#include <heap.h>
 #include <stdint.h>
 
 #define PROC_MAX_FDS 64
@@ -58,6 +59,7 @@ typedef struct
     uint64_t code_start_vaddr;
     uint64_t heap_start_vaddr;
     uint64_t args_start_vaddr;
+    heap_t* heap;
     process_flags_t flags;
     file_descriptor_t fds[PROC_MAX_FDS];
     segment_list_t code_segments;

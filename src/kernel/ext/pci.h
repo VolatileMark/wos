@@ -114,6 +114,27 @@ typedef struct
     pci_devices_list_entry_t* tail;
 } pci_devices_list_t;
 
+typedef enum
+{
+    PCI_HEADER_0x0 = 0x0,
+    PCI_HEADER_0x1 = 0x1,
+    PCI_HEADER_0x2 = 0x2
+} PCI_HEADER_TYPE;
+
+typedef struct pci_export_list_entry
+{
+    struct pci_export_list_entry* next;
+    pci_header_common_t header;
+} pci_export_list_entry_t;
+
+typedef struct
+{
+    pci_export_list_entry_t* head;
+    pci_export_list_entry_t* tail;
+} pci_export_list_t;
+
+#define GET_HEADER_TYPE(type) (type & 0x7F)
+
 void scan_pci(void);
 pci_devices_list_t* find_pci_devices(uint8_t class, uint8_t subclass, uint8_t program_interface);
 void delete_devices_list(pci_devices_list_t* list);

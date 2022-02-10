@@ -29,6 +29,8 @@ static void init_process(process_t* ps, uint64_t pid)
     ps->stack_start_vaddr = PROC_DEFAULT_STACK_VADDR;
     ps->heap_start_vaddr = PROC_DEFAULT_HEAP_VADDR;
     
+    ps->heap = NULL;
+
     ps->kernel_stack_segments.head = NULL;
     ps->kernel_stack_segments.tail = NULL;
     
