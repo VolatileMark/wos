@@ -17,18 +17,18 @@ typedef enum
     PROC_EXEC_BIN
 } PROC_EXEC_TYPE;
 
-typedef struct segment_list_entry
+typedef struct pages_list_entry
 {
     uint64_t paddr;
     uint64_t pages;
-    struct segment_list_entry* next;
-} segment_list_entry_t;
+    struct pages_list_entry* next;
+} pages_list_entry_t;
 
 typedef struct
 {
-    segment_list_entry_t* head;
-    segment_list_entry_t* tail;
-} segment_list_t;
+    pages_list_entry_t* head;
+    pages_list_entry_t* tail;
+} pages_list_t;
 
 typedef uint64_t file_descriptor_t;
 
@@ -59,11 +59,11 @@ typedef struct
     uint64_t args_start_vaddr;
     process_flags_t flags;
     file_descriptor_t fds[PROC_MAX_FDS];
-    segment_list_t code_segments;
-    segment_list_t stack_segments;
-    segment_list_t kernel_stack_segments;
-    segment_list_t mapped_segments;
-    segment_list_t args_segments;
+    pages_list_t code_pages;
+    pages_list_t stack_pages;
+    pages_list_t kernel_stack_pages;
+    pages_list_t mapped_pages;
+    pages_list_t args_pages;
     cpu_state_t current;
     cpu_state_t user_mode;
 } process_t;

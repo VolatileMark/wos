@@ -16,7 +16,7 @@ ASM_OBJS = $(patsubst $(SOURCE_DIR)%.asm, $(BUILD_DIR)%_asm.o, $(ASM_SRCS))
 
 AC_FLAGS = -I $(SOURCE_DIR) -f elf64 -F dwarf -g
 CC_FLAGS = -g -std=c99 -m64 -Wall -Werror -ffreestanding -mno-red-zone -nostdinc -nostartfiles -nodefaultlibs -nostdlib
-LD_FLAGS = -nostdlib -z max-page-size=4096
+LD_FLAGS = -nostdlib -z max-page-size=4096 --entry=main
 
 
 
