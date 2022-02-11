@@ -178,7 +178,7 @@ uint64_t request_func(process_t* ps, const char* name)
                 if 
                 (
                     pml4_get_next_vaddr(ps->pml4, ps->code_start_vaddr, fn->size, &fn_vaddr) < fn->size ||
-                    pml4_map_memory(ps->pml4, fn->paddr, fn_vaddr, fn->size, PAGE_ACCESS_RO, PL3) < fn->size
+                    pml4_map_memory(ps->pml4, fn->paddr, fn_vaddr, fn->size, PAGE_ACCESS_RX, PL3) < fn->size
                 )
                     return 0;
                 return (fn_vaddr + GET_ADDR_OFFSET(fn->paddr));

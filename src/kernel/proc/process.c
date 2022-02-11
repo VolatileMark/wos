@@ -79,7 +79,7 @@ static int process_load_binary(process_t* ps, const process_descriptor_t* desc, 
     uint64_t size;
     pages_list_entry_t* code_pages;
 
-    size = pml4_map_memory(ps->pml4, desc->exec_paddr, vaddr, desc->exec_size, PAGE_ACCESS_RW, PL3);
+    size = pml4_map_memory(ps->pml4, desc->exec_paddr, vaddr, desc->exec_size, PAGE_ACCESS_WX, PL3);
     if (size < desc->exec_size)
         return -1;
     
@@ -164,7 +164,7 @@ static int process_load_elf(process_t* ps, const process_descriptor_t* desc)
             if 
             (
                 kernel_map_memory(alloc_paddr, copy_tmp_vaddr, phdr->p_filesz, PAGE_ACCESS_RW, PL0) < phdr->p_filesz ||
-                pml4_map_memory(ps->pml4, file_paddr, phdr->p_vaddr, phdr->p_memsz, PAGE_ACCESS_RW, PL3) < phdr->p_memsz
+                pml4_map_memory(ps->pml4, file_paddr, phdr->p_vaddr, phdr->p_memsz, PAGE_ACCESS_WX, PL3) < phdr->p_memsz
             )
             {
                 kernel_unmap_memory(copy_tmp_vaddr, phdr->p_filesz);
@@ -586,7 +586,7 @@ static int copy_segments_list(page_table_t pml4, uint64_t vaddr, pages_list_t* f
             to->tail->next = segment;
         to->tail = segment;
 
-        size = pml4_map_memory(pml4, paddr, vaddr, bytes, PAGE_ACCESS_RW, PL3);
+        size = pml4_map_memory(pml4, paddr, vaddr, bytes, PAGE_ACCESS_WX, PL3);
         if (size < bytes)
         {
             free(segment);

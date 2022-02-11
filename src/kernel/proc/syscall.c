@@ -1,14 +1,22 @@
+#include "syscall.h"
 #include "scheduler.h"
 #include "ipc/spp.h"
 #include "../mem/heap.h"
+#include "../mem/paging.h"
+#include "../mem/pfa.h"
+#include "../utils/constants.h"
 #include "../utils/macros.h"
 #include "../utils/helpers/alloc.h"
 #include "../sys/pci.h"
+#include "../abi/vm-flags.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <mem.h>
+#include <math.h>
 
-#define POP_STACK(T, stack) *((T*) stack++)
+#define SYSCALL(name) sys_##name
+#define DEFINE_SYSCALL(name) static int SYSCALL(name)(uint64_t* stack)
+#define POP_STACK(T) *((T*) stack++)
 #define INVALID_SYSCALL -128
 
 typedef int (*syscall_handler_t)(uint64_t* stack_ptr);
@@ -27,7 +35,7 @@ static void pfree(void* addr)
 }
 */
 
-static int sys_exit(uint64_t* stack)
+DEFINE_SYSCALL(exit)
 {
     UNUSED(stack);
     switch_to_kernel(&(get_current_scheduled_process()->user_mode));
@@ -36,13 +44,13 @@ static int sys_exit(uint64_t* stack)
     return -1;
 }
 
-static int sys_execve(uint64_t* stack)
+DEFINE_SYSCALL(execve)
 {
     const char* path;
     process_t* current;
     process_t* new;
 
-    path = POP_STACK(const char*, stack);
+    path = POP_STACK(const char*);
     current = get_current_scheduled_process();
     new = create_replacement_process(current, NULL);
 
@@ -131,21 +139,87 @@ static int sys_pci_find(uint64_t* stack)
 }
 */
 
-static int sys_vm_map(uint64_t* stack)
+DEFINE_SYSCALL(vm_map)
 {
+    uint64_t hint = POP_STACK(uint64_t);
+    uint64_t size = POP_STACK(uint64_t);
+    PAGE_ACCESS_TYPE prot = POP_STACK(PAGE_ACCESS_TYPE);
+    int flags = POP_STACK(int);
+    int fd = POP_STACK(int);
+    long offset = POP_STACK(long);
+    uint64_t* window = POP_STACK(uint64_t*);
+    process_t* ps = get_current_scheduled_process();
+    uint64_t vaddr, paddr;
+
+    *window = (uint64_t) -1;
+
+    if 
+    (
+        hint & 0x0000000000000FFF ||
+        size & 0x0000000000000FFF ||
+        offset & 0x0000000000000FFF
+    )
+        return EINVAL;
+
+    if ((flags & MAP_ANONYMOUS) && fd == -1 && offset == 0)
+        paddr = request_pages(ceil((double) size / SIZE_4KB));
+    else
+    {
+        /* TODO: Implement mapping fd */
+        paddr = 0;
+    }
+
+    if (flags & (MAP_FIXED | MAP_FIXED_NOREPLACE))
+    {
+        if (flags & MAP_FIXED)
+            pml4_unmap_memory(ps->pml4, hint, size);
+        if (pml4_map_memory(ps->pml4, paddr, hint, size, prot, PL3) < size)
+            return EEXIST;
+    }
+    else
+    {
+        if (hint < ps->mapping_start_vaddr)
+            hint = ps->mapping_start_vaddr;
+        if 
+        (
+            (flags & MAP_32BIT) &&
+            (
+                hint > alignd(VADDR_GET(0, 0, 2, 0) - size, SIZE_4KB) ||
+                pml4_get_next_vaddr(ps->pml4, hint, size, &vaddr) < size
+            )
+        )
+            return ENOMEM;
+        else if (pml4_get_next_vaddr(ps->pml4, hint, size, &vaddr) < size)
+            return ENOMEM;
+        if (pml4_map_memory(ps->pml4, paddr, vaddr, size, prot, PL3) < size)
+            return EEXIST;
+    }
+
+    if ((flags & MAP_ANONYMOUS) || !(flags & MAP_UNINITIALIZED))
+        memset((void*) vaddr, 0, size);
+
+    *window = vaddr;
+
     return 0;
 }
 
-static int sys_vm_unmap(uint64_t* stack)
+DEFINE_SYSCALL(vm_unmap)
 {
+    uint64_t vaddr = POP_STACK(uint64_t);
+    uint64_t size = POP_STACK(uint64_t);
+    process_t* ps = get_current_scheduled_process();
+
+    if (pml4_unmap_memory(ps->pml4, vaddr, size) < size)
+        return -1;
+
     return 0;
 }
 
 static syscall_handler_t handlers[] = {
-    sys_exit,
-    sys_execve,
-    sys_vm_map,
-    sys_vm_unmap
+    SYSCALL(exit),
+    SYSCALL(execve),
+    SYSCALL(vm_map),
+    SYSCALL(vm_unmap)
 };
 
 #define NUM_SYSCALLS (sizeof(handlers) / sizeof(uint64_t))

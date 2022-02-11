@@ -28,8 +28,11 @@ typedef page_table_entry_t* page_table_t;
 
 typedef enum
 {
-    PAGE_ACCESS_RO = 0,
-    PAGE_ACCESS_RW = 1
+    PAGE_ACCESS_00 = 0b0000,
+    PAGE_ACCESS_RX = 0b0100,
+    PAGE_ACCESS_WX = 0b0101,
+    PAGE_ACCESS_RO = 0b0110,
+    PAGE_ACCESS_RW = 0b0111
 } PAGE_ACCESS_TYPE;
 
 #define PTE_CLEAR(pte) *((uint64_t*) pte) = 0

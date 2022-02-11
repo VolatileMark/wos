@@ -1,6 +1,6 @@
 #include "acpi.h"
 #include "../mem/paging.h"
-#include "../utils/helpers/mb2utils.h"
+#include "../utils/helpers/multiboot2-utils.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -76,7 +76,7 @@ int init_acpi(void)
     
     sdt_addr_offset = GET_ADDR_OFFSET(main_sdt.header_paddr);
     
-    mapped_sdt_header = (sdt_header_t*) (kernel_map_temporary_page(main_sdt.header_paddr, PAGE_ACCESS_RO, PL0) + sdt_addr_offset);
+    mapped_sdt_header = (sdt_header_t*) (kernel_map_temporary_page(main_sdt.header_paddr, PAGE_ACCESS_RX, PL0) + sdt_addr_offset);
     sdt_size = (uint64_t) mapped_sdt_header->length;
     kernel_unmap_temporary_page((uint64_t) mapped_sdt_header);
     
@@ -84,7 +84,7 @@ int init_acpi(void)
         return -1;
     sdt_vaddr += sdt_addr_offset;
     
-    kernel_map_memory(main_sdt.header_paddr, sdt_vaddr, sdt_size, PAGE_ACCESS_RO, PL0);
+    kernel_map_memory(main_sdt.header_paddr, sdt_vaddr, sdt_size, PAGE_ACCESS_RX, PL0);
     main_sdt.header = (sdt_header_t*) sdt_vaddr;
 
     main_sdt.entries = (main_sdt.header->length - sizeof(sdt_header_t)) / main_sdt.pointer_size;
@@ -117,7 +117,7 @@ sdt_header_t* find_acpi_table(const char* signature)
     for (entry = 0; entry < main_sdt.entries; entry++)
     {
         entry_paddr = get_next_entry_pointer(&main_sdt, entry);
-        header = (sdt_header_t*) (kernel_map_temporary_page(entry_paddr, PAGE_ACCESS_RO, PL0) + GET_ADDR_OFFSET(entry_paddr));
+        header = (sdt_header_t*) (kernel_map_temporary_page(entry_paddr, PAGE_ACCESS_RX, PL0) + GET_ADDR_OFFSET(entry_paddr));
         if (!strncmp(header->signature, signature, 4))
         {
             entry_size = header->length;
@@ -125,7 +125,7 @@ sdt_header_t* find_acpi_table(const char* signature)
             if (kernel_get_next_vaddr(entry_size, &entry_vaddr) < entry_size)
                 return NULL;
             entry_vaddr += GET_ADDR_OFFSET(entry_paddr);
-            kernel_map_memory(entry_paddr, entry_vaddr, entry_size, PAGE_ACCESS_RO, PL0);
+            kernel_map_memory(entry_paddr, entry_vaddr, entry_size, PAGE_ACCESS_RX, PL0);
             return ((sdt_header_t*) entry_vaddr);
         }
         kernel_unmap_temporary_page((uint64_t) header);

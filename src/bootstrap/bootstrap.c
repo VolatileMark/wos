@@ -92,7 +92,7 @@ static int load_elf(uint64_t start_addr, uint64_t* entry_address, uint64_t* elf_
             if (*elf_end_addr < phdr->p_paddr + phdr->p_memsz)
                 *elf_end_addr = phdr->p_paddr + phdr->p_memsz;
             paging_unmap_memory(phdr->p_paddr, phdr->p_memsz);
-            paging_map_memory(phdr->p_paddr, phdr->p_vaddr, phdr->p_memsz, PAGE_ACCESS_RW, PL0);
+            paging_map_memory(phdr->p_paddr, phdr->p_vaddr, phdr->p_memsz, PAGE_ACCESS_WX, PL0);
             memcpy((void*) phdr->p_vaddr, (void*) (((uint64_t) ehdr) + phdr->p_offset), phdr->p_filesz);
             break;
         }
@@ -125,7 +125,7 @@ static bitmap_t* free_useless_pages(struct multiboot_tag_module* initrd)
         {
             paddr = get_pte_address(&entry);
             lock_page(paddr);
-            pdp = (page_table_t) paging_map_temporary_page(paddr, PAGE_ACCESS_RO, PL0);
+            pdp = (page_table_t) paging_map_temporary_page(paddr, PAGE_ACCESS_RX, PL0);
             for (pdp_idx = 0; pdp_idx < MAX_PAGE_TABLE_ENTRIES; pdp_idx++)
             {
                 entry = pdp[pdp_idx];
@@ -133,7 +133,7 @@ static bitmap_t* free_useless_pages(struct multiboot_tag_module* initrd)
                 {
                     paddr = get_pte_address(&entry);
                     lock_page(paddr);
-                    pd = (page_table_t) paging_map_temporary_page(paddr, PAGE_ACCESS_RO, PL0);
+                    pd = (page_table_t) paging_map_temporary_page(paddr, PAGE_ACCESS_RX, PL0);
                     for (pd_idx = 0; pd_idx < MAX_PAGE_TABLE_ENTRIES; pd_idx++)
                     {
                         entry = pd[pd_idx];
@@ -153,8 +153,8 @@ static bitmap_t* free_useless_pages(struct multiboot_tag_module* initrd)
 static void relocate_initrd(struct multiboot_tag_module* initrd)
 {
     uint64_t size = initrd->mod_end - initrd->mod_start;
-    paging_map_memory(initrd->mod_start, initrd->mod_start, size, PAGE_ACCESS_RO, PL0);
-    paging_map_memory(INITRD_RELOC_ADDR, INITRD_RELOC_ADDR, size, PAGE_ACCESS_RW, PL0);
+    paging_map_memory(initrd->mod_start, initrd->mod_start, size, PAGE_ACCESS_RX, PL0);
+    paging_map_memory(INITRD_RELOC_ADDR, INITRD_RELOC_ADDR, size, PAGE_ACCESS_WX, PL0);
     memcpy((void*) INITRD_RELOC_ADDR, (void*) ((uint64_t) initrd->mod_start), size);
     free_pages(initrd->mod_start, ceil((double) size / SIZE_4KB));
     initrd->mod_start = INITRD_RELOC_ADDR;
@@ -214,8 +214,8 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
     {
         init_exec_file_size = ustar_lookup(INIT_EXEC_FILE_PATH, &init_exec_file_addr);
         init_exec_file_new_addr = alignu(kernel_end_paddr, SIZE_4KB);
-        paging_map_memory(init_exec_file_addr, init_exec_file_addr, init_exec_file_size, PAGE_ACCESS_RO, PL0);
-        paging_map_memory(init_exec_file_new_addr, init_exec_file_new_addr, init_exec_file_size, PAGE_ACCESS_RW, PL0);
+        paging_map_memory(init_exec_file_addr, init_exec_file_addr, init_exec_file_size, PAGE_ACCESS_RX, PL0);
+        paging_map_memory(init_exec_file_new_addr, init_exec_file_new_addr, init_exec_file_size, PAGE_ACCESS_WX, PL0);
         memcpy((void*) init_exec_file_new_addr, (void*) init_exec_file_addr, init_exec_file_size);
         lock_pages(alignd(init_exec_file_new_addr, SIZE_4KB), ceil((double) (init_exec_file_new_addr + init_exec_file_size) / SIZE_4KB));
     }
@@ -224,8 +224,8 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
     {
         fsrv_exec_file_size = ustar_lookup(FSRV_EXEC_FILE_PATH, &fsrv_exec_file_addr);
         fsrv_exec_file_new_addr = alignu(init_exec_file_new_addr, SIZE_4KB);
-        paging_map_memory(fsrv_exec_file_addr, fsrv_exec_file_addr, fsrv_exec_file_size, PAGE_ACCESS_RO, PL0);
-        paging_map_memory(fsrv_exec_file_new_addr, fsrv_exec_file_new_addr, fsrv_exec_file_size, PAGE_ACCESS_RW, PL0);
+        paging_map_memory(fsrv_exec_file_addr, fsrv_exec_file_addr, fsrv_exec_file_size, PAGE_ACCESS_RX, PL0);
+        paging_map_memory(fsrv_exec_file_new_addr, fsrv_exec_file_new_addr, fsrv_exec_file_size, PAGE_ACCESS_WX, PL0);
         memcpy((void*) fsrv_exec_file_new_addr, (void*) fsrv_exec_file_addr, fsrv_exec_file_size);
         lock_pages(alignd(fsrv_exec_file_new_addr, SIZE_4KB), ceil((double) (fsrv_exec_file_new_addr + fsrv_exec_file_size) / SIZE_4KB));
     }

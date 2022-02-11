@@ -1,4 +1,4 @@
-#include "mb2utils.h"
+#include "multiboot2-utils.h"
 #include <mem.h>
 #include <stddef.h>
 

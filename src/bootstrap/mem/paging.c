@@ -55,9 +55,10 @@ static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, PAGE_
     page_table_entry_t* entry = &table[index];
     PTE_CLEAR(entry);
     set_pte_address(entry, paddr);
-    entry->present = 1;
-    entry->allow_writes = access;
-    entry->allow_user_access = (privilege_level > 0);
+    entry->present = (((uint64_t) access) & 0b0100) >> 2;
+    entry->allow_writes = (((uint64_t) access) & 0b0001);
+    entry->allow_user_access = (privilege_level == PL3);
+    entry->no_execute = (((uint64_t) access) & 0b0010) >> 1;
 }
 
 uint64_t paging_map_temporary_page(uint64_t paddr, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
@@ -318,14 +319,14 @@ static uint64_t pd_map_memory
             pt_paddr = request_page();
             if (pt_paddr == 0)
                 return 0;
-            pt_vaddr = paging_map_temporary_page(pt_paddr, PAGE_ACCESS_RW, privilege_level);
+            pt_vaddr = paging_map_temporary_page(pt_paddr, PAGE_ACCESS_WX, privilege_level);
             memset((void*) pt_vaddr, 0, SIZE_4KB);
             create_pte(pd, pd_idx, pt_paddr, 1, 1);
         }
         else
         {
             pt_paddr = get_pte_address(&entry);
-            pt_vaddr = paging_map_temporary_page(pt_paddr, PAGE_ACCESS_RW, privilege_level);
+            pt_vaddr = paging_map_temporary_page(pt_paddr, PAGE_ACCESS_WX, privilege_level);
         }
 
         pt = (page_table_t) pt_vaddr;
@@ -370,14 +371,14 @@ static uint64_t pdp_map_memory
             pd_paddr = request_page();
             if (pd_paddr == 0)
                 return 0;
-            pd_vaddr = paging_map_temporary_page(pd_paddr, PAGE_ACCESS_RW, privilege_level);
+            pd_vaddr = paging_map_temporary_page(pd_paddr, PAGE_ACCESS_WX, privilege_level);
             memset((void*) pd_vaddr, 0, SIZE_4KB);
-            create_pte(pdp, pdp_idx, pd_paddr, PAGE_ACCESS_RW, privilege_level);
+            create_pte(pdp, pdp_idx, pd_paddr, PAGE_ACCESS_WX, privilege_level);
         }
         else
         {
             pd_paddr = get_pte_address(&entry);
-            pd_vaddr = paging_map_temporary_page(pd_paddr, PAGE_ACCESS_RW, privilege_level);
+            pd_vaddr = paging_map_temporary_page(pd_paddr, PAGE_ACCESS_WX, privilege_level);
         }
 
         pd = (page_table_t) pd_vaddr;
@@ -423,14 +424,14 @@ uint64_t pml4_map_memory
             pdp_paddr = request_page();
             if (pdp_paddr == 0)
                 return 0;
-            pdp_vaddr = paging_map_temporary_page(pdp_paddr, PAGE_ACCESS_RW, privilege_level);
+            pdp_vaddr = paging_map_temporary_page(pdp_paddr, PAGE_ACCESS_WX, privilege_level);
             memset((void*) pdp_vaddr, 0, SIZE_4KB);
-            create_pte(pml4, pml4_idx, pdp_paddr, PAGE_ACCESS_RW, privilege_level);
+            create_pte(pml4, pml4_idx, pdp_paddr, PAGE_ACCESS_WX, privilege_level);
         }
         else
         {
             pdp_paddr = get_pte_address(&entry);
-            pdp_vaddr = paging_map_temporary_page(pdp_paddr, PAGE_ACCESS_RW, privilege_level);
+            pdp_vaddr = paging_map_temporary_page(pdp_paddr, PAGE_ACCESS_WX, privilege_level);
         }
 
         pdp = (page_table_t) pdp_vaddr;

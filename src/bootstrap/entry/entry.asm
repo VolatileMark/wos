@@ -1,4 +1,4 @@
-%include "entry/multiboot2_header.asm"
+%include "entry/multiboot2-header.asm"
 %include "entry/gdt.asm"
 %include "entry/checks.asm"
 %include "entry/paging.asm"

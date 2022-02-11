@@ -5,7 +5,7 @@
 #include "mem/paging.h"
 #include "utils/macros.h"
 #include "utils/helpers/bitmap.h"
-#include "utils/helpers/mb2utils.h"
+#include "utils/helpers/multiboot2-utils.h"
 #include "sys/cpu/gdt.h"
 #include "sys/cpu/idt.h"
 #include "sys/cpu/isr.h"

@@ -7,7 +7,6 @@
 #include "../utils/constants.h"
 #include "../sys/chips/pic.h"
 #include "../sys/chips/pit.h"
-#include "../utils/helpers/mb2utils.h"
 #include "../utils/helpers/alloc.h"
 #include "../utils/elf.h"
 #include <stddef.h>

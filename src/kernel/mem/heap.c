@@ -34,7 +34,7 @@ static uint64_t expand_kernel_heap(uint64_t size)
     if (pages_paddr == 0)
         return 0;
     
-    mapped_size = kernel_map_memory(pages_paddr, kernel_heap.end_vaddr, new_size, PAGE_ACCESS_RW, PL0);
+    mapped_size = kernel_map_memory(pages_paddr, kernel_heap.end_vaddr, new_size, PAGE_ACCESS_WX, PL0);
     if (mapped_size < new_size)
     {
         free_pages(pages_paddr, pages_count);

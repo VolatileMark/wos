@@ -1,5 +1,5 @@
-#ifndef __MB2UTILS_H__
-#define __MB2UTILS_H__
+#ifndef __MULTIBOOT2_UTILS_H__
+#define __MULTIBOOT2_UTILS_H__
 
 #include "../multiboot2.h"
 #include <stdint.h>
