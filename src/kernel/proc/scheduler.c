@@ -8,11 +8,11 @@
 #include "../sys/chips/pic.h"
 #include "../sys/chips/pit.h"
 #include "../utils/helpers/mb2utils.h"
+#include "../utils/helpers/alloc.h"
 #include "../utils/elf.h"
 #include <stddef.h>
 #include <math.h>
 #include <mem.h>
-#include <alloc.h>
 
 #define SCHEDULER_PIT_INTERVAL 2 /* ms */
 #define SCHEDULER_TIME_SLICE (5 * SCHEDULER_PIT_INTERVAL)

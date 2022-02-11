@@ -1,7 +1,7 @@
 #include "kernel.h"
 #include "mem/mmap.h"
 #include "mem/pfa.h"
-#include "mem/kheap.h"
+#include "mem/heap.h"
 #include "mem/paging.h"
 #include "utils/macros.h"
 #include "utils/helpers/bitmap.h"
@@ -20,7 +20,6 @@
 #include "proc/ipc/spp.h"
 #include <stdint.h>
 #include <stddef.h>
-#include <alloc.h>
 #include <string.h>
 #include <mem.h>
 

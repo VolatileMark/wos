@@ -31,7 +31,7 @@ DBG_FLAGS = -ex "target remote localhost:1234" \
 all: build initrd iso
 
 .PHONY: build
-build: build-libc build-bootstrap build-kernel build-init build-fsrv
+build: build-intlibc build-bootstrap build-kernel build-init build-fsrv
 
 .PHONY: build-kernel
 build-kernel:
@@ -49,11 +49,9 @@ build-init:
 build-bootstrap:
 	$(MAKE) -C $(SOURCE_DIR)/bootstrap SOURCE_DIR="$(SOURCE_DIR)/bootstrap" BUILD_DIR="$(BUILD_DIR)/bootstrap"
 
-.PHONY: build-libc
-build-libc:
-	$(MAKE) -C $(SOURCE_DIR)/libc SOURCE_DIR="$(SOURCE_DIR)/libc" ROOT_BUILD_DIR="$(BUILD_DIR)/libc" utils
-	$(MAKE) -C $(SOURCE_DIR)/libc SOURCE_DIR="$(SOURCE_DIR)/libc" ROOT_BUILD_DIR="$(BUILD_DIR)/libc" nocrt
-	$(MAKE) -C $(SOURCE_DIR)/libc SOURCE_DIR="$(SOURCE_DIR)/libc" ROOT_BUILD_DIR="$(BUILD_DIR)/libc" full
+.PHONY: build-intlibc
+build-intlibc:
+	$(MAKE) -C $(SOURCE_DIR)/intlibc SOURCE_DIR="$(SOURCE_DIR)/intlibc" BUILD_DIR="$(BUILD_DIR)/intlibc"
 
 .PHONY: run
 run:
@@ -67,7 +65,6 @@ debug:
 initrd:
 	@mkdir -p $(BUILD_DIR)/initrd
 	@mkdir -p $(BUILD_DIR)/iso/boot
-#	cp -f $(DATA_DIR)/ttyfont.psf $(BUILD_DIR)/initrd
 	cp -f $(BUILD_DIR)/init/init.elf $(BUILD_DIR)/initrd/winit.elf
 	cp -f $(BUILD_DIR)/fsrv/fsrv.elf $(BUILD_DIR)/initrd/wfsrv.elf
 	cp -f $(BUILD_DIR)/kernel/kernel.elf $(BUILD_DIR)/initrd/wkernel.elf

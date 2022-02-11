@@ -1,11 +1,11 @@
 #include "scheduler.h"
 #include "ipc/spp.h"
-#include "../mem/kheap.h"
+#include "../mem/heap.h"
 #include "../utils/macros.h"
+#include "../utils/helpers/alloc.h"
 #include "../sys/pci.h"
 #include <stdint.h>
 #include <stddef.h>
-#include <alloc.h>
 #include <mem.h>
 
 #define POP_STACK(T, stack) *((T*) stack++)
@@ -15,12 +15,12 @@ typedef int (*syscall_handler_t)(uint64_t* stack_ptr);
 
 extern void switch_to_kernel(cpu_state_t* state);
 
+/*
 static void* pmalloc(uint64_t size)
 {
     return (void*) allocate_heap_memory(get_current_scheduled_process()->heap, size);
 }
 
-/*
 static void pfree(void* addr)
 {
     free_heap_memory(get_current_scheduled_process()->heap, (uint64_t) addr);
@@ -53,23 +53,7 @@ static int sys_execve(uint64_t* stack)
     return 0;
 }
 
-static int sys_heap_expand(uint64_t* stack)
-{
-    uint64_t size = POP_STACK(uint64_t, stack);
-    uint64_t* out_size = POP_STACK(uint64_t*, stack);
-    process_t* ps = get_current_scheduled_process();
-    *out_size = expand_process_heap(ps, size);
-    return 0;
-}
-
-static int sys_heap_set(uint64_t* stack)
-{
-    heap_t* heap = POP_STACK(heap_t*, stack);
-    process_t* ps = get_current_scheduled_process();
-    ps->heap = heap;
-    return 0;
-}
-
+/*
 static int sys_spp_expose(uint64_t* stack)
 {
     uint64_t fn_addr = POP_STACK(uint64_t, stack);
@@ -106,7 +90,7 @@ static int sys_pci_find(uint64_t* stack)
     entry = list->head;
     while (entry != NULL)
     {   
-        /* The problem with mapping only one page is if the header overlaps two pages (very unlikely scenario but still possible) */
+        // The problem with mapping only one page is if the header overlaps two pages (very unlikely scenario but still possible)
         header = (pci_header_common_t*) (kernel_map_temporary_page(entry->header_paddr, PAGE_ACCESS_RO, PL0) + GET_ADDR_OFFSET(entry->header_paddr));
         switch (GET_HEADER_TYPE(header->header_type))
         {
@@ -145,15 +129,23 @@ static int sys_pci_find(uint64_t* stack)
     delete_devices_list(list);
     return devices_found;
 }
+*/
+
+static int sys_vm_map(uint64_t* stack)
+{
+    return 0;
+}
+
+static int sys_vm_unmap(uint64_t* stack)
+{
+    return 0;
+}
 
 static syscall_handler_t handlers[] = {
     sys_exit,
     sys_execve,
-    sys_heap_expand,
-    sys_heap_set,
-    sys_spp_expose,
-    sys_spp_request,
-    sys_pci_find
+    sys_vm_map,
+    sys_vm_unmap
 };
 
 #define NUM_SYSCALLS (sizeof(handlers) / sizeof(uint64_t))

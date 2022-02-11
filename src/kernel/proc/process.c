@@ -1,16 +1,16 @@
 #include "process.h"
 #include "scheduler.h"
 #include "../kernel.h"
-#include "../utils/constants.h"
 #include "../mem/pfa.h"
 #include "../mem/paging.h"
 #include "../utils/elf.h"
+#include "../utils/constants.h"
 #include "../utils/macros.h"
+#include "../utils/helpers/alloc.h"
 #include "../sys/cpu/gdt.h"
 #include <stddef.h>
 #include <mem.h>
 #include <math.h>
-#include <alloc.h>
 #include <string.h>
 
 extern void switch_pml4(uint64_t pml4_paddr);
@@ -27,10 +27,8 @@ static void init_process(process_t* ps, uint64_t pid)
     ps->code_start_vaddr = 0;
     ps->args_start_vaddr = 0;
     ps->stack_start_vaddr = PROC_DEFAULT_STACK_VADDR;
-    ps->heap_start_vaddr = PROC_DEFAULT_HEAP_VADDR;
+    ps->mapping_start_vaddr = 0;
     
-    ps->heap = NULL;
-
     ps->kernel_stack_segments.head = NULL;
     ps->kernel_stack_segments.tail = NULL;
     
@@ -40,8 +38,8 @@ static void init_process(process_t* ps, uint64_t pid)
     ps->stack_segments.head = NULL;
     ps->stack_segments.tail = NULL;
     
-    ps->heap_segments.head = NULL;
-    ps->heap_segments.tail = NULL;
+    ps->mapped_segments.head = NULL;
+    ps->mapped_segments.tail = NULL;
     
     ps->args_segments.head = NULL;
     ps->args_segments.tail = NULL;
@@ -97,13 +95,15 @@ static int process_load_binary(process_t* ps, const process_descriptor_t* desc, 
     ps->code_segments.tail = code_segments;
     ps->user_mode.stack.rip = vaddr;
     ps->code_start_vaddr = vaddr;
+
+    ps->mapping_start_vaddr = alignu(vaddr + desc->exec_size, SIZE_4KB);
     
     return 0;
 }
 
 static int process_load_elf(process_t* ps, const process_descriptor_t* desc)
 {
-    uint64_t phdrs_offset, phdrs_total_size, paddr, tmp_vaddr;
+    uint64_t phdrs_offset, phdrs_total_size, paddr, tmp_vaddr, highest_vaddr, section_highest_vaddr;
     Elf64_Phdr* phdr;
     Elf64_Ehdr* ehdr;
 
@@ -134,6 +134,7 @@ static int process_load_elf(process_t* ps, const process_descriptor_t* desc)
 
     phdrs_offset = (((uint64_t) ehdr) + ehdr->e_phoff);
     phdrs_total_size = ehdr->e_phentsize * ehdr->e_phnum;
+    highest_vaddr = 0;
 
     for
     (
@@ -148,12 +149,17 @@ static int process_load_elf(process_t* ps, const process_descriptor_t* desc)
             paddr = desc->exec_paddr + phdr->p_offset;
             if (pml4_map_memory(ps->pml4, paddr, phdr->p_vaddr, phdr->p_memsz, PAGE_ACCESS_RW, PL3) < phdr->p_memsz)
                 return -1;
+            section_highest_vaddr = phdr->p_vaddr + phdr->p_memsz;
+            if (highest_vaddr < section_highest_vaddr)
+                highest_vaddr = alignu(section_highest_vaddr, SIZE_4KB);
             memcpy((void*) phdr->p_vaddr, (void*) (((uint64_t) ehdr) + phdr->p_offset), phdr->p_filesz);
             break;
         }
     }
     
     kernel_unmap_memory(tmp_vaddr, desc->exec_size);
+
+    ps->mapping_start_vaddr = section_highest_vaddr;
 
     return 0;
 }
@@ -416,7 +422,7 @@ void delete_process_resources(process_t* ps)
 
     delete_segments_list(&ps->code_segments);
     delete_segments_list(&ps->stack_segments);
-    delete_segments_list(&ps->heap_segments);
+    delete_segments_list(&ps->mapped_segments);
 
     for (i = 0; i < PROC_MAX_FDS; i++)
     {
@@ -563,7 +569,7 @@ process_t* clone_process(process_t* parent, uint64_t id)
 
     child->code_start_vaddr = parent->code_start_vaddr;
     child->stack_start_vaddr = parent->stack_start_vaddr;
-    child->heap_start_vaddr = parent->heap_start_vaddr;
+    child->mapping_start_vaddr = parent->mapping_start_vaddr;
     child->args_start_vaddr = parent->args_start_vaddr;
 
     if 
@@ -571,7 +577,7 @@ process_t* clone_process(process_t* parent, uint64_t id)
         init_process_pml4(child) ||
         copy_segments_list(child->pml4, parent->code_start_vaddr, &parent->code_segments, &child->code_segments) ||
         copy_segments_list(child->pml4, parent->stack_start_vaddr, &parent->stack_segments, &child->stack_segments) ||
-        copy_segments_list(child->pml4, parent->heap_start_vaddr, &parent->heap_segments, &child->heap_segments) ||
+        copy_segments_list(child->pml4, parent->mapping_start_vaddr, &parent->mapped_segments, &child->mapped_segments) ||
         copy_segments_list(child->pml4, parent->args_start_vaddr, &parent->args_segments, &child->args_segments) ||
         init_process_kernel_stack(child) || 
         copy_file_descriptors(parent->fds, child->fds)

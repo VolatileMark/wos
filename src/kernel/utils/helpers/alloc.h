@@ -1,7 +1,7 @@
-#if !defined(__ALLOC_H__) && !defined(LIBC_UTILS_ONLY)
+#ifndef __ALLOC_H__
 #define __ALLOC_H__
 
-#include "stdint.h"
+#include <stdint.h>
 
 void* malloc(uint64_t size);
 void* calloc(uint64_t n, uint64_t size);

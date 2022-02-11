@@ -3,7 +3,6 @@
 
 #include "../sys/cpu/isr.h"
 #include "../mem/paging.h"
-#include <heap.h>
 #include <stdint.h>
 
 #define PROC_MAX_FDS 64
@@ -11,7 +10,6 @@
 #define PROC_INITIAL_STACK_SIZE SIZE_4KB
 #define PROC_DEFAULT_STACK_VADDR (VADDR_GET_TEMPORARY(0) - SIZE_4KB)
 #define PROC_DEFAULT_RFLAGS 0x202 /* Only interrupts enabled */
-#define PROC_DEFAULT_HEAP_VADDR 0xFFFF800000000000
 
 typedef enum
 {
@@ -57,15 +55,14 @@ typedef struct
     uint64_t kernel_stack_start_vaddr;
     uint64_t stack_start_vaddr;
     uint64_t code_start_vaddr;
-    uint64_t heap_start_vaddr;
+    uint64_t mapping_start_vaddr;
     uint64_t args_start_vaddr;
-    heap_t* heap;
     process_flags_t flags;
     file_descriptor_t fds[PROC_MAX_FDS];
     segment_list_t code_segments;
     segment_list_t stack_segments;
     segment_list_t kernel_stack_segments;
-    segment_list_t heap_segments;
+    segment_list_t mapped_segments;
     segment_list_t args_segments;
     cpu_state_t current;
     cpu_state_t user_mode;

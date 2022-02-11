@@ -1,8 +1,8 @@
 #include "pci.h"
 #include "acpi.h"
 #include "../mem/paging.h"
+#include "../utils/helpers/alloc.h"
 #include <stddef.h>
-#include <alloc.h>
 #include <mem.h>
 
 static pci_devices_list_t devices_list;

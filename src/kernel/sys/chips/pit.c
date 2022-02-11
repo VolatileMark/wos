@@ -1,9 +1,9 @@
 #include "pit.h"
 #include "../cpu/io.h"
 #include "../cpu/interrupts.h"
+#include "../../utils/helpers/alloc.h"
 #include <stddef.h>
 #include <mem.h>
-#include <alloc.h>
 
 #define PIT_BASE_FREQUENCY 1193182
 
