@@ -158,7 +158,7 @@ static uint64_t pd_unmap_memory
         }
 
         pt_paddr = get_pte_address(&entry);
-        pt_vaddr = kernel_map_temporary_page(pt_paddr, 1, 1);
+        pt_vaddr = kernel_map_temporary_page(pt_paddr, PAGE_ACCESS_RW, PL0);
 
         pt = (page_table_t) pt_vaddr;
         unmapped_size = pt_unmap_memory(pt, vaddr, size - total_unmapped_size);
@@ -208,7 +208,7 @@ static uint64_t pdp_unmap_memory
         }
 
         pd_paddr = get_pte_address(&entry);
-        pd_vaddr = kernel_map_temporary_page(pd_paddr, 1, 1);
+        pd_vaddr = kernel_map_temporary_page(pd_paddr, PAGE_ACCESS_RW, PL0);
 
         pd = (page_table_t) pd_vaddr;
         unmapped_size = pd_unmap_memory(pd, vaddr, size - total_unmapped_size);
@@ -259,7 +259,7 @@ uint64_t pml4_unmap_memory
         }
 
         pdp_paddr = get_pte_address(&entry);
-        pdp_vaddr = kernel_map_temporary_page(pdp_paddr, 1, 1);
+        pdp_vaddr = kernel_map_temporary_page(pdp_paddr, PAGE_ACCESS_RW, PL0);
 
         pdp = (page_table_t) pdp_vaddr;
         unmapped_size = pdp_unmap_memory(pdp, vaddr, size - total_unmapped_size);
@@ -336,7 +336,7 @@ static uint64_t pd_map_memory
                 return 0;
             pt_vaddr = kernel_map_temporary_page(pt_paddr, PAGE_ACCESS_WX, privilege_level);
             memset((void*) pt_vaddr, 0, SIZE_4KB);
-            create_pte(pd, pd_idx, pt_paddr, 1, 1);
+            create_pte(pd, pd_idx, pt_paddr, PAGE_ACCESS_WX, privilege_level);
         }
         else
         {
@@ -468,7 +468,7 @@ uint64_t pml4_map_memory
 
 uint64_t kernel_get_next_vaddr(uint64_t size, uint64_t* vaddr_out)
 {
-    return pml4_get_next_vaddr(kernel_pml4, (uint64_t) &_end_vaddr, size, vaddr_out);
+    return pml4_get_next_vaddr(kernel_pml4, (uint64_t) &_end_addr, size, vaddr_out);
 }
 
 uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t size, uint64_t* vaddr_out)

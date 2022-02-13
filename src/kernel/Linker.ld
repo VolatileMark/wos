@@ -8,8 +8,7 @@ SECTIONS
 {
     . = KERNEL_BASE + KERNEL_OFFSET;
 
-    _start_paddr = . - KERNEL_BASE;
-    _start_vaddr = .;
+    _start_addr = .;
 
     .text ALIGN(4K) : AT(ADDR(.text) - KERNEL_BASE)
     {
@@ -45,6 +44,5 @@ SECTIONS
         *(.comment)
     }
 
-    _end_paddr = . - KERNEL_BASE;
-    _end_vaddr = .;
+    _end_addr = .;
 }

@@ -23,27 +23,19 @@ DBG_FLAGS = -ex "target remote localhost:1234" \
 			-ex "set disassemble-next-line on" \
 			-ex "set step-mode on" \
 			-ex "set disassembly-flavor intel" \
-			-ex "add-symbol-file $(BUILD_DIR)/fsrv/fsrv.elf" -ex "add-symbol-file $(BUILD_DIR)/kernel/kernel.elf" #-ex "add-symbol-file $(BUILD_DIR)/fsrv/fsrv.elf"
+			-ex "add-symbol-file $(BUILD_DIR)/bootstrap/bootstrap.elf" -ex "add-symbol-file $(BUILD_DIR)/kernel/kernel.elf"
 
 
 
 .PHONY: all
-all: build initrd iso
+all: build iso
 
 .PHONY: build
-build: build-intlibc build-bootstrap build-kernel build-init build-fsrv
+build: build-intlibc build-bootstrap build-kernel
 
 .PHONY: build-kernel
 build-kernel:
 	$(MAKE) -C $(SOURCE_DIR)/kernel SOURCE_DIR="$(SOURCE_DIR)/kernel" BUILD_DIR="$(BUILD_DIR)/kernel"
-
-.PHONY: build-fsrv
-build-fsrv:
-	$(MAKE) -C $(SOURCE_DIR)/fsrv SOURCE_DIR="$(SOURCE_DIR)/fsrv" BUILD_DIR="$(BUILD_DIR)/fsrv"
-
-.PHONY: build-init
-build-init:
-	$(MAKE) -C $(SOURCE_DIR)/init SOURCE_DIR="$(SOURCE_DIR)/init" BUILD_DIR="$(BUILD_DIR)/init"
 
 .PHONY: build-bootstrap
 build-bootstrap:
@@ -61,18 +53,10 @@ run:
 debug:
 	$(EMU) $(EMU_FLAGS) $(EMU_DBG_FLAGS) & $(DBG) $(DBG_FLAGS)
 
-.PHONY: initrd
-initrd:
-	@mkdir -p $(BUILD_DIR)/initrd
-	@mkdir -p $(BUILD_DIR)/iso/boot
-	cp -f $(BUILD_DIR)/init/init.elf $(BUILD_DIR)/initrd/winit.elf
-	cp -f $(BUILD_DIR)/fsrv/fsrv.elf $(BUILD_DIR)/initrd/wfsrv.elf
-	cp -f $(BUILD_DIR)/kernel/kernel.elf $(BUILD_DIR)/initrd/wkernel.elf
-	cd $(BUILD_DIR)/initrd && tar --no-auto-compress --format=ustar --create --file=$(BUILD_DIR)/iso/boot/initrd.tar.gz .
-
 .PHONY: iso
 iso: cfg-file
 	cp -f $(BUILD_DIR)/bootstrap/bootstrap.elf $(BUILD_DIR)/iso/boot/wboot.elf
+	cp -f $(BUILD_DIR)/kernel/kernel.elf $(BUILD_DIR)/iso/boot/wkernel.elf
 	@rm -f $(BUILD_DIR)/$(OS_NAME).iso
 	grub-mkrescue -o $(BUILD_DIR)/$(OS_NAME).iso $(BUILD_DIR)/iso
 
@@ -84,7 +68,7 @@ cfg-file:
 	set default=0\n\
 	menuentry "$(OS_NAME)" {\n\
 		multiboot2 /boot/wboot.elf\n\
-		module2 /boot/initrd.tar.gz\n\
+		module2 /boot/wkernel.elf\n\
 		boot\n\
 	}\n\
 	" > $(BUILD_DIR)/iso/boot/grub/grub.cfg

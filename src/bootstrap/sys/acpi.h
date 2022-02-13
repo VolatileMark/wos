@@ -3,6 +3,6 @@
 
 #include <stdint.h>
 
-int lock_acpi_sdt_pages(uint64_t rsdp_paddr);
+int lock_acpi_sdt_pages(uint64_t rsdp_start_paddr, uint64_t* rsdp_size);
 
 #endif

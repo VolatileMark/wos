@@ -31,14 +31,18 @@ uint64_t request_page(void)
 uint64_t request_pages(uint64_t num)
 {
     uint64_t found;
-    uint64_t address = 0;
-    for (found = 0; last_page_index < page_bitmap.size * 8 && found < num; last_page_index++)
+    uint64_t address;
+    for 
+    (
+        found = 0, address = 0; 
+        last_page_index < page_bitmap.size * 8 && found < num; 
+        last_page_index++
+    )
     {
         if (!bitmap_get(&page_bitmap, last_page_index))
         {
             ++found;
-            if (address == 0)
-                address = (last_page_index * SIZE_4KB);
+            if (address == 0) { address = (last_page_index * SIZE_4KB); }
         }
         else
         {
@@ -47,8 +51,7 @@ uint64_t request_pages(uint64_t num)
         }
     }
 
-    if (address == 0)
-        lock_pages(address, num);
+    if (address == 0) { lock_pages(address, num); }
     
     return address;
 }
@@ -60,29 +63,27 @@ void lock_page(uint64_t page_addr)
 
 void free_page(uint64_t page_addr)
 {
-    uint64_t index = PFA_GET_PAGE_IDX(page_addr);
+    uint64_t index;
+    index = PFA_GET_PAGE_IDX(page_addr);
     bitmap_set(&page_bitmap, index, 0);
-    if (last_page_index > index)
-        last_page_index = index;
+    if (last_page_index > index) { last_page_index = index; }
 }
 
 void lock_pages(uint64_t page_addr, uint64_t num)
 {
-    for (; num > 0; num--, page_addr += SIZE_4KB)
-        lock_page(page_addr);
+    for (; num > 0; num--, page_addr += SIZE_4KB) { lock_page(page_addr); }
 }
 
 void free_pages(uint64_t page_addr, uint64_t num)
 {
-    for (; num > 0; num--, page_addr += SIZE_4KB)
-        free_page(page_addr);
+    for (; num > 0; num--, page_addr += SIZE_4KB) { free_page(page_addr); }
 }
 
 void init_pfa(void)
 {
-    uint64_t total_memory = get_total_memory_of_type(MULTIBOOT_MEMORY_AVAILABLE);
-    if (total_memory > PFA_MAX_MEM_SIZE)
-        total_memory = PFA_MAX_MEM_SIZE;
+    uint64_t total_memory;
+    total_memory = get_total_memory_of_type(MULTIBOOT_MEMORY_AVAILABLE);
+    if (total_memory > PFA_MAX_MEM_SIZE) { total_memory = PFA_MAX_MEM_SIZE; }
     page_bitmap.size = ceil(((double) total_memory) / SIZE_4KB / 8.0);
     page_bitmap.buffer = page_bitmap_buffer;
     memset(page_bitmap.buffer, 0, page_bitmap.size);

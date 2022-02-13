@@ -10,9 +10,7 @@
 
 void launch_init();
 
-extern uint64_t _start_paddr;
-extern uint64_t _start_vaddr;
-extern uint64_t _end_paddr;
-extern uint64_t _end_vaddr;
+extern uint64_t _start_addr;
+extern uint64_t _end_addr;
 
 #endif

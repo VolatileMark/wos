@@ -18,7 +18,7 @@ no, lmao.
 
 #### What are your political views?
 
-So anyways, this is my free-time/i-have-no-social-life project, and my 6th attempt at a micro-kernel, yes, I am aware of the definition of insanity. It is designed to run ONLY on x86-64 CPUs, because, god forbid, I have touch ARM assembly.
+So anyways, this is my free-time/i-have-no-social-life project, and my 6th attempt at making an OS all by myself, yes, I am aware of the definition of insanity. It is designed to run ONLY on x86-64 CPUs, because, god forbid, I have touch ARM assembly.
 
 Currently there's not much to see and right now I can't be bothered to comment my code (this always ends well) and write instructions on how to build this thing.
 

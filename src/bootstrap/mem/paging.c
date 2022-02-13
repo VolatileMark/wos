@@ -38,9 +38,9 @@ uint64_t get_pte_address(page_table_entry_t* entry)
 
 static uint64_t get_next_tmp_index(void)
 {
-    if (bootstrap_tmp_index >= MAX_PAGE_TABLE_ENTRIES)
-        return 0;
-    uint64_t index = bootstrap_tmp_index++;
+    uint64_t index;
+    if (bootstrap_tmp_index >= MAX_PAGE_TABLE_ENTRIES) { return 0; }
+    index = bootstrap_tmp_index++;
     for 
     (
         ; 
@@ -52,18 +52,20 @@ static uint64_t get_next_tmp_index(void)
 
 static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
 {
-    page_table_entry_t* entry = &table[index];
+    page_table_entry_t* entry;
+    entry = &table[index];
     PTE_CLEAR(entry);
     set_pte_address(entry, paddr);
     entry->present = (((uint64_t) access) & 0b0100) >> 2;
     entry->allow_writes = (((uint64_t) access) & 0b0001);
     entry->allow_user_access = (privilege_level == PL3);
-    entry->no_execute = (((uint64_t) access) & 0b0010) >> 1;
+    /* entry->no_execute = (((uint64_t) access) & 0b0010) >> 1; */
 }
 
 uint64_t paging_map_temporary_page(uint64_t paddr, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
 {
-    uint64_t index = get_next_tmp_index();
+    uint64_t index;
+    index = get_next_tmp_index();
     create_pte(bootstrap_tmp_pt, index, paddr, access, privilege_level);
     return VADDR_GET_TEMPORARY(index);
 }
@@ -71,11 +73,9 @@ uint64_t paging_map_temporary_page(uint64_t paddr, PAGE_ACCESS_TYPE access, PRIV
 void paging_unmap_temporary_page(uint64_t vaddr)
 {
     uint64_t index;
-    if (!VADDR_IS_TEMPORARY(vaddr))
-        return;
+    if (!VADDR_IS_TEMPORARY(vaddr)) { return; }
     index = VADDR_TO_PT_IDX(vaddr);
-    if (bootstrap_tmp_index > index)
-        bootstrap_tmp_index = index;
+    if (bootstrap_tmp_index > index) { bootstrap_tmp_index = index; }
     PTE_CLEAR(&bootstrap_tmp_pt[index]);
     invalidate_pte(vaddr);
 }
@@ -97,8 +97,10 @@ static uint64_t pt_unmap_memory
     uint64_t size
 )
 {
-    uint64_t pt_idx = VADDR_TO_PT_IDX(vaddr);
-    uint64_t unmapped_size = 0;
+    uint64_t pt_idx, unmapped_size;
+
+    pt_idx = VADDR_TO_PT_IDX(vaddr);
+    unmapped_size = 0;
 
     while (unmapped_size < size && pt_idx < MAX_PAGE_TABLE_ENTRIES)
     {
@@ -123,12 +125,16 @@ static uint64_t pd_unmap_memory
     uint64_t size
 )
 {
-    uint64_t pd_idx = VADDR_TO_PD_IDX(vaddr);
     page_table_t pt;
     page_table_entry_t entry;
     uint64_t i;
+    uint64_t pd_idx;
     uint64_t pt_paddr, pt_vaddr;
-    uint64_t unmapped_size = 0, total_unmapped_size = 0;
+    uint64_t unmapped_size, total_unmapped_size;
+
+    pd_idx = VADDR_TO_PD_IDX(vaddr);
+    unmapped_size = 0;
+    total_unmapped_size = 0;
 
     while (total_unmapped_size < size && pd_idx < MAX_PAGE_TABLE_ENTRIES)
     {
@@ -143,7 +149,7 @@ static uint64_t pd_unmap_memory
         }
 
         pt_paddr = get_pte_address(&entry);
-        pt_vaddr = paging_map_temporary_page(pt_paddr, 1, 1);
+        pt_vaddr = paging_map_temporary_page(pt_paddr, PAGE_ACCESS_RW, PL0);
 
         pt = (page_table_t) pt_vaddr;
         unmapped_size = pt_unmap_memory(pt, vaddr, size - total_unmapped_size);
@@ -173,12 +179,16 @@ static uint64_t pdp_unmap_memory
     uint64_t size
 )
 {
-    uint64_t pdp_idx = VADDR_TO_PDP_IDX(vaddr);
     page_table_t pd;
     page_table_entry_t entry;
     uint64_t i;
+    uint64_t pdp_idx;
     uint64_t pd_paddr, pd_vaddr;
-    uint64_t unmapped_size = 0, total_unmapped_size = 0;
+    uint64_t unmapped_size, total_unmapped_size;
+
+    pdp_idx = VADDR_TO_PDP_IDX(vaddr);
+    unmapped_size = 0;
+    total_unmapped_size = 0;
 
     while (total_unmapped_size < size && pdp_idx < MAX_PAGE_TABLE_ENTRIES)
     {
@@ -193,7 +203,7 @@ static uint64_t pdp_unmap_memory
         }
 
         pd_paddr = get_pte_address(&entry);
-        pd_vaddr = paging_map_temporary_page(pd_paddr, 1, 1);
+        pd_vaddr = paging_map_temporary_page(pd_paddr, PAGE_ACCESS_RW, PL0);
 
         pd = (page_table_t) pd_vaddr;
         unmapped_size = pd_unmap_memory(pd, vaddr, size - total_unmapped_size);
@@ -223,13 +233,17 @@ uint64_t pml4_unmap_memory
     uint64_t size
 )
 {
-    uint64_t pml4_idx = VADDR_TO_PML4_IDX(vaddr);
     page_table_t pdp;
     page_table_entry_t entry;
     uint64_t i;
+    uint64_t pml4_idx;
     uint64_t pdp_paddr, pdp_vaddr;
-    uint64_t unmapped_size = 0, total_unmapped_size = 0;
+    uint64_t unmapped_size, total_unmapped_size;
+    
     size = alignu(size + (vaddr - alignd(vaddr, SIZE_4KB)), PT_ENTRY_SIZE);
+    pml4_idx = VADDR_TO_PML4_IDX(vaddr);
+    unmapped_size = 0;
+    total_unmapped_size = 0;
 
     while (total_unmapped_size < size && pml4_idx < MAX_PAGE_TABLE_ENTRIES)
     {
@@ -244,7 +258,7 @@ uint64_t pml4_unmap_memory
         }
 
         pdp_paddr = get_pte_address(&entry);
-        pdp_vaddr = paging_map_temporary_page(pdp_paddr, 1, 1);
+        pdp_vaddr = paging_map_temporary_page(pdp_paddr, PAGE_ACCESS_RW, PL0);
 
         pdp = (page_table_t) pdp_vaddr;
         unmapped_size = pdp_unmap_memory(pdp, vaddr, size - total_unmapped_size);
@@ -277,13 +291,15 @@ static uint64_t pt_map_memory
     PRIVILEGE_LEVEL privilege_level
 )
 {
-    uint64_t pt_idx = VADDR_TO_PT_IDX(vaddr);
-    uint64_t mapped_size = 0;
+    uint64_t pt_idx;
+    uint64_t mapped_size;
+
+    pt_idx = VADDR_TO_PT_IDX(vaddr);
+    mapped_size = 0;
 
     while (mapped_size < size && pt_idx < MAX_PAGE_TABLE_ENTRIES)
     {
-        if (pt[pt_idx].present)
-            return 0;
+        if (pt[pt_idx].present) { return 0; }
         create_pte(pt, pt_idx, paddr, access, privilege_level);
 
         paddr += PT_ENTRY_SIZE;
@@ -304,11 +320,15 @@ static uint64_t pd_map_memory
     PRIVILEGE_LEVEL privilege_level
 )
 {
-    uint64_t pd_idx = VADDR_TO_PD_IDX(vaddr);
     page_table_t pt;
     page_table_entry_t entry;
+    uint64_t pd_idx;
     uint64_t pt_paddr, pt_vaddr;
-    uint64_t mapped_size = 0, total_mapped_size = 0;
+    uint64_t mapped_size, total_mapped_size;
+
+    pd_idx = VADDR_TO_PD_IDX(vaddr);
+    mapped_size = 0;
+    total_mapped_size = 0;
 
     while (total_mapped_size < size && pd_idx < MAX_PAGE_TABLE_ENTRIES)
     {
@@ -317,16 +337,15 @@ static uint64_t pd_map_memory
         if (!entry.present)
         {
             pt_paddr = request_page();
-            if (pt_paddr == 0)
-                return 0;
-            pt_vaddr = paging_map_temporary_page(pt_paddr, PAGE_ACCESS_WX, privilege_level);
+            if (pt_paddr == 0) { return 0; }
+            pt_vaddr = paging_map_temporary_page(pt_paddr, PAGE_ACCESS_RW, privilege_level);
             memset((void*) pt_vaddr, 0, SIZE_4KB);
-            create_pte(pd, pd_idx, pt_paddr, 1, 1);
+            create_pte(pd, pd_idx, pt_paddr, PAGE_ACCESS_RW, privilege_level);
         }
         else
         {
             pt_paddr = get_pte_address(&entry);
-            pt_vaddr = paging_map_temporary_page(pt_paddr, PAGE_ACCESS_WX, privilege_level);
+            pt_vaddr = paging_map_temporary_page(pt_paddr, PAGE_ACCESS_RW, privilege_level);
         }
 
         pt = (page_table_t) pt_vaddr;
@@ -334,8 +353,7 @@ static uint64_t pd_map_memory
 
         paging_unmap_temporary_page(pt_vaddr);
 
-        if (mapped_size == 0)
-            return 0;
+        if (mapped_size == 0) { return 0; }
         
         total_mapped_size += mapped_size;
         vaddr += mapped_size;
@@ -356,11 +374,15 @@ static uint64_t pdp_map_memory
     PRIVILEGE_LEVEL privilege_level
 )
 {
-    uint64_t pdp_idx = VADDR_TO_PDP_IDX(vaddr);
     page_table_t pd;
     page_table_entry_t entry;
+    uint64_t pdp_idx;
     uint64_t pd_paddr, pd_vaddr;
-    uint64_t mapped_size = 0, total_mapped_size = 0;
+    uint64_t mapped_size, total_mapped_size;
+
+    pdp_idx = VADDR_TO_PDP_IDX(vaddr);
+    mapped_size = 0;
+    total_mapped_size = 0;
 
     while (total_mapped_size < size && pdp_idx < MAX_PAGE_TABLE_ENTRIES)
     {
@@ -369,16 +391,15 @@ static uint64_t pdp_map_memory
         if (!entry.present)
         {
             pd_paddr = request_page();
-            if (pd_paddr == 0)
-                return 0;
-            pd_vaddr = paging_map_temporary_page(pd_paddr, PAGE_ACCESS_WX, privilege_level);
+            if (pd_paddr == 0) { return 0; }
+            pd_vaddr = paging_map_temporary_page(pd_paddr, PAGE_ACCESS_RW, privilege_level);
             memset((void*) pd_vaddr, 0, SIZE_4KB);
-            create_pte(pdp, pdp_idx, pd_paddr, PAGE_ACCESS_WX, privilege_level);
+            create_pte(pdp, pdp_idx, pd_paddr, PAGE_ACCESS_RW, privilege_level);
         }
         else
         {
             pd_paddr = get_pte_address(&entry);
-            pd_vaddr = paging_map_temporary_page(pd_paddr, PAGE_ACCESS_WX, privilege_level);
+            pd_vaddr = paging_map_temporary_page(pd_paddr, PAGE_ACCESS_RW, privilege_level);
         }
 
         pd = (page_table_t) pd_vaddr;
@@ -386,8 +407,7 @@ static uint64_t pdp_map_memory
 
         paging_unmap_temporary_page(pd_vaddr);
 
-        if (mapped_size == 0)
-            return 0;
+        if (mapped_size == 0) { return 0; }
         
         total_mapped_size += mapped_size;
         vaddr += mapped_size;
@@ -408,12 +428,16 @@ uint64_t pml4_map_memory
     PRIVILEGE_LEVEL privilege_level
 )
 {
-    uint64_t pml4_idx = VADDR_TO_PML4_IDX(vaddr);
     page_table_t pdp;
     page_table_entry_t entry;
+    uint64_t pml4_idx;
     uint64_t pdp_paddr, pdp_vaddr;
-    uint64_t mapped_size = 0, total_mapped_size = 0;
+    uint64_t mapped_size, total_mapped_size;
+    
     size = alignu(size + (paddr - alignd(paddr, SIZE_4KB)), PT_ENTRY_SIZE);
+    pml4_idx = VADDR_TO_PML4_IDX(vaddr);
+    mapped_size = 0;
+    total_mapped_size = 0;
 
     while (total_mapped_size < size && pml4_idx < MAX_PAGE_TABLE_ENTRIES)
     {
@@ -422,16 +446,15 @@ uint64_t pml4_map_memory
         if (!entry.present)
         {
             pdp_paddr = request_page();
-            if (pdp_paddr == 0)
-                return 0;
-            pdp_vaddr = paging_map_temporary_page(pdp_paddr, PAGE_ACCESS_WX, privilege_level);
+            if (pdp_paddr == 0) { return 0; }
+            pdp_vaddr = paging_map_temporary_page(pdp_paddr, PAGE_ACCESS_RW, privilege_level);
             memset((void*) pdp_vaddr, 0, SIZE_4KB);
-            create_pte(pml4, pml4_idx, pdp_paddr, PAGE_ACCESS_WX, privilege_level);
+            create_pte(pml4, pml4_idx, pdp_paddr, PAGE_ACCESS_RW, privilege_level);
         }
         else
         {
             pdp_paddr = get_pte_address(&entry);
-            pdp_vaddr = paging_map_temporary_page(pdp_paddr, PAGE_ACCESS_WX, privilege_level);
+            pdp_vaddr = paging_map_temporary_page(pdp_paddr, PAGE_ACCESS_RW, privilege_level);
         }
 
         pdp = (page_table_t) pdp_vaddr;
@@ -439,8 +462,7 @@ uint64_t pml4_map_memory
 
         paging_unmap_temporary_page(pdp_vaddr);
 
-        if (mapped_size == 0)
-            return 0;
+        if (mapped_size == 0) { return 0; }
 
         total_mapped_size += mapped_size;
         vaddr += mapped_size;
