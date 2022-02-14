@@ -1,6 +1,6 @@
 #include "acpi.h"
-#include "../mem/paging.h"
-#include "../utils/helpers/multiboot2-utils.h"
+#include "../../mem/paging.h"
+#include "../../utils/helpers/multiboot2-utils.h"
 #include <stddef.h>
 #include <string.h>
 

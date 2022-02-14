@@ -1,7 +1,7 @@
 #include "pci.h"
 #include "acpi.h"
-#include "../mem/paging.h"
-#include "../utils/helpers/alloc.h"
+#include "../../mem/paging.h"
+#include "../../utils/helpers/alloc.h"
 #include <stddef.h>
 #include <mem.h>
 

@@ -6,7 +6,7 @@
 #include "../utils/constants.h"
 #include "../utils/macros.h"
 #include "../utils/helpers/alloc.h"
-#include "../sys/pci.h"
+#include "../sys/drivers/pci.h"
 #include "../abi/vm-flags.h"
 #include <stdint.h>
 #include <stddef.h>
@@ -20,7 +20,7 @@
 
 typedef int (*syscall_handler_t)(uint64_t* stack_ptr);
 
-extern void switch_to_kernel(cpu_state_t* state);
+extern void switch_to_kernel(cpu_state_t* state, uint64_t args_to_copy);
 
 /*
 static void* pmalloc(uint64_t size)
@@ -37,7 +37,7 @@ static void pfree(void* addr)
 DEFINE_SYSCALL(exit)
 {
     UNUSED(stack);
-    switch_to_kernel(&(get_current_scheduled_process()->user_mode));
+    switch_to_kernel(&(get_current_scheduled_process()->user_mode), 0);
     terminate_process(get_current_scheduled_process());
     run_scheduler();
     return -1;
@@ -46,17 +46,20 @@ DEFINE_SYSCALL(exit)
 DEFINE_SYSCALL(execve)
 {
     const char* path;
-    process_t* current;
     process_t* new;
+    process_t* old;
 
     path = POP_STACK(const char*);
-    current = get_current_scheduled_process();
-    new = create_replacement_process(current, NULL);
+    old = get_current_scheduled_process();
+    new = create_replacement_process(path, old);
+    if (new == NULL)
+        return -1;
 
-    UNUSED(path);
-    UNUSED(current);
-    UNUSED(new);
+    switch_to_kernel(&(get_current_scheduled_process()->user_mode), 3);
 
+    replace_process(old, new);
+    run_scheduler();
+    
     return 0;
 }
 

@@ -102,12 +102,16 @@ switch_to_kernel:
     ; Store FLAGS register
     pushf
     pop qword [rdi + 8*17]
-    ; Save FPU state
+    ; Save args
     push rdi
+    push rsi
+    ; Save FPU state
     add rdi, 8*20
     mov rsi, 16
     call alignu
     fxsave [rax]
+    ; Restore args
+    pop rsi
     pop rdi
 
     ; Load correct data registers
@@ -117,6 +121,31 @@ switch_to_kernel:
     mov fs, ax
     mov gs, ax
 
+    ; Copy local variables
+    mov rcx, rsi
+    
+    mov r8, rsp
+    add r8, 8
+
+    mov r9, (kernel_stack_bottom - 8)
+    mov rax, 8
+    mul esi
+    shl rdx, 32
+    mov edx, eax
+    sub r9, rdx
+
+    .copy:
+    cmp rcx, 0
+    je .copy_end
+    mov rax, qword [r8]
+    mov qword [r9], rax
+    add r9, 8
+    add r8, 8
+    jmp .copy
+    .copy_end:
+    mov qword [r9], 0
+    ; Finish copy local variables
+    
     ; Load default kernel stack and pml4
     pop rcx
     mov [rdi + 8*15], rcx ; Save return RIP

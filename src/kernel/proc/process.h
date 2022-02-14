@@ -68,16 +68,8 @@ typedef struct
     cpu_state_t user_mode;
 } process_t;
 
-typedef struct 
-{
-    PROC_EXEC_TYPE exec_type;
-    uint64_t exec_paddr;
-    uint64_t exec_size;
-    char* cmdline;
-} process_descriptor_t;
-
-process_t* create_process(const process_descriptor_t* file, uint64_t pid);
-process_t* create_replacement_process(process_t* parent, const process_descriptor_t* file);
+process_t* create_process(const char* path, uint64_t pid);
+process_t* create_replacement_process(const char* path, process_t* parent);
 process_t* clone_process(process_t* parent, uint64_t id);
 void delete_and_free_process(process_t* ps);
 void delete_process_resources(process_t* ps);

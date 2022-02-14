@@ -65,6 +65,7 @@ void set_pit_interval(uint64_t interval)
 {
     uint64_t frequency;
     uint16_t divider;
+    
     frequency = 1000 / interval;
     divider = (uint16_t) (PIT_BASE_FREQUENCY / frequency);
     write_to_port(PIT_CH0, (uint8_t) divider);

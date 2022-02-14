@@ -1,5 +1,8 @@
 #include "process.h"
 #include "scheduler.h"
+#include "vfs/vfs.h"
+#include "vfs/vnode.h"
+#include "vfs/vattribs.h"
 #include "../kernel.h"
 #include "../mem/pfa.h"
 #include "../mem/paging.h"
@@ -74,25 +77,29 @@ static int init_process_pml4(process_t* ps)
     return 0;
 }
 
-static int load_process_code(process_t* ps, const process_descriptor_t* desc)
+static int load_process_code(process_t* ps, const char* path)
 {
     uint64_t phdrs_offset, phdrs_total_size;
-    uint64_t tmp_vaddr, copy_tmp_vaddr;
+    uint64_t copy_tmp_vaddr;
     uint64_t highest_vaddr, section_highest_vaddr, lowest_vaddr, section_lowest_vaddr;
-    uint64_t file_paddr, alloc_paddr, alloc_pages;
+    uint64_t alloc_paddr, alloc_pages;
     pages_list_entry_t* code_pages;
     Elf64_Phdr* phdr;
     Elf64_Ehdr* ehdr;
+    vnode_t node;
+    vattribs_t attribs;
+    void* buffer;
 
-    if (kernel_get_next_vaddr(desc->exec_size, &tmp_vaddr) < desc->exec_size)
+    vfs_lookup(path, &node);
+    vfs_get_attribs(&node, &attribs);
+    
+    buffer = malloc(attribs.size);
+    if (buffer == NULL)
         return -1;
-    if (kernel_map_memory(desc->exec_paddr, tmp_vaddr, desc->exec_size, PAGE_ACCESS_RO, PL0) < desc->exec_size)
-    {
-        kernel_unmap_memory(tmp_vaddr, desc->exec_size);
-        return -1;
-    }
+    
+    vfs_read(&node, buffer, attribs.size);
 
-    ehdr = (Elf64_Ehdr*) tmp_vaddr;
+    ehdr = (Elf64_Ehdr*) buffer;
 
     if 
     (
@@ -123,25 +130,23 @@ static int load_process_code(process_t* ps, const process_descriptor_t* desc)
     {
         switch (phdr->p_type)
         {
-        case PT_LOAD:
-            file_paddr = desc->exec_paddr + phdr->p_offset;
-            
+        case PT_LOAD:            
             alloc_pages = ceil((double) phdr->p_memsz / SIZE_4KB);
             alloc_paddr = request_pages(alloc_pages);
             
             if (kernel_get_next_vaddr(phdr->p_memsz, &copy_tmp_vaddr) < phdr->p_memsz)
             {
-                kernel_unmap_memory(tmp_vaddr, desc->exec_size);
+                free(buffer);
                 return -1;
             }
             if 
             (
                 kernel_map_memory(alloc_paddr, copy_tmp_vaddr, phdr->p_filesz, PAGE_ACCESS_RW, PL0) < phdr->p_filesz ||
-                pml4_map_memory(ps->pml4, file_paddr, phdr->p_vaddr, phdr->p_memsz, PAGE_ACCESS_WX, PL3) < phdr->p_memsz
+                pml4_map_memory(ps->pml4, alloc_paddr, phdr->p_vaddr, phdr->p_memsz, PAGE_ACCESS_WX, PL3) < phdr->p_memsz
             )
             {
                 kernel_unmap_memory(copy_tmp_vaddr, phdr->p_filesz);
-                kernel_unmap_memory(tmp_vaddr, desc->exec_size);
+                free(buffer);
                 return -1;
             }
             memcpy((void*) copy_tmp_vaddr, (void*) (((uint64_t) ehdr) + phdr->p_offset), phdr->p_filesz);
@@ -150,12 +155,14 @@ static int load_process_code(process_t* ps, const process_descriptor_t* desc)
             code_pages = malloc(sizeof(pages_list_entry_t));
             if (code_pages == NULL)
             {
-                kernel_unmap_memory(tmp_vaddr, desc->exec_size);
+                free(buffer);
                 return -1;
             }
+
             code_pages->next = NULL;
             code_pages->pages = alloc_paddr;
             code_pages->pages = alloc_pages;
+
             if (ps->code_pages.tail == NULL)
                 ps->code_pages.head = code_pages;
             else
@@ -173,11 +180,11 @@ static int load_process_code(process_t* ps, const process_descriptor_t* desc)
         }
     }
 
+    free(buffer);
+    
     ps->code_start_vaddr = lowest_vaddr;
     ps->user_mode.stack.rip = ehdr->e_entry;
     ps->mapping_start_vaddr = highest_vaddr;
-
-    kernel_unmap_memory(tmp_vaddr, desc->exec_size);
 
     return 0;
 }
@@ -317,7 +324,7 @@ static char** parse_args(char* c, uint64_t* argc, uint64_t* bytes)
     return argv;
 }
 
-static int load_process_args(process_t* ps, const process_descriptor_t* desc)
+static int load_process_args(process_t* ps, const char* cmdline)
 {
     pages_list_entry_t* args_pages;
     uint64_t argc;
@@ -325,10 +332,10 @@ static int load_process_args(process_t* ps, const process_descriptor_t* desc)
     uint64_t paddr, vaddr, tmp_vaddr;
     char** argv;
 
-    if (desc->cmdline == NULL)
+    if (cmdline == NULL)
         return 0;
     
-    argv = parse_args(desc->cmdline, &argc, &cmdline_bytes);
+    argv = parse_args((char*) cmdline, &argc, &cmdline_bytes);
     argv_bytes = argc * sizeof(char*);
 
     if (cmdline_bytes > SIZE_4KB)
@@ -354,7 +361,7 @@ static int load_process_args(process_t* ps, const process_descriptor_t* desc)
     }
 
     tmp_vaddr = kernel_map_temporary_page(paddr, PAGE_ACCESS_RW, PL0);
-    memcpy((void*) tmp_vaddr, desc->cmdline, cmdline_bytes);
+    memcpy((void*) tmp_vaddr, cmdline, cmdline_bytes);
     kernel_unmap_temporary_page(tmp_vaddr);
 
     tmp_vaddr = kernel_map_temporary_page(paddr + cmdline_bytes, PAGE_ACCESS_RW, PL0);
@@ -446,7 +453,7 @@ void delete_and_free_process(process_t* ps)
     free(ps);
 }
 
-process_t* create_process(const process_descriptor_t* desc, uint64_t pid)
+process_t* create_process(const char* path, uint64_t pid)
 {
     process_t* ps;
     
@@ -459,10 +466,10 @@ process_t* create_process(const process_descriptor_t* desc, uint64_t pid)
     if 
     (
         init_process_pml4(ps) ||
-        load_process_code(ps, desc) || 
+        load_process_code(ps, path) || 
         init_process_stack(ps) || 
         init_process_kernel_stack(ps) ||
-        load_process_args(ps, desc)
+        load_process_args(ps, NULL) /* TODO: Add back CMDLINE support */
     )
     {
         delete_and_free_process(ps);
@@ -487,11 +494,11 @@ static int copy_file_descriptors(file_descriptor_t* from, file_descriptor_t* to)
     return 0;
 }
 
-process_t* create_replacement_process(process_t* parent, const process_descriptor_t* file)
+process_t* create_replacement_process(const char* path, process_t* parent)
 {
     process_t* child;
     
-    child = create_process(file, parent->pid);
+    child = create_process(path, parent->pid);
     if (child == NULL)
         return NULL;
     
