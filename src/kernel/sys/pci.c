@@ -11,7 +11,9 @@ static void enumerate_function(uint64_t address, uint64_t num)
 {
     pci_header_common_t* header;
     pci_devices_list_entry_t* new_entry;
-    uint64_t function_address = address + (num << 12);
+    uint64_t function_address;
+    
+    function_address = address + (num << 12);
     header = (pci_header_common_t*) kernel_map_temporary_page(function_address, PAGE_ACCESS_RX, PL0);
     if (header->device_id == 0 || header->device_id == 0xFFFF)
         return;
@@ -32,7 +34,9 @@ static void enumerate_device(uint64_t address, uint64_t num)
 {
     pci_header_common_t* header;
     uint64_t function;
-    uint64_t device_address = address + (num << 15);
+    uint64_t device_address;
+    
+    device_address = address + (num << 15);
     header = (pci_header_common_t*) kernel_map_temporary_page(device_address, PAGE_ACCESS_RX, PL0);
     if (header->device_id == 0 || header->device_id == 0xFFFF)
         return;
@@ -45,7 +49,9 @@ static void enumerate_bus(uint64_t address, uint64_t num)
 {
     pci_header_common_t* header;
     uint64_t device;
-    uint64_t bus_address = address + (num << 20);
+    uint64_t bus_address;
+    
+    bus_address = address + (num << 20);
     header = (pci_header_common_t*) kernel_map_temporary_page(bus_address, PAGE_ACCESS_RX, PL0);
     if (header->device_id == 0 || header->device_id == 0xFFFF)
         return;
@@ -57,8 +63,9 @@ static void enumerate_bus(uint64_t address, uint64_t num)
 static void enumerate_pci(mcfg_t* mcfg)
 {
     mcfg_entry_t* entry;
-    uint64_t entry_num, bus;
-    uint64_t entries = (mcfg->sdt_header.length - sizeof(mcfg_t)) / sizeof(mcfg_entry_t);
+    uint64_t entries, entry_num, bus;
+    
+    entries = (mcfg->sdt_header.length - sizeof(mcfg_t)) / sizeof(mcfg_entry_t);
     for (entry_num = 0; entry_num < entries;entry_num++)
     {
         entry = &mcfg->entries[entry_num];
@@ -69,7 +76,9 @@ static void enumerate_pci(mcfg_t* mcfg)
 
 void scan_pci(void)
 {
-    mcfg_t* mcfg = (mcfg_t*) find_acpi_table(MCFG_SIG);
+    mcfg_t* mcfg;
+    
+    mcfg = (mcfg_t*) find_acpi_table(MCFG_SIG);
     if (mcfg == NULL)
         return;
     memset(&devices_list, 0, sizeof(pci_devices_list_t));
@@ -81,8 +90,9 @@ pci_devices_list_t* find_pci_devices(uint8_t class, uint8_t subclass, uint8_t pr
     pci_devices_list_entry_t* entry = devices_list.head;
     pci_devices_list_entry_t* new;
     pci_header_common_t* header;
-    pci_devices_list_t* devices_found = calloc(1, sizeof(pci_devices_list_t));
-
+    pci_devices_list_t* devices_found;
+    
+    devices_found = calloc(1, sizeof(pci_devices_list_t));
     if (devices_found == NULL)
         return NULL;
 
@@ -125,13 +135,15 @@ pci_devices_list_t* find_pci_devices(uint8_t class, uint8_t subclass, uint8_t pr
 void delete_devices_list(pci_devices_list_t* list)
 {
     pci_devices_list_entry_t* tmp;
-    pci_devices_list_entry_t* entry = list->head;
+    pci_devices_list_entry_t* entry;
+    
+    entry = list->head;
     while (entry != NULL)
     {
         tmp = entry->next;
         free(entry);
         entry = tmp;
     }
-    memset(list, 0, sizeof(pci_devices_list_t));
-    return;
+    
+    memset(list, 0, sizeof(pci_devices_list_t));    
 }

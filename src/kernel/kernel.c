@@ -17,7 +17,6 @@
 #include "proc/process.h"
 #include "proc/scheduler.h"
 #include "proc/syscall.h"
-#include "proc/ipc/spp.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
@@ -49,7 +48,6 @@ static void kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap
     init_syscalls();
     init_pit();
     init_scheduler();
-    init_spp();
 
     gather_system_info();
 }

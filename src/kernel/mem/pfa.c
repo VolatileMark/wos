@@ -31,8 +31,9 @@ uint64_t request_page(void)
 uint64_t request_pages(uint64_t num)
 {
     uint64_t found;
-    uint64_t address = 0;
-    for (found = 0; last_page_index < page_bitmap.size * 8 && found < num; last_page_index++)
+    uint64_t address;
+    
+    for (found = 0, address = 0; last_page_index < page_bitmap.size * 8 && found < num; last_page_index++)
     {
         if (!bitmap_get(&page_bitmap, last_page_index))
         {
@@ -55,7 +56,8 @@ uint64_t request_pages(uint64_t num)
 
 void lock_page(uint64_t page_addr)
 {
-    uint64_t index = PFA_GET_PAGE_IDX(page_addr);
+    uint64_t index;
+    index = PFA_GET_PAGE_IDX(page_addr);
     if (!bitmap_get(&page_bitmap, index))
     {
         bitmap_set(&page_bitmap, PFA_GET_PAGE_IDX(page_addr), 1);
@@ -66,7 +68,8 @@ void lock_page(uint64_t page_addr)
 
 void free_page(uint64_t page_addr)
 {
-    uint64_t index = PFA_GET_PAGE_IDX(page_addr);
+    uint64_t index;
+    index = PFA_GET_PAGE_IDX(page_addr);
     if (bitmap_get(&page_bitmap, index))
     {
         bitmap_set(&page_bitmap, index, 0);

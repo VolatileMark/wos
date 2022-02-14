@@ -30,7 +30,8 @@ static pit_callback_list_t callbacks;
 
 static void pit_handler(const interrupt_frame_t* frame)
 {
-    pit_callback_t* callback = callbacks.start;
+    pit_callback_t* callback;
+    callback = callbacks.start;
     while (callback != NULL)
     {
         if (callback->handler != NULL)
@@ -62,8 +63,10 @@ int register_pit_callback(isr_handler_t handler)
 
 void set_pit_interval(uint64_t interval)
 {
-    uint64_t frequency = 1000 / interval;
-    uint16_t divider = (uint16_t) (PIT_BASE_FREQUENCY / frequency);
+    uint64_t frequency;
+    uint16_t divider;
+    frequency = 1000 / interval;
+    divider = (uint16_t) (PIT_BASE_FREQUENCY / frequency);
     write_to_port(PIT_CH0, (uint8_t) divider);
     wait_for_ports();
     write_to_port(PIT_CH0, (uint8_t) (divider >> 8));

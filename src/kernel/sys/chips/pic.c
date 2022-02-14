@@ -129,6 +129,8 @@ void init_pic(void)
 
 void pic_mask_irq(uint8_t index)
 {
+    uint8_t pic_mask, pic_port, bit_mask;
+
     /* Check if the index is absolute or relative to IRQ0 */
     if (index >= IRQ_COUNT)
         index -= IRQ(0);
@@ -136,9 +138,7 @@ void pic_mask_irq(uint8_t index)
     if (index < 0)
         return;
     
-    uint8_t pic_mask;
-    uint8_t bit_mask;
-    uint8_t pic_port = PIC1_DATA;
+    pic_port = PIC1_DATA;
     /* Check if the IRQ is handled by PIC2 */
     if (index >= IRQ_COUNT / 2)
     {
@@ -155,6 +155,8 @@ void pic_mask_irq(uint8_t index)
 
 void pic_unmask_irq(uint8_t index)
 {
+    uint8_t pic_mask, pic_port, bit_mask;
+
     /* Check if the index is absolute or relative to IRQ0 */
     if (index >= IRQ_COUNT)
         index -= IRQ(0);
@@ -162,9 +164,7 @@ void pic_unmask_irq(uint8_t index)
     if (index < 0)
         return;
     
-    uint8_t pic_mask;
-    uint8_t bit_mask;
-    uint8_t pic_port = PIC1_DATA;
+    pic_port = PIC1_DATA;
     /* Check if the IRQ is handled by PIC2 */
     if (index >= IRQ_COUNT / 2)
     {
@@ -180,6 +180,8 @@ void pic_unmask_irq(uint8_t index)
 
 void pic_toggle_irq(uint8_t index)
 {
+    uint8_t pic_mask, pic_port, bit_mask;
+
     /* Check if the index is absolute or relative to IRQ0 */
     if (index >= IRQ_COUNT)
         index -= IRQ(0);
@@ -187,9 +189,7 @@ void pic_toggle_irq(uint8_t index)
     if (index < 0)
         return;
     
-    uint8_t pic_mask;
-    uint8_t bit_mask;
-    uint8_t pic_port = PIC1_DATA;
+    pic_port = PIC1_DATA;
     /* Check if the IRQ is handled by PIC2 */
     if (index >= IRQ_COUNT / 2)
     {

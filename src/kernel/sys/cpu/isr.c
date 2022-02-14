@@ -13,7 +13,8 @@ void init_isr(void)
 
 void isr_handler(interrupt_frame_t* frame)
 {
-    uint64_t interrupt_number = frame->interrupt_info.interrupt_number;
+    uint64_t interrupt_number;
+    interrupt_number = frame->interrupt_info.interrupt_number;
     if (isr_handlers[interrupt_number] != NULL)
     {
         isr_handlers[interrupt_number](frame);

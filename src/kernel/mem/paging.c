@@ -59,7 +59,8 @@ static uint64_t get_next_tmp_index(void)
 
 static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
 {
-    page_table_entry_t* entry = &table[index];
+    page_table_entry_t* entry;
+    entry = &table[index];
     PTE_CLEAR(entry);
     set_pte_address(entry, paddr);
     entry->present = (((uint64_t) access) & 0b0100) >> 2;
@@ -70,7 +71,8 @@ static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, PAGE_
 
 uint64_t kernel_map_temporary_page(uint64_t paddr, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
 {
-    uint64_t index = get_next_tmp_index();
+    uint64_t index;
+    index = get_next_tmp_index();
     create_pte(kernel_tmp_pt, index, paddr, access, privilege_level);
     return VADDR_GET_TEMPORARY(index);
 }
@@ -112,8 +114,11 @@ static uint64_t pt_unmap_memory
     uint64_t size
 )
 {
-    uint64_t pt_idx = VADDR_TO_PT_IDX(vaddr);
-    uint64_t unmapped_size = 0;
+    uint64_t pt_idx;
+    uint64_t unmapped_size;
+
+    pt_idx = VADDR_TO_PT_IDX(vaddr);
+    unmapped_size = 0;
 
     while (unmapped_size < size && pt_idx < MAX_PAGE_TABLE_ENTRIES)
     {
@@ -138,12 +143,16 @@ static uint64_t pd_unmap_memory
     uint64_t size
 )
 {
-    uint64_t pd_idx = VADDR_TO_PD_IDX(vaddr);
+    uint64_t pd_idx;
     page_table_t pt;
     page_table_entry_t entry;
     uint64_t i;
     uint64_t pt_paddr, pt_vaddr;
-    uint64_t unmapped_size = 0, total_unmapped_size = 0;
+    uint64_t unmapped_size, total_unmapped_size;
+
+    pd_idx = VADDR_TO_PD_IDX(vaddr);
+    unmapped_size = 0;
+    total_unmapped_size = 0;
 
     while (total_unmapped_size < size && pd_idx < MAX_PAGE_TABLE_ENTRIES)
     {
@@ -188,12 +197,16 @@ static uint64_t pdp_unmap_memory
     uint64_t size
 )
 {
-    uint64_t pdp_idx = VADDR_TO_PDP_IDX(vaddr);
+    uint64_t pdp_idx;
     page_table_t pd;
     page_table_entry_t entry;
     uint64_t i;
     uint64_t pd_paddr, pd_vaddr;
-    uint64_t unmapped_size = 0, total_unmapped_size = 0;
+    uint64_t unmapped_size, total_unmapped_size;
+
+    pdp_idx = VADDR_TO_PDP_IDX(vaddr);
+    unmapped_size = 0;
+    total_unmapped_size = 0;
 
     while (total_unmapped_size < size && pdp_idx < MAX_PAGE_TABLE_ENTRIES)
     {
@@ -238,13 +251,17 @@ uint64_t pml4_unmap_memory
     uint64_t size
 )
 {
-    uint64_t pml4_idx = VADDR_TO_PML4_IDX(vaddr);
+    uint64_t pml4_idx;
     page_table_t pdp;
     page_table_entry_t entry;
     uint64_t i;
     uint64_t pdp_paddr, pdp_vaddr;
-    uint64_t unmapped_size = 0, total_unmapped_size = 0;
+    uint64_t unmapped_size, total_unmapped_size;
+
     size = alignu(size + (vaddr - alignd(vaddr, SIZE_4KB)), PT_ENTRY_SIZE);
+    pml4_idx = VADDR_TO_PML4_IDX(vaddr);
+    unmapped_size = 0;
+    total_unmapped_size = 0;
 
     while (total_unmapped_size < size && pml4_idx < MAX_PAGE_TABLE_ENTRIES)
     {
@@ -292,8 +309,11 @@ static uint64_t pt_map_memory
     PRIVILEGE_LEVEL privilege_level
 )
 {
-    uint64_t pt_idx = VADDR_TO_PT_IDX(vaddr);
-    uint64_t mapped_size = 0;
+    uint64_t pt_idx;
+    uint64_t mapped_size;
+
+    pt_idx = VADDR_TO_PT_IDX(vaddr);
+    mapped_size = 0;
 
     while (mapped_size < size && pt_idx < MAX_PAGE_TABLE_ENTRIES)
     {
@@ -319,11 +339,15 @@ static uint64_t pd_map_memory
     PRIVILEGE_LEVEL privilege_level
 )
 {
-    uint64_t pd_idx = VADDR_TO_PD_IDX(vaddr);
+    uint64_t pd_idx;
     page_table_t pt;
     page_table_entry_t entry;
     uint64_t pt_paddr, pt_vaddr;
-    uint64_t mapped_size = 0, total_mapped_size = 0;
+    uint64_t mapped_size, total_mapped_size;
+
+    pd_idx = VADDR_TO_PD_IDX(vaddr);
+    mapped_size = 0;
+    total_mapped_size = 0;
 
     while (total_mapped_size < size && pd_idx < MAX_PAGE_TABLE_ENTRIES)
     {
@@ -371,11 +395,15 @@ static uint64_t pdp_map_memory
     PRIVILEGE_LEVEL privilege_level
 )
 {
-    uint64_t pdp_idx = VADDR_TO_PDP_IDX(vaddr);
+    uint64_t pdp_idx;
     page_table_t pd;
     page_table_entry_t entry;
     uint64_t pd_paddr, pd_vaddr;
-    uint64_t mapped_size = 0, total_mapped_size = 0;
+    uint64_t mapped_size, total_mapped_size;
+
+    pdp_idx = VADDR_TO_PDP_IDX(vaddr);
+    mapped_size = 0;
+    total_mapped_size = 0;
 
     while (total_mapped_size < size && pdp_idx < MAX_PAGE_TABLE_ENTRIES)
     {
@@ -423,12 +451,16 @@ uint64_t pml4_map_memory
     PRIVILEGE_LEVEL privilege_level
 )
 {
-    uint64_t pml4_idx = VADDR_TO_PML4_IDX(vaddr);
+    uint64_t pml4_idx;
     page_table_t pdp;
     page_table_entry_t entry;
     uint64_t pdp_paddr, pdp_vaddr;
-    uint64_t mapped_size = 0, total_mapped_size = 0;
+    uint64_t mapped_size, total_mapped_size;
+
     size = alignu(size + (paddr - alignd(paddr, SIZE_4KB)), PT_ENTRY_SIZE);
+    pml4_idx = VADDR_TO_PML4_IDX(vaddr);
+    mapped_size = 0;
+    total_mapped_size = 0;
 
     while (total_mapped_size < size && pml4_idx < MAX_PAGE_TABLE_ENTRIES)
     {
@@ -474,13 +506,13 @@ uint64_t kernel_get_next_vaddr(uint64_t size, uint64_t* vaddr_out)
 uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t size, uint64_t* vaddr_out)
 {
     uint64_t pml4_idx, pdp_idx, pd_idx, pt_idx;
-    uint64_t total_size_found = 0;
+    uint64_t total_size_found;
     page_table_t pdp, pd, pt;
     page_table_entry_t entry;
 
     size = alignu(size, SIZE_4KB);
     vaddr_start = alignd(vaddr_start, PT_ENTRY_SIZE);
-
+    total_size_found = 0;
     pml4_idx = VADDR_TO_PML4_IDX(vaddr_start);
     pdp_idx = VADDR_TO_PDP_IDX(vaddr_start);
     pd_idx = VADDR_TO_PD_IDX(vaddr_start);

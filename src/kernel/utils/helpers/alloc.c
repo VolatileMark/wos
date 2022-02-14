@@ -12,18 +12,24 @@ void* malloc(uint64_t size)
 
 void* calloc(uint64_t n, uint64_t size)
 {
+    void* ptr;
+
     size = n * size;
-    void* ptr = malloc(size);
+    ptr = malloc(size);
     memset(ptr, 0, size);
     return ptr;
 }
 
 void* realloc(void* src, uint64_t new_size)
 {
-    heap_segment_header_t* hdr = ((heap_segment_header_t*) src) - 1;
-    void* new_ptr = malloc(new_size);
+    heap_segment_header_t* hdr;
+    void* new_ptr;
+
+    hdr = ((heap_segment_header_t*) src) - 1;
+    new_ptr = malloc(new_size);
     memcpy(new_ptr, src, (hdr->size < new_size) ? hdr->size : new_size);
     free(src);
+    
     return new_ptr;
 }
 

@@ -74,34 +74,7 @@ static int init_process_pml4(process_t* ps)
     return 0;
 }
 
-static int process_load_binary(process_t* ps, const process_descriptor_t* desc, uint64_t vaddr)
-{
-    uint64_t size;
-    pages_list_entry_t* code_pages;
-
-    size = pml4_map_memory(ps->pml4, desc->exec_paddr, vaddr, desc->exec_size, PAGE_ACCESS_WX, PL3);
-    if (size < desc->exec_size)
-        return -1;
-    
-    code_pages = malloc(sizeof(pages_list_entry_t));
-    if (code_pages == NULL)
-        return -1;
-    
-    code_pages->paddr = desc->exec_paddr;
-    code_pages->pages = ceil((double) desc->exec_size / SIZE_4KB);
-    code_pages->next = NULL;
-
-    ps->code_pages.head = code_pages;
-    ps->code_pages.tail = code_pages;
-    ps->user_mode.stack.rip = vaddr;
-    ps->code_start_vaddr = vaddr;
-
-    ps->mapping_start_vaddr = alignu(vaddr + desc->exec_size, SIZE_4KB);
-    
-    return 0;
-}
-
-static int process_load_elf(process_t* ps, const process_descriptor_t* desc)
+static int load_process_code(process_t* ps, const process_descriptor_t* desc)
 {
     uint64_t phdrs_offset, phdrs_total_size;
     uint64_t tmp_vaddr, copy_tmp_vaddr;
@@ -207,18 +180,6 @@ static int process_load_elf(process_t* ps, const process_descriptor_t* desc)
     kernel_unmap_memory(tmp_vaddr, desc->exec_size);
 
     return 0;
-}
-
-static int load_process_code(process_t* ps, const process_descriptor_t* desc)
-{
-    switch (desc->exec_type)
-    {
-    case PROC_EXEC_BIN:
-        return process_load_binary(ps, desc, 0);
-    case PROC_EXEC_ELF:
-        return process_load_elf(ps, desc);
-    }
-    return -1;
 }
 
 static int init_process_stack(process_t* ps)
@@ -434,8 +395,9 @@ static uint64_t delete_pages_list(pages_list_t* list)
 {
     pages_list_entry_t* current;
     pages_list_entry_t* tmp;
-    uint64_t pages = 0;
-
+    uint64_t pages;
+    
+    pages = 0;
     current = list->head;
     while (current != NULL)
     {
@@ -486,7 +448,9 @@ void delete_and_free_process(process_t* ps)
 
 process_t* create_process(const process_descriptor_t* desc, uint64_t pid)
 {
-    process_t* ps = malloc(sizeof(process_t));
+    process_t* ps;
+    
+    ps = malloc(sizeof(process_t));
     if (ps == NULL)
         return NULL;
 
@@ -525,15 +489,19 @@ static int copy_file_descriptors(file_descriptor_t* from, file_descriptor_t* to)
 
 process_t* create_replacement_process(process_t* parent, const process_descriptor_t* file)
 {
-    process_t* child = create_process(file, parent->pid);
+    process_t* child;
+    
+    child = create_process(file, parent->pid);
     if (child == NULL)
         return NULL;
+    
     child->parent_pid = parent->parent_pid;
     if (copy_file_descriptors(parent->fds, child->fds))
     {
         delete_and_free_process(child);
         return NULL;
     }
+    
     return child;
 }
 
@@ -541,8 +509,9 @@ static int copy_segments_list(page_table_t pml4, uint64_t vaddr, pages_list_t* f
 {
     uint64_t bytes, size, paddr, kernel_vaddr;
     pages_list_entry_t* segment;
-    pages_list_entry_t* ptr = from->head;
+    pages_list_entry_t* ptr;
 
+    ptr = from->head;
     while (ptr != NULL)
     {
         paddr = request_pages(ptr->pages);
@@ -603,7 +572,9 @@ static int copy_segments_list(page_table_t pml4, uint64_t vaddr, pages_list_t* f
 
 process_t* clone_process(process_t* parent, uint64_t id)
 {
-    process_t* child = malloc(sizeof(process_t));
+    process_t* child;
+    
+    child = malloc(sizeof(process_t));
     if (child == NULL)
         return NULL;
     

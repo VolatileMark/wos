@@ -52,7 +52,8 @@ static void set_idt_gate
     uint8_t present
 )
 {
-    idt64_entry_t* entry = &idt[interrupt_number];
+    idt64_entry_t* entry;
+    entry = &idt[interrupt_number];
     entry->offset_lo = (uint16_t) (offset & 0x000000000000FFFF);
     entry->offset_mid = (uint16_t) ((offset & 0x00000000FFFF0000) >> 16);
     entry->offset_high = (uint32_t) ((offset & 0xFFFFFFFF00000000) >> 32);

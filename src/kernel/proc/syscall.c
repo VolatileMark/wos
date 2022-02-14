@@ -1,6 +1,5 @@
 #include "syscall.h"
 #include "scheduler.h"
-#include "ipc/spp.h"
 #include "../mem/heap.h"
 #include "../mem/paging.h"
 #include "../mem/pfa.h"
@@ -61,95 +60,24 @@ DEFINE_SYSCALL(execve)
     return 0;
 }
 
-/*
-static int sys_spp_expose(uint64_t* stack)
-{
-    uint64_t fn_addr = POP_STACK(uint64_t, stack);
-    const char* fn_name = POP_STACK(const char*, stack);
-    return expose_function(get_current_scheduled_process(), fn_addr, fn_name);
-}
-
-static int sys_spp_request(uint64_t* stack)
-{
-    const char* fn_name = POP_STACK(const char*, stack);
-    uint64_t* out_addr = POP_STACK(uint64_t*, stack);
-    *out_addr = request_func(get_current_scheduled_process(), fn_name);
-    return -(out_addr == 0);
-}
-
-static int sys_pci_find(uint64_t* stack)
-{
-    pci_devices_list_entry_t* entry;
-    pci_export_list_entry_t* new_entry;
-    pci_header_common_t* header;
-    uint64_t header_size, devices_found = 0;
-    uint8_t class = POP_STACK(uint8_t, stack);
-    uint8_t subclass = POP_STACK(uint8_t, stack);
-    uint8_t program_interface = POP_STACK(uint8_t, stack);
-    pci_export_list_t* new_list = POP_STACK(pci_export_list_t*, stack);
-    pci_devices_list_t* list = find_pci_devices(class, subclass, program_interface);
-
-    if (list == NULL)
-        return 0;
-    
-    new_list->head = NULL;
-    new_list->tail = NULL;
-
-    entry = list->head;
-    while (entry != NULL)
-    {   
-        // The problem with mapping only one page is if the header overlaps two pages (very unlikely scenario but still possible)
-        header = (pci_header_common_t*) (kernel_map_temporary_page(entry->header_paddr, PAGE_ACCESS_RO, PL0) + GET_ADDR_OFFSET(entry->header_paddr));
-        switch (GET_HEADER_TYPE(header->header_type))
-        {
-        case PCI_HEADER_0x0:
-            header_size = sizeof(pci_header_0x0_t);
-            break;
-        case PCI_HEADER_0x1:
-            header_size = sizeof(pci_header_0x1_t);
-            break;
-        case PCI_HEADER_0x2:
-            header_size = sizeof(pci_header_0x2_t);
-            break;
-        }
-        
-        new_entry = pmalloc(header_size + sizeof(pci_devices_list_entry_t*));
-        if (new_entry == NULL)
-        {
-            kernel_unmap_temporary_page((uint64_t) header);
-            delete_devices_list(list);
-            free(list);
-            return 0;
-        }
-        new_entry->next = NULL;
-        memcpy(&new_entry->header, header, header_size);
-        if (new_list->tail == NULL)
-            new_list->head = new_entry;
-        else
-            new_list->tail->next = new_entry;
-        new_list->tail = new_entry;
-
-        kernel_unmap_temporary_page((uint64_t) header);
-        entry = entry->next;
-        ++devices_found;
-    }
-
-    delete_devices_list(list);
-    return devices_found;
-}
-*/
-
 DEFINE_SYSCALL(vm_map)
 {
-    uint64_t hint = POP_STACK(uint64_t);
-    uint64_t size = POP_STACK(uint64_t);
-    PAGE_ACCESS_TYPE prot = POP_STACK(PAGE_ACCESS_TYPE);
-    int flags = POP_STACK(int);
-    int fd = POP_STACK(int);
-    long offset = POP_STACK(long);
-    uint64_t* window = POP_STACK(uint64_t*);
-    process_t* ps = get_current_scheduled_process();
+    uint64_t hint, size;
     uint64_t vaddr, paddr;
+    PAGE_ACCESS_TYPE prot;
+    int flags, fd;
+    long offset;
+    uint64_t* window;
+    process_t* ps;
+
+    hint = POP_STACK(uint64_t);
+    size = POP_STACK(uint64_t);
+    prot = POP_STACK(PAGE_ACCESS_TYPE);
+    flags = POP_STACK(int);
+    fd = POP_STACK(int);
+    offset = POP_STACK(long);
+    window = POP_STACK(uint64_t*);
+    ps = get_current_scheduled_process();
 
     *window = (uint64_t) -1;
 
@@ -205,9 +133,12 @@ DEFINE_SYSCALL(vm_map)
 
 DEFINE_SYSCALL(vm_unmap)
 {
-    uint64_t vaddr = POP_STACK(uint64_t);
-    uint64_t size = POP_STACK(uint64_t);
-    process_t* ps = get_current_scheduled_process();
+    uint64_t vaddr, size;
+    process_t* ps;
+
+    vaddr = POP_STACK(uint64_t);
+    size = POP_STACK(uint64_t);
+    ps = get_current_scheduled_process();
 
     if (pml4_unmap_memory(ps->pml4, vaddr, size) < size)
         return -1;

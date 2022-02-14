@@ -12,8 +12,8 @@ static struct multiboot_tag_old_acpi* old_acpi;
 void parse_multiboot_struct(uint64_t addr)
 {
     struct multiboot_tag* tag;
-    struct_size = (uint64_t) *((uint32_t*) addr);
 
+    struct_size = (uint64_t) *((uint32_t*) addr);
     mmap = NULL;
     initrd = NULL;
     framebuffer = NULL;

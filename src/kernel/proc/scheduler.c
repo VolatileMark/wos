@@ -37,8 +37,11 @@ extern void switch_pml4_and_stack(uint64_t pml4_paddr);
 
 static uint64_t max_id_in_process_list(process_list_t* pss)
 {
-    uint64_t max = 0;
-    process_list_entry_t* ptr = pss->head;
+    uint64_t max;
+    process_list_entry_t* ptr;
+    
+    max = 0;
+    ptr = pss->head;
     while (ptr != NULL)
     {
         if (ptr->ps != NULL && ptr->ps->pid >= max)
@@ -50,8 +53,9 @@ static uint64_t max_id_in_process_list(process_list_t* pss)
 
 uint64_t get_next_pid(void)
 {
-    uint64_t pid_runnable = max_id_in_process_list(&runnable_pss);
-    uint64_t pid_zombie = max_id_in_process_list(&zombie_pss);
+    uint64_t pid_runnable, pid_zombie;
+    pid_runnable = max_id_in_process_list(&runnable_pss);
+    pid_zombie = max_id_in_process_list(&zombie_pss);
     return maxu(pid_runnable, pid_zombie) + 1;
 }
 
@@ -140,7 +144,9 @@ process_t* get_current_scheduled_process(void)
 
 static int schedule_process(process_list_t* pss, process_t* ps)
 {
-    process_list_entry_t* entry = malloc(sizeof(process_list_entry_t));
+    process_list_entry_t* entry;
+    
+    entry = malloc(sizeof(process_list_entry_t));
     if (entry == NULL)
         return -1;
     
@@ -163,9 +169,11 @@ int schedule_runnable_process(process_t* ps)
 
 static int remove_process(process_list_t* pss, uint64_t pid, uint8_t should_delete)
 {
-    process_list_entry_t* current = pss->head;
-    process_list_entry_t* prev = NULL;
-
+    process_list_entry_t* current;
+    process_list_entry_t* prev;
+    
+    current = pss->head;
+    prev = NULL;
     while (current != NULL)
     {
         if (current->ps != NULL && current->ps->pid == pid)
@@ -205,20 +213,26 @@ void terminate_process(process_t* ps)
 
 int has_any_child_process_terminated(process_t* parent)
 {
-    process_list_entry_t* entry = zombie_pss.head;
+    process_list_entry_t* entry;
+    
+    entry = zombie_pss.head;
     while (entry != NULL)
     {
         if (entry->ps->parent_pid == parent->pid)
             return 1;
         entry = entry->next;
     }
+
     return 0;
 }
 
 static int count_num_children_of_process_in_list(process_list_t* pss, uint64_t parent_pid)
 {
-    int num = 0;
-    process_list_entry_t* entry = pss->head;
+    int num;
+    process_list_entry_t* entry;
+    
+    num = 0;
+    entry = pss->head;
     while (entry != NULL)
     {
         if (entry->ps->parent_pid == parent_pid)
@@ -230,8 +244,9 @@ static int count_num_children_of_process_in_list(process_list_t* pss, uint64_t p
 
 int num_children_of_process(uint64_t parent_pid)
 {
-    int num_running = count_num_children_of_process_in_list(&runnable_pss, parent_pid);
-    int num_zombies = count_num_children_of_process_in_list(&zombie_pss, parent_pid);
+    int num_running, num_zombies;
+    num_running = count_num_children_of_process_in_list(&runnable_pss, parent_pid);
+    num_zombies = count_num_children_of_process_in_list(&zombie_pss, parent_pid);
     return (num_zombies + num_running);
 }
 
@@ -265,7 +280,9 @@ void delete_zombie_processes(void)
 {
     /* Delete all zombie processes */
     process_list_entry_t* tmp;
-    process_list_entry_t* ptr = zombie_pss.head;
+    process_list_entry_t* ptr;
+    
+    ptr = zombie_pss.head;
     while (ptr != NULL)
     {
         if (ptr->ps != NULL)
@@ -278,13 +295,15 @@ void delete_zombie_processes(void)
         ptr = tmp;
         zombie_pss.head = ptr;
     }
+
     zombie_pss.tail = zombie_pss.head;
 }
 
 void run_scheduler(void)
 {
-    process_t* ps = get_next_runnable_process();
+    process_t* ps;
     
+    ps = get_next_runnable_process();
     if (ps == NULL)
         launch_init(); /* Set a default launch function */
     

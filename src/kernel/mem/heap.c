@@ -23,7 +23,9 @@ static heap_t kernel_heap;
 static uint64_t expand_kernel_heap(uint64_t size)
 {
     uint64_t pages_paddr, pages_count, mapped_size, new_size;
-    heap_segment_header_t* new = (heap_segment_header_t*) kernel_heap.end_vaddr;
+    heap_segment_header_t* new;
+    
+    new = (heap_segment_header_t*) kernel_heap.end_vaddr;
     
     new_size = alignu(size + sizeof(heap_segment_header_t), SIZE_4KB);
     if (kernel_heap.end_vaddr + new_size > kernel_heap.ceil_vaddr)
@@ -59,15 +61,19 @@ static uint64_t expand_kernel_heap(uint64_t size)
 
 static heap_segment_header_t* next_free_kernel_heap_segment(uint64_t size)
 {
-    heap_segment_header_t* current = kernel_heap.head;
+    heap_segment_header_t* current;
+    
+    current = kernel_heap.head;
     while (current != NULL)
     {
         if (current->free && current->size >= size)
             return current;
         current = current->next;
     }
+    
     if (expand_kernel_heap(size) < size)
         return NULL;
+    
     return next_free_kernel_heap_segment(size);
 }
 
@@ -136,7 +142,8 @@ uint64_t allocate_kernel_heap_memory(uint64_t size)
 
 void free_kernel_heap_memory(uint64_t addr)
 {
-    heap_segment_header_t* seg = (heap_segment_header_t*) (addr - sizeof(heap_segment_header_t));
+    heap_segment_header_t* seg;
+    seg = (heap_segment_header_t*) (addr - sizeof(heap_segment_header_t));
     seg->free = 1;
     combine_kernel_heap_forward(seg);
     combine_kernel_heap_backward(seg);

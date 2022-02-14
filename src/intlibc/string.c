@@ -47,19 +47,25 @@ uint64_t strcspn(const char* str1, const char* str2)
 
 int atoi(const char* str)
 {
-    uint64_t i = 1, j = 0;
-    int out = 0;
+    uint64_t i, j;
+    int out;
+
+    i = 1;
+    out = 0;
     for (j = strlen(str); j > 0; j--)
     {
         out += (str[j - 1] - '0') * i;
         i *= 10;
     }
+    
     return out;
 }
 
 char* itoa(int val, char* str, int base)
 {
-    uint64_t i = 0;
+    uint64_t i;
+    
+    i = 0;
     if (val < 0)
     {
         str[i++] = '-';

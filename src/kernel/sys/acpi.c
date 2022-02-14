@@ -40,7 +40,8 @@ static sdt_t main_sdt;
 
 static rsdp_descriptor_v1_t* get_rsdp(void)
 {
-    struct multiboot_tag_old_acpi* old = get_multiboot_tag_old_acpi();
+    struct multiboot_tag_old_acpi* old;
+    old = get_multiboot_tag_old_acpi();
     return (rsdp_descriptor_v1_t*) ((old == NULL) ? get_multiboot_tag_new_acpi()->rsdp : old->rsdp);
 }
 
@@ -57,8 +58,9 @@ int init_acpi(void)
 {
     uint64_t sdt_vaddr, sdt_size, sdt_addr_offset;
     sdt_header_t* mapped_sdt_header;
-    rsdp_descriptor_v1_t* rsdp = get_rsdp();
-
+    rsdp_descriptor_v1_t* rsdp;
+    
+    rsdp = get_rsdp();
     if (strncmp(rsdp->signature, RSDP_SIG, 8))
         return -1;
     if (rsdp->revision == ACPI_REV_OLD && checksum(rsdp, sizeof(rsdp_descriptor_v1_t)))
@@ -94,9 +96,11 @@ int init_acpi(void)
 
 static uint64_t get_next_entry_pointer(sdt_t* sdt, uint64_t index)
 {
-    uint64_t entries_array = (uint64_t) (sdt->header + 1);
-    uint64_t entry_offset = index * sdt->pointer_size;
+    uint64_t entries_array, entry_offset;
     uint64_t entry_pointer, byte_offset, byte;
+
+    entries_array = (uint64_t) (sdt->header + 1);
+    entry_offset = index * sdt->pointer_size;
     for 
     (
         byte = sdt->pointer_size, entry_pointer = 0; 
@@ -107,6 +111,7 @@ static uint64_t get_next_entry_pointer(sdt_t* sdt, uint64_t index)
         byte_offset = byte - 1;
         entry_pointer |= *((uint8_t*) (entries_array + entry_offset + byte_offset)) << (8 * byte_offset);
     }
+    
     return entry_pointer;
 }
 

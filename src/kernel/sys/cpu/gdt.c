@@ -60,7 +60,9 @@ static uint16_t create_gdt_entry
     GDT_SEG_TYPE type
 )
 {
-    gdt_entry_t* entry = &gdt[index];
+    gdt_entry_t* entry;
+    
+    entry = &gdt[index];
     if (type == GDT_SEG_NULL)
         memset(entry, 0, sizeof(gdt_entry_t));
     else
@@ -91,7 +93,9 @@ static uint16_t create_gdt_entry
 
 static uint16_t create_tss_entry(uint16_t index, uint64_t addr)
 {
-    gdt_entry_t* entry = &gdt[index];
+    gdt_entry_t* entry;
+    
+    entry = &gdt[index];
     
     entry->base_lo = addr & 0x0000FFFF;
     entry->base_mid = (addr >> 16) & 0x000000FF;
@@ -124,7 +128,9 @@ static uint16_t create_tss_entry(uint16_t index, uint64_t addr)
 
 void init_gdt(void)
 {
-    uint64_t tss_addr = (uint64_t) get_tss();
+    uint64_t tss_addr;
+    
+    tss_addr = (uint64_t) get_tss();
 
     create_gdt_entry(0, 0x00000000, 0x00000000, PL0, GDT_SEG_NULL);
     kernel_cs = create_gdt_entry(1, 0x00000000, 0xFFFFFFFF, PL0, GDT_SEG_CODE);
