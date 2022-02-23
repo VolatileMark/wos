@@ -50,7 +50,7 @@ static uint64_t get_next_tmp_index(void)
     return index;
 }
 
-static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
+static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, page_access_type_t access, privilege_level_t privilege_level)
 {
     page_table_entry_t* entry;
     entry = &table[index];
@@ -62,7 +62,7 @@ static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, PAGE_
     /* entry->no_execute = (((uint64_t) access) & 0b0010) >> 1; */
 }
 
-uint64_t paging_map_temporary_page(uint64_t paddr, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
+uint64_t paging_map_temporary_page(uint64_t paddr, page_access_type_t access, privilege_level_t privilege_level)
 {
     uint64_t index;
     index = get_next_tmp_index();
@@ -80,7 +80,7 @@ void paging_unmap_temporary_page(uint64_t vaddr)
     invalidate_pte(vaddr);
 }
 
-uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
+uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, page_access_type_t access, privilege_level_t privilege_level)
 {
     return pml4_map_memory(bootstrap_pml4, paddr, vaddr, size, access, privilege_level);
 }
@@ -287,8 +287,8 @@ static uint64_t pt_map_memory
     uint64_t paddr,
     uint64_t vaddr,
     uint64_t size,
-    PAGE_ACCESS_TYPE access,
-    PRIVILEGE_LEVEL privilege_level
+    page_access_type_t access,
+    privilege_level_t privilege_level
 )
 {
     uint64_t pt_idx;
@@ -316,8 +316,8 @@ static uint64_t pd_map_memory
     uint64_t paddr,
     uint64_t vaddr,
     uint64_t size,
-    PAGE_ACCESS_TYPE access,
-    PRIVILEGE_LEVEL privilege_level
+    page_access_type_t access,
+    privilege_level_t privilege_level
 )
 {
     page_table_t pt;
@@ -370,8 +370,8 @@ static uint64_t pdp_map_memory
     uint64_t paddr,
     uint64_t vaddr,
     uint64_t size,
-    PAGE_ACCESS_TYPE access,
-    PRIVILEGE_LEVEL privilege_level
+    page_access_type_t access,
+    privilege_level_t privilege_level
 )
 {
     page_table_t pd;
@@ -424,8 +424,8 @@ uint64_t pml4_map_memory
     uint64_t paddr, 
     uint64_t vaddr, 
     uint64_t size, 
-    PAGE_ACCESS_TYPE access, 
-    PRIVILEGE_LEVEL privilege_level
+    page_access_type_t access, 
+    privilege_level_t privilege_level
 )
 {
     page_table_t pdp;

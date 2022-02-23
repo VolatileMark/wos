@@ -12,7 +12,7 @@ typedef enum
     PL1 = 0x01,
     PL2 = 0x02,
     PL3 = 0x03
-} PRIVILEGE_LEVEL;
+} privilege_level_t;
 
 extern uint64_t _start_addr;
 extern uint64_t _end_addr;

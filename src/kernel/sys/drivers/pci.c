@@ -85,7 +85,7 @@ void scan_pci(void)
     enumerate_pci(mcfg);
 }
 
-pci_devices_list_t* find_pci_devices(uint8_t class, uint8_t subclass, uint8_t program_interface)
+pci_devices_list_t* find_pci_devices(int class, int subclass, int program_interface)
 {
     pci_devices_list_entry_t* entry = devices_list.head;
     pci_devices_list_entry_t* new;
@@ -103,9 +103,9 @@ pci_devices_list_t* find_pci_devices(uint8_t class, uint8_t subclass, uint8_t pr
             header = (pci_header_common_t*) (kernel_map_temporary_page(entry->header_paddr, PAGE_ACCESS_RX, PL0) + GET_ADDR_OFFSET(entry->header_paddr));
             if 
             (
-                header->class_code == class &&
-                header->subclass == subclass &&
-                header->program_interface == program_interface
+                (class == -1 || header->class_code == (uint8_t) class) &&
+                (subclass == -1 || header->subclass == (uint8_t) subclass) &&
+                (program_interface == -1 || header->program_interface == (uint8_t) program_interface)
             )
             {
                 new = malloc(sizeof(pci_devices_list_entry_t));

@@ -67,7 +67,7 @@ DEFINE_SYSCALL(vm_map)
 {
     uint64_t hint, size;
     uint64_t vaddr, paddr;
-    PAGE_ACCESS_TYPE prot;
+    page_access_type_t prot;
     int flags, fd;
     long offset;
     uint64_t* window;
@@ -75,7 +75,7 @@ DEFINE_SYSCALL(vm_map)
 
     hint = POP_STACK(uint64_t);
     size = POP_STACK(uint64_t);
-    prot = POP_STACK(PAGE_ACCESS_TYPE);
+    prot = POP_STACK(page_access_type_t);
     flags = POP_STACK(int);
     fd = POP_STACK(int);
     offset = POP_STACK(long);

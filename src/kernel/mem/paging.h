@@ -35,7 +35,16 @@ typedef enum
     PAGE_ACCESS_WX = 0b0101,
     PAGE_ACCESS_RO = 0b0110,
     PAGE_ACCESS_RW = 0b0111
-} PAGE_ACCESS_TYPE;
+} page_access_type_t;
+
+typedef enum
+{
+    PAGE_FLAG_ALLOW_WRITES = 1,
+    PAGE_FLAG_ALLOW_USER = 2,
+    PAGE_FLAG_NO_WRITETHROUGH = 3,
+    PAGE_FLAG_UNCACHABLE = 4,
+    PAGE_FLAG_NO_EXECUTE = 63
+} PAGE_FLAG;
 
 #define PTE_CLEAR(pte) *((uint64_t*) pte) = 0
 #define VADDR_GET(pml4, pdp, pd, pt) ((((uint64_t) ((pml4 < 256) ? 0x0000 : 0xFFFF)) << 48) | ((((uint64_t) pml4) << 39) | (((uint64_t) pdp) << 30) | (((uint64_t) pd) << 21) | (((uint64_t) pt) << 12)))
@@ -63,9 +72,9 @@ uint64_t get_pte_address(page_table_entry_t* entry);
 
 void init_paging(void);
 
-uint64_t pml4_map_memory(page_table_t pml4, uint64_t paddr, uint64_t vaddr, uint64_t size, PAGE_ACCESS_TYPE access, enum PRIVILEGE_LEVEL_ENUM privilege_level);
-uint64_t kernel_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, PAGE_ACCESS_TYPE access, enum PRIVILEGE_LEVEL_ENUM privilege_level);
-uint64_t kernel_map_temporary_page(uint64_t paddr, PAGE_ACCESS_TYPE access, enum PRIVILEGE_LEVEL_ENUM privilege_level);
+uint64_t pml4_map_memory(page_table_t pml4, uint64_t paddr, uint64_t vaddr, uint64_t size, page_access_type_t access, privilege_level_t privilege_level);
+uint64_t kernel_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, page_access_type_t access, privilege_level_t privilege_level);
+uint64_t kernel_map_temporary_page(uint64_t paddr, page_access_type_t access, privilege_level_t privilege_level);
 
 uint64_t pml4_unmap_memory(page_table_t pml4, uint64_t vaddr, uint64_t size);
 uint64_t kernel_unmap_memory(uint64_t vaddr, uint64_t size);
@@ -82,5 +91,17 @@ void kernel_inject_pml4(page_table_t pml4);
 
 uint64_t get_kernel_pml4_paddr(void);
 page_table_t get_kernel_pml4(void);
+
+int kernel_set_pte_flag(uint64_t vaddr, PAGE_FLAG flag);
+int pml4_set_pte_flag(page_table_t pml4, uint64_t vaddr, PAGE_FLAG flag);
+
+int kernel_reset_pte_flag(uint64_t vaddr, PAGE_FLAG flag);
+int pml4_reset_pte_flag(page_table_t pml4, uint64_t vaddr, PAGE_FLAG flag);
+
+int kernel_flag_memory_area(uint64_t vaddr, uint64_t size, PAGE_FLAG flag);
+int pml4_flag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, PAGE_FLAG flag);
+
+int kernel_unflag_memory_area(uint64_t vaddr, uint64_t size, PAGE_FLAG flag);
+int pml4_unflag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, PAGE_FLAG flag);
 
 #endif

@@ -57,7 +57,7 @@ static uint64_t get_next_tmp_index(void)
     return index;
 }
 
-static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
+static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, page_access_type_t access, privilege_level_t privilege_level)
 {
     page_table_entry_t* entry;
     entry = &table[index];
@@ -69,7 +69,7 @@ static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, PAGE_
     entry->no_execute = (((uint64_t) access) & 0b0010) >> 1;
 }
 
-uint64_t kernel_map_temporary_page(uint64_t paddr, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
+uint64_t kernel_map_temporary_page(uint64_t paddr, page_access_type_t access, privilege_level_t privilege_level)
 {
     uint64_t index;
     index = get_next_tmp_index();
@@ -97,7 +97,7 @@ void init_paging(void)
     kernel_pml4_paddr = kernel_get_paddr(KERNEL_PML4_VADDR);
 }
 
-uint64_t kernel_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, PAGE_ACCESS_TYPE access, PRIVILEGE_LEVEL privilege_level)
+uint64_t kernel_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, page_access_type_t access, privilege_level_t privilege_level)
 {
     return pml4_map_memory(kernel_pml4, paddr, vaddr, size, access, privilege_level);
 }
@@ -305,8 +305,8 @@ static uint64_t pt_map_memory
     uint64_t paddr,
     uint64_t vaddr,
     uint64_t size,
-    PAGE_ACCESS_TYPE access,
-    PRIVILEGE_LEVEL privilege_level
+    page_access_type_t access,
+    privilege_level_t privilege_level
 )
 {
     uint64_t pt_idx;
@@ -335,8 +335,8 @@ static uint64_t pd_map_memory
     uint64_t paddr,
     uint64_t vaddr,
     uint64_t size,
-    PAGE_ACCESS_TYPE access,
-    PRIVILEGE_LEVEL privilege_level
+    page_access_type_t access,
+    privilege_level_t privilege_level
 )
 {
     uint64_t pd_idx;
@@ -391,8 +391,8 @@ static uint64_t pdp_map_memory
     uint64_t paddr,
     uint64_t vaddr,
     uint64_t size,
-    PAGE_ACCESS_TYPE access,
-    PRIVILEGE_LEVEL privilege_level
+    page_access_type_t access,
+    privilege_level_t privilege_level
 )
 {
     uint64_t pdp_idx;
@@ -447,8 +447,8 @@ uint64_t pml4_map_memory
     uint64_t paddr, 
     uint64_t vaddr, 
     uint64_t size, 
-    PAGE_ACCESS_TYPE access, 
-    PRIVILEGE_LEVEL privilege_level
+    page_access_type_t access, 
+    privilege_level_t privilege_level
 )
 {
     uint64_t pml4_idx;
@@ -824,4 +824,130 @@ static void merge_pml4_with_pml4(page_table_t src, page_table_t dest, uint64_t v
 void kernel_inject_pml4(page_table_t pml4)
 {
     merge_pml4_with_pml4(kernel_pml4, pml4, KERNEL_HEAP_START_ADDR);
+}
+
+int kernel_set_pte_flag(uint64_t vaddr, PAGE_FLAG flag)
+{
+    return pml4_set_pte_flag(kernel_pml4, vaddr, flag);
+}
+
+int pml4_set_pte_flag(page_table_t pml4, uint64_t vaddr, PAGE_FLAG flag)
+{
+    page_table_t pt;
+    page_table_entry_t entry;
+    uint64_t pt_idx;
+
+    pt_idx = VADDR_TO_PML4_IDX(vaddr);
+    entry = pml4[pt_idx];
+    if (!entry.present)
+        return -1;
+    pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RW, PL0);
+
+    pt_idx = VADDR_TO_PDP_IDX(vaddr);
+    entry = pt[pt_idx];
+    kernel_unmap_temporary_page((uint64_t) pt);
+    if (!entry.present)
+        return -1;
+    pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RW, PL0);
+
+    pt_idx = VADDR_TO_PD_IDX(vaddr);
+    entry = pt[pt_idx];
+    kernel_unmap_temporary_page((uint64_t) pt);
+    if (!entry.present)
+        return -1;
+    pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RW, PL0);
+
+    pt_idx = VADDR_TO_PDP_IDX(vaddr);
+    entry = pt[pt_idx];
+    if (!entry.present)
+    {
+        kernel_unmap_temporary_page((uint64_t) pt);
+        return -1;
+    }
+    *((uint64_t*) &entry) |= ((uint64_t) 1 << flag);
+    kernel_unmap_temporary_page((uint64_t) pt);
+}
+
+int kernel_reset_pte_flag(uint64_t vaddr, PAGE_FLAG flag)
+{
+    return pml4_set_pte_flag(kernel_pml4, vaddr, flag);
+}
+
+int pml4_reset_pte_flag(page_table_t pml4, uint64_t vaddr, PAGE_FLAG flag)
+{
+    page_table_t pt;
+    page_table_entry_t entry;
+    uint64_t pt_idx;
+
+    pt_idx = VADDR_TO_PML4_IDX(vaddr);
+    entry = pml4[pt_idx];
+    if (!entry.present)
+        return -1;
+    pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RW, PL0);
+
+    pt_idx = VADDR_TO_PDP_IDX(vaddr);
+    entry = pt[pt_idx];
+    kernel_unmap_temporary_page((uint64_t) pt);
+    if (!entry.present)
+        return -1;
+    pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RW, PL0);
+
+    pt_idx = VADDR_TO_PD_IDX(vaddr);
+    entry = pt[pt_idx];
+    kernel_unmap_temporary_page((uint64_t) pt);
+    if (!entry.present)
+        return -1;
+    pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RW, PL0);
+
+    pt_idx = VADDR_TO_PDP_IDX(vaddr);
+    entry = pt[pt_idx];
+    if (!entry.present)
+    {
+        kernel_unmap_temporary_page((uint64_t) pt);
+        return -1;
+    }
+    *((uint64_t*) &entry) &= ~((uint64_t) 1 << flag);
+    kernel_unmap_temporary_page((uint64_t) pt);
+}
+
+int kernel_flag_memory_area(uint64_t vaddr, uint64_t size, PAGE_FLAG flag)
+{
+    return pml4_flag_memory_area(kernel_pml4, vaddr, size, flag);
+}
+
+int pml4_flag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, PAGE_FLAG flag)
+{
+    vaddr = alignd(vaddr, SIZE_4KB);
+    size = alignu(size, SIZE_4KB);
+
+    while (size > 0)
+    {
+        if (pml4_set_pte_flag(pml4, vaddr, flag))
+            return -1;
+        size -= SIZE_4KB;
+        vaddr += SIZE_4KB;
+    }
+
+    return 0;
+}
+
+int kernel_unflag_memory_area(uint64_t vaddr, uint64_t size, PAGE_FLAG flag)
+{
+    return pml4_unflag_memory_area(kernel_pml4, vaddr, size, flag);
+}
+
+int pml4_unflag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, PAGE_FLAG flag)
+{
+    vaddr = alignd(vaddr, SIZE_4KB);
+    size = alignu(size, SIZE_4KB);
+
+    while (size > 0)
+    {
+        if (pml4_reset_pte_flag(pml4, vaddr, flag))
+            return -1;
+        size -= SIZE_4KB;
+        vaddr += SIZE_4KB;
+    }
+
+    return 0;
 }

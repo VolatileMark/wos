@@ -56,7 +56,7 @@ static uint16_t create_gdt_entry
     uint16_t index, 
     uint32_t base, 
     uint32_t limit, 
-    PRIVILEGE_LEVEL privilege_level,
+    privilege_level_t privilege_level,
     GDT_SEG_TYPE type
 )
 {

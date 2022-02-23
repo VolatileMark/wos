@@ -37,3 +37,11 @@ void free(void* ptr)
 {
     free_kernel_heap_memory((uint64_t) ptr);
 }
+
+void* aligned_alloc(uint64_t alignment, uint64_t size)
+{
+    uint64_t vaddr;
+    size = alignu(size, alignment);
+    vaddr = allocate_kernel_heap_memory(size);
+    return (void*) alignu(vaddr, alignment);
+}
