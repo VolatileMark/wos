@@ -4,10 +4,11 @@
 #include "../../../utils/constants.h"
 #include "../../../utils/macros.h"
 #include "../../../utils/helpers/alloc.h"
-#include <stdint.h>
 #include <stddef.h>
 #include <math.h>
 #include <mem.h>
+
+#define TIMEOUT_SPIN 1000000
 
 #define HBA_CAP_S64A (1 << 31)
 #define HBA_CAP_NCS (0xF << 8)
@@ -365,13 +366,13 @@ static void init_port(hba_port_t* port, uint8_t max_cmd_slots)
 
     stop_command_engine(port);
 
-    port->clb = aligned_alloc(1024, sizeof(hba_cmd_header_t) * max_cmd_slots);
+    port->clb = (uint64_t) aligned_alloc(1024, sizeof(hba_cmd_header_t) * max_cmd_slots);
     memset((void*) port->clb, 0, sizeof(hba_cmd_header_t) * max_cmd_slots);
 
-    port->fb = aligned_alloc(256, sizeof(hba_fis_t));
+    port->fb = (uint64_t) aligned_alloc(256, sizeof(hba_fis_t));
     memset((void*) port->fb, 0, sizeof(hba_fis_t));
 
-    cmd_tables_base_address = aligned_alloc(128, sizeof(hba_cmd_tbl_t) * 256);
+    cmd_tables_base_address = (uint64_t) aligned_alloc(128, sizeof(hba_cmd_tbl_t) * 256);
     cmd_header = (hba_cmd_header_t*) port->clb;
     for (i = 0; i < max_cmd_slots; i++)
     {
@@ -435,7 +436,7 @@ static uint64_t init_ahci_controller(pci_header_0x0_t* pci_header)
     }
 
     abar->ghc |= HBA_GHC_HR;
-    SPIN(1000000);
+    SPIN(TIMEOUT_SPIN);
     abar->ghc |= HBA_GHC_AE;
 
     init_ports(abar);
@@ -469,6 +470,7 @@ int init_ahci_driver(void)
         pci_header = map_pci_header(controller->header_paddr);
         if (pci_header->header_type == PCI_HEADER_0x0)
             controllers_online += init_ahci_controller((pci_header_0x0_t*) pci_header);
+        unmap_pci_header((uint64_t) pci_header);
         controller = controller->next;
     }
 
@@ -540,7 +542,7 @@ static uint64_t ahci_read_bytes_limited(uint64_t device_coordinates, uint64_t ad
     
     cmd_header = (hba_cmd_header_t*) port->clb;
     cmd_header += slot;
-    cmd_header->cmd_fis_length = sizeof(hba_fis_t) / sizeof(uint32_t);
+    cmd_header->cmd_fis_length = (uint8_t) (sizeof(fis_reg_h2d_t) / sizeof(uint32_t));
     cmd_header->write = 0;
     cmd_header->prdt_length = (uint16_t)(ceil((double) bytes / SIZE_nMB(4)) * HBA_PORT_PRDT_ENTRIES);
     
@@ -578,9 +580,11 @@ static uint64_t ahci_read_bytes_limited(uint64_t device_coordinates, uint64_t ad
     for 
     (
         spin = 0; 
-        (port->tfd & (AHCI_ATA_DEV_BUSY | AHCI_ATA_DEV_DRQ)) && (spin < 1000000); 
+        (port->tfd & (AHCI_ATA_DEV_BUSY | AHCI_ATA_DEV_DRQ)) && (spin < TIMEOUT_SPIN); 
         spin++
     );
+    if (spin == TIMEOUT_SPIN)
+        return 0;
 
     port->ci = 1 << slot;
 

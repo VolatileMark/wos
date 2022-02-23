@@ -866,6 +866,8 @@ int pml4_set_pte_flag(page_table_t pml4, uint64_t vaddr, PAGE_FLAG flag)
     }
     *((uint64_t*) &entry) |= ((uint64_t) 1 << flag);
     kernel_unmap_temporary_page((uint64_t) pt);
+    
+    return 0;
 }
 
 int kernel_reset_pte_flag(uint64_t vaddr, PAGE_FLAG flag)
@@ -908,6 +910,8 @@ int pml4_reset_pte_flag(page_table_t pml4, uint64_t vaddr, PAGE_FLAG flag)
     }
     *((uint64_t*) &entry) &= ~((uint64_t) 1 << flag);
     kernel_unmap_temporary_page((uint64_t) pt);
+
+    return 0;
 }
 
 int kernel_flag_memory_area(uint64_t vaddr, uint64_t size, PAGE_FLAG flag)
