@@ -7,7 +7,9 @@ uint64_t strlen(const char* str);
 char strcmp(const char* str1, const char* str2);
 char strncmp(const char* str1, const char* str2, uint64_t bytes);
 uint64_t strcspn(const char* str1, const char* str2);
+char* strrev(char* str);
 int atoi(const char* str);
 char* itoa(int val, char* str, int base);
+char* utoa(uint32_t val, char* str, int base);
 
 #endif

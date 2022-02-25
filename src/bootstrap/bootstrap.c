@@ -148,11 +148,8 @@ uint64_t align_multiboot_struct
 (
     uint64_t current_addr, 
     uint64_t size, 
-    uint64_t start_address, 
     uint64_t boundary, 
     struct multiboot_tag_old_acpi** rsdp_tag, 
-    uint64_t rsdp_start_paddr,
-    uint64_t rsdp_size,
     struct multiboot_tag_module** kernel_elf
 )
 {
@@ -165,13 +162,11 @@ uint64_t align_multiboot_struct
     dst = (uint8_t*) (new_addr + (size - 1));
     tmp_size = size;
 
-    paging_map_memory(new_addr, new_addr, size + rsdp_size, PAGE_ACCESS_RW, PL0);
-    memcpy(dst + 1, (void*) rsdp_start_paddr, rsdp_size);
+    paging_map_memory(new_addr, new_addr, size, PAGE_ACCESS_RW, PL0);
     for (; tmp_size > 0; tmp_size--) { *dst-- = *src--; }
 
-    *rsdp_tag = (struct multiboot_tag_old_acpi*) (new_addr + (((uint64_t) *rsdp_tag) - start_address));
-    *kernel_elf = (struct multiboot_tag_module*) (new_addr + (((uint64_t) *kernel_elf) - start_address));
-    *((uint64_t*) &(*rsdp_tag)->rsdp) = new_addr + size;
+    *rsdp_tag = (struct multiboot_tag_old_acpi*) (new_addr + (((uint64_t) *rsdp_tag) - current_addr));
+    *kernel_elf = (struct multiboot_tag_module*) (new_addr + (((uint64_t) *kernel_elf) - current_addr));
 
     return new_addr;
 }
@@ -182,7 +177,7 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
     struct multiboot_tag_old_acpi* rsdp_tag;
     uint64_t kernel_entry;
     uint64_t multiboot_struct_size, multiboot_struct_new_addr;
-    uint64_t rsdp_start_paddr, rsdp_size;
+    uint64_t rsdp_size;
     bitmap_t* new_bitmap;
 
     if 
@@ -199,7 +194,6 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
         rsdp_tag == NULL ||
         kernel_elf == NULL
     ) { return; }
-    rsdp_start_paddr = (uint64_t) rsdp_tag->rsdp;
 
     /* Initialize the page frame allocator */
     init_pfa();
@@ -210,17 +204,14 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
     lock_pages(alignd((uint64_t) &_start_addr, SIZE_4KB), ceil((double) (((uint64_t) &_end_addr) - ((uint64_t) &_start_addr)) / SIZE_4KB));
     lock_pages(alignd(kernel_elf->mod_start, SIZE_4KB), ceil((double) (kernel_elf->mod_end - kernel_elf->mod_start) / SIZE_4KB));
 
-    if (lock_acpi_sdt_pages(rsdp_start_paddr, &rsdp_size)) { return; }
+    if (lock_acpi_sdt_pages((uint64_t) rsdp_tag->rsdp, &rsdp_size)) { return; }
     
     multiboot_struct_new_addr = align_multiboot_struct
     (
         multiboot_struct_addr, 
         multiboot_struct_size, 
-        kernel_elf->mod_end, 
         SIZE_4KB, 
         &rsdp_tag,
-        rsdp_start_paddr, 
-        rsdp_size,
         &kernel_elf
     );
     lock_pages(alignd(multiboot_struct_new_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB));

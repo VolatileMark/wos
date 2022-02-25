@@ -39,11 +39,30 @@ uint64_t strcspn(const char* str1, const char* str2)
 {
     uint64_t i, j;
     for (i = 0; i < strlen(str1); i ++)
+    {
         for (j = 0; j < strlen(str2); j ++)
+        {
             if (str1[i] == str2[j])
                 return i;
+        }
+    }
     return strlen(str1);
 }
+
+char* strrev(char* str)
+{
+    char tmp;
+    uint64_t i, j;
+    uint64_t str_length = strlen(str) - 1;
+    for (i = 0, j = str_length; i < j; i ++, j --)
+    {
+        tmp = str[i];
+        str[i] = str[j];
+        str[j] = tmp;
+    }
+    return str;
+}
+
 
 int atoi(const char* str)
 {
@@ -72,8 +91,25 @@ char* itoa(int val, char* str, int base)
         val *= -1;
     }
 
-    for (; val != 0; i++, val /= 10)
-        str[i] = (val % base) + '0';
+    do {
+        str[i++] = (val % base) + '0';
+    } while ((val /= base) > 0);
+    str[i] = '\0';
 
+    strrev(str);
+    return str;
+}
+
+char* utoa(uint32_t val, char* str, int base)
+{
+    uint64_t i;
+    
+    i = 0;
+    do {
+        str[i++] = (val % base) + '0';
+    } while ((val /= base) > 0);
+    str[i] = '\0';
+
+    strrev(str);
     return str;
 }

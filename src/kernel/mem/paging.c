@@ -66,7 +66,7 @@ static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, page_
     entry->present = (((uint64_t) access) & 0b0100) >> 2;
     entry->allow_writes = (((uint64_t) access) & 0b0001);
     entry->allow_user_access = (privilege_level == PL3);
-    entry->no_execute = (((uint64_t) access) & 0b0010) >> 1;
+    /* entry->no_execute = (((uint64_t) access) & 0b0010) >> 1 */;
 }
 
 uint64_t kernel_map_temporary_page(uint64_t paddr, page_access_type_t access, privilege_level_t privilege_level)

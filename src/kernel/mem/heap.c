@@ -49,6 +49,7 @@ static uint64_t expand_kernel_heap(uint64_t size)
     new->size = new_size;
     new->data = (uint64_t)(new + 1);
     new->prev = kernel_heap.tail;
+    new->next = NULL;
     if (kernel_heap.tail != NULL)
     {
         new->next = kernel_heap.tail->next;
