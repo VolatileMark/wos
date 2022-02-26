@@ -12,6 +12,7 @@ typedef enum
     AHCI_DEV_SATA
 } ahci_device_type_t;
 
+int init_ahci_driver(void);
 uint64_t ahci_read_sectors(uint64_t device_coordinates, uint64_t address, uint64_t sectors_count, void* buffer);
 uint64_t ahci_read_bytes(uint64_t device_coordinates, uint64_t address, uint64_t bytes_count, void* buffer);
 

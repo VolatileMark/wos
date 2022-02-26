@@ -83,6 +83,7 @@ int atoi(const char* str)
 char* itoa(int val, char* str, int base)
 {
     uint64_t i;
+    int num;
     
     i = 0;
     if (val < 0)
@@ -92,7 +93,14 @@ char* itoa(int val, char* str, int base)
     }
 
     do {
-        str[i++] = (val % base) + '0';
+        num = (val % base);
+        if (num >= 0xA)
+        {
+            num -= 0xA;
+            str[i++] = num + 'A';
+        }
+        else
+            str[i++] = num + '0';
     } while ((val /= base) > 0);
     str[i] = '\0';
 

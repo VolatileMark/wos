@@ -12,15 +12,7 @@
 #define trace_ahci(msg, ...) trace("AHCI", msg, ##__VA_ARGS__)
 
 #define TIMEOUT_SPIN 1000000
-
-#define HBA_CAP_S64A (1 << 31)
-#define HBA_CAP_NCS (0xF << 8)
-#define HBA_CAP_NP (0xF << 0)
-
-#define HBA_GHC_AE (1 << 31)
-#define HBA_GHC_MRSM (1 << 2)
-#define HBA_GHC_IE (1 << 1)
-#define HBA_GHC_HR (1 << 0)
+#define CONTROLLER_RESET_WAIT 1000
 
 #define HBA_PxCMD_ST 0x0001
 #define HBA_PxCMD_FRE 0x0010
@@ -201,10 +193,46 @@ struct hba_port
 } __attribute__((packed));
 typedef struct hba_port hba_port_t;
 
+struct hba_mem_cap
+{
+    uint32_t np : 5;
+    uint32_t sxs: 1;
+    uint32_t ems : 1;
+    uint32_t cccs : 1;
+    uint32_t ncs : 5;
+    uint32_t psc : 1;
+    uint32_t ssc : 1;
+    uint32_t pmd : 1;
+    uint32_t fbss : 1;
+    uint32_t spm : 1;
+    uint32_t sam : 1;
+    uint32_t rsv : 1;
+    uint32_t iss : 4;
+    uint32_t sclo : 1;
+    uint32_t sal : 1;
+    uint32_t salp : 1;
+    uint32_t sss : 1;
+    uint32_t smps : 1;
+    uint32_t ssntf : 1;
+    uint32_t sncq : 1;
+    uint32_t s64a : 1;
+} __attribute__((packed));
+typedef struct hba_mem_cap hba_mem_cap_t;
+
+struct hba_mem_ghc
+{
+    uint32_t hr : 1;
+    uint32_t ie : 1;
+    uint32_t mrsm : 1;
+    uint32_t rsv : 28;
+    uint32_t ae : 1;
+} __attribute__((packed));
+typedef struct hba_mem_ghc hba_mem_ghc_t;
+
 struct hba_mem
 {
-    uint32_t cap;
-    uint32_t ghc;
+    hba_mem_cap_t cap;
+    hba_mem_ghc_t ghc;
     uint32_t is;
     uint32_t pi;
     uint32_t vs;
@@ -392,14 +420,14 @@ static void init_ports(hba_mem_t* abar)
     uint32_t pi, i;
     uint8_t max_ports, ports, max_cmd_slots;
     ahci_device_type_t type;
-
+    
     pi = abar->pi;
-    max_ports = abar->cap & HBA_CAP_NP;
-    max_cmd_slots = abar->cap & HBA_CAP_NCS;
+    max_ports = abar->cap.np + 1;
+    max_cmd_slots = abar->cap.ncs + 1;
     ports = 0;
     for (i = 0; i < 32 && ports < max_ports; i++)
     {
-        if (pi & (1 << 0))
+        if (pi & 1)
         {
             type = get_type(&abar->ports[i]);
             switch (type)
@@ -435,16 +463,16 @@ static uint64_t init_ahci_controller(pci_header_0x0_t* pci_header)
     }
 
     entry = malloc(sizeof(ahci_controllers_list_entry_t));
-    if (!(abar->cap & HBA_CAP_S64A) || entry == NULL)
+    if (!(abar->cap.s64a) || entry == NULL)
     {
-        trace_ahci("64-bit addressing not supported for controller %x:%x", pci_header->common.vendor_id, pci_header->common.device_id);
+        trace_ahci("64-bit addressing not supported by controller %x:%x", pci_header->common.vendor_id, pci_header->common.device_id);
         kernel_unmap_memory((uint64_t) abar, sizeof(hba_mem_t));
         return 0;
     }
 
-    abar->ghc |= HBA_GHC_HR;
-    SPIN(TIMEOUT_SPIN);
-    abar->ghc |= HBA_GHC_AE;
+    abar->ghc.hr = 1;
+    SPIN(CONTROLLER_RESET_WAIT);
+    abar->ghc.ae = 1;
 
     init_ports(abar);
 
@@ -475,15 +503,22 @@ int init_ahci_driver(void)
     while (controller != NULL)
     {
         pci_header = map_pci_header(controller->header_paddr);
-        if (pci_header->header_type == PCI_HEADER_0x0)
-            controllers_online += init_ahci_controller((pci_header_0x0_t*) pci_header);
+        if 
+        (
+            pci_header->header_type == PCI_HEADER_0x0 && 
+            init_ahci_controller((pci_header_0x0_t*) pci_header)
+        )
+        {
+            info("Controller %x:%x initialized. New ID is %d", pci_header->vendor_id, pci_header->device_id, controllers_online);
+            ++controllers_online;
+        }
         unmap_pci_header((uint64_t) pci_header);
         controller = controller->next;
     }
 
     ahci_controllers.num_of_controllers = controllers_online;
 
-    return (controllers_online > 0);
+    return !(controllers_online > 0);
 }
 
 static hba_port_t* get_port(uint64_t coordinates)

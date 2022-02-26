@@ -8,14 +8,4 @@ build/
 .vscode/
 .vagrant/
 
-tools/**
-
-# Exceptions
-!tools/*.sh
-!tools/vagrant
-!tools/vagrant/*.sh
-!tools/font-utils
-!tools/font-utils/*.sh
-!tools/font-utils/*.psf
-!tools/font-utils/readpsf
-!tools/font-utils/writepsf
+tools/x86_64-elf-cross

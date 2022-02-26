@@ -16,6 +16,7 @@
 #include "sys/drivers/acpi.h"
 #include "sys/drivers/pci.h"
 #include "sys/drivers/video/framebuffer.h"
+#include "sys/drivers/storage/ahci.h"
 #include "proc/process.h"
 #include "proc/scheduler.h"
 #include "proc/syscall.h"
@@ -34,6 +35,8 @@ static int gather_system_info(void)
 
 static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
+    disable_interrupts();
+
     init_paging();
     restore_pfa(current_bitmap);
     parse_multiboot_struct(multiboot_struct_addr);
@@ -61,22 +64,22 @@ static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
     if (init_scheduler())
         return -1;
     
-    return gather_system_info();
+    if (gather_system_info())
+        return -1;
+    
+    if (init_ahci_driver())
+        return -1;
+    
+    return 0;
 }
 
 void launch_init(void)
 {
-    /*
-    delete_zombie_processes();
-    schedule_runnable_process(create_process(&init_descriptor, 0));
-    schedule_runnable_process(create_process(&fsrv_descriptor, 1));
-    run_scheduler();
-    */
+    
 }
 
 void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
-    disable_interrupts();
     if (kernel_init(multiboot_struct_addr, current_bitmap))
     {
         error("Could not initialize kernel");

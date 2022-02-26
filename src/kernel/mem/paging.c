@@ -857,7 +857,7 @@ int pml4_set_pte_flag(page_table_t pml4, uint64_t vaddr, PAGE_FLAG flag)
         return -1;
     pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RW, PL0);
 
-    pt_idx = VADDR_TO_PDP_IDX(vaddr);
+    pt_idx = VADDR_TO_PT_IDX(vaddr);
     entry = pt[pt_idx];
     if (!entry.present)
     {
@@ -901,7 +901,7 @@ int pml4_reset_pte_flag(page_table_t pml4, uint64_t vaddr, PAGE_FLAG flag)
         return -1;
     pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RW, PL0);
 
-    pt_idx = VADDR_TO_PDP_IDX(vaddr);
+    pt_idx = VADDR_TO_PT_IDX(vaddr);
     entry = pt[pt_idx];
     if (!entry.present)
     {
