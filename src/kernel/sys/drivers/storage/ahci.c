@@ -1,5 +1,6 @@
 #include "ahci.h"
 #include "../pci.h"
+#include "../../../mem/pfa.h"
 #include "../../../mem/paging.h"
 #include "../../../utils/constants.h"
 #include "../../../utils/macros.h"
@@ -35,6 +36,8 @@
 #define AHCI_ATA_CMD_WRITE_DMA 0xCA
 #define AHCI_ATA_CMD_WRITE_DMA_EX 0x35
 #define AHCI_ATA_CMD_MODE_LBA (1 << 6)
+
+#define CONTROLLER_MEM(max_ports, max_cmd_slots) (((sizeof(hba_cmd_header_t) * max_cmd_slots) + sizeof(hba_fis_t) + (sizeof(hba_cmd_tbl_t) * max_cmd_slots)) * max_ports)
 
 typedef enum
 {
@@ -135,7 +138,7 @@ struct fis_pio_setup
     uint8_t port_multiplier : 4;
     uint8_t reserved0 : 1;
     uint8_t d_bit : 1;
-    uint8_t interrupt_bit;
+    uint8_t interrupt_bit : 1;
     uint8_t reserved1 : 1;
     uint8_t status;
     uint8_t error;
@@ -262,6 +265,8 @@ struct hba_fis
 } __attribute__((packed));
 typedef struct hba_fis hba_fis_t;
 
+long cool = sizeof(fis_dma_setup_t);
+
 struct hba_cmd_header
 {
     uint8_t cmd_fis_length : 5;
@@ -272,7 +277,7 @@ struct hba_cmd_header
     uint8_t bist : 1;
     uint8_t clear_busy : 1;
     uint8_t reserved0 : 1;
-    uint8_t port_multiplier;
+    uint8_t port_multiplier : 4;
     uint16_t prdt_length;
     uint32_t prdt_count;
     uint64_t cmd_table_base_addr;
@@ -389,34 +394,35 @@ static void stop_command_engine(hba_port_t* port)
     while (port->cmd & (HBA_PxCMD_CR | HBA_PxCMD_FR));
 }
 
-static void init_port(hba_port_t* port, uint8_t max_cmd_slots)
+static void init_port(uint64_t controller_base, hba_port_t* port, uint64_t port_num, uint8_t max_cmd_slots, uint8_t max_ports)
 {
     hba_cmd_header_t* cmd_header;
-    uint64_t cmd_tables_base_address;
     uint8_t i;
+    uint64_t cmd_headers_total_size;
 
     stop_command_engine(port);
 
-    port->clb = (uint64_t) aligned_alloc(1024, sizeof(hba_cmd_header_t) * max_cmd_slots);
-    memset((void*) port->clb, 0, sizeof(hba_cmd_header_t) * max_cmd_slots);
+    cmd_headers_total_size = sizeof(hba_cmd_header_t) * max_cmd_slots;
+    port->clb = controller_base + (port_num * cmd_headers_total_size);
+    memset((void*) port->clb, 0, cmd_headers_total_size);
 
-    port->fb = (uint64_t) aligned_alloc(256, sizeof(hba_fis_t));
+    port->fb = controller_base + (max_ports * cmd_headers_total_size) + (port_num * sizeof(hba_fis_t));
     memset((void*) port->fb, 0, sizeof(hba_fis_t));
 
-    cmd_tables_base_address = (uint64_t) aligned_alloc(128, sizeof(hba_cmd_tbl_t) * 256);
     cmd_header = (hba_cmd_header_t*) port->clb;
     for (i = 0; i < max_cmd_slots; i++)
     {
         cmd_header[i].prdt_length = HBA_PORT_PRDT_ENTRIES;
-        cmd_header[i].cmd_table_base_addr = cmd_tables_base_address + (sizeof(hba_cmd_tbl_t) * i);
+        cmd_header[i].cmd_table_base_addr = controller_base + ((cmd_headers_total_size + sizeof(hba_fis_t)) * max_ports) + (sizeof(hba_cmd_tbl_t) * i);
         memset((void*) cmd_header[i].cmd_table_base_addr, 0, sizeof(hba_cmd_tbl_t));
     }
 
     start_command_engine(port);
 }
 
-static void init_ports(hba_mem_t* abar)
+static void init_ports(hba_mem_t* abar, pci_header_0x0_t* pci_header)
 {
+    uint64_t controller_mem_size, controller_vaddr, controller_paddr, controller_pages;
     uint32_t pi, i;
     uint8_t max_ports, ports, max_cmd_slots;
     ahci_device_type_t type;
@@ -425,6 +431,29 @@ static void init_ports(hba_mem_t* abar)
     max_ports = abar->cap.np + 1;
     max_cmd_slots = abar->cap.ncs + 1;
     ports = 0;
+    controller_mem_size = CONTROLLER_MEM(max_ports, max_cmd_slots);
+    controller_pages = ceil((double) controller_mem_size / SIZE_4KB);
+    
+    if (kernel_get_next_vaddr(controller_mem_size, &controller_vaddr) < controller_mem_size)
+    {
+        trace_ahci("Could get vaddr for controller %x:%x", pci_header->common.vendor_id, pci_header->common.device_id);
+        return;
+    }
+
+    controller_paddr = request_pages(controller_pages);
+    if (controller_paddr == 0)
+    {
+        trace_ahci("Could not allocate physical memory for controller %x:%x", pci_header->common.vendor_id, pci_header->common.device_id);
+        return;
+    }
+
+    if (kernel_map_memory(controller_paddr, controller_vaddr, controller_mem_size, PAGE_ACCESS_RW, PL0) < controller_mem_size)
+    {
+        trace_ahci("Could not map memory for controller %x:%x", pci_header->common.vendor_id, pci_header->common.device_id);
+        free_pages(controller_paddr, controller_pages);
+        return;
+    }
+
     for (i = 0; i < 32 && ports < max_ports; i++)
     {
         if (pi & 1)
@@ -441,7 +470,7 @@ static void init_ports(hba_mem_t* abar)
                 break;
             case AHCI_DEV_SATAPI:
             case AHCI_DEV_SATA:
-                init_port(&abar->ports[i], max_cmd_slots);
+                init_port(controller_vaddr, &abar->ports[i], ports, max_cmd_slots, max_ports);
                 break;
             }
             ++ports;
@@ -470,11 +499,13 @@ static uint64_t init_ahci_controller(pci_header_0x0_t* pci_header)
         return 0;
     }
 
+    /*
     abar->ghc.hr = 1;
     SPIN(CONTROLLER_RESET_WAIT);
     abar->ghc.ae = 1;
+    */
 
-    init_ports(abar);
+    init_ports(abar, pci_header);
 
     entry->next = NULL;
     entry->abar = abar;
@@ -509,7 +540,7 @@ int init_ahci_driver(void)
             init_ahci_controller((pci_header_0x0_t*) pci_header)
         )
         {
-            info("Controller %x:%x initialized. New ID is %d", pci_header->vendor_id, pci_header->device_id, controllers_online);
+            info("AHCI controller %x:%x initialized. New ID is %d", pci_header->vendor_id, pci_header->device_id, controllers_online);
             ++controllers_online;
         }
         unmap_pci_header((uint64_t) pci_header);
