@@ -1,8 +1,11 @@
 #include "acpi.h"
 #include "../../mem/paging.h"
+#include "../../utils/helpers/log.h"
 #include "../../utils/helpers/multiboot2-utils.h"
 #include <stddef.h>
 #include <string.h>
+
+#define trace_acpi(msg, ...) trace("ACPI", msg, ##__VA_ARGS__)
 
 #define ACPI_REV_OLD 0
 #define ACPI_REV_NEW 2
@@ -62,7 +65,10 @@ int init_acpi(void)
     
     rsdp = get_rsdp();
     if (strncmp(rsdp->signature, RSDP_SIG, 8))
+    {
+        trace_acpi("RSDP signature mismatch");
         return -1;
+    }
     if (rsdp->revision == ACPI_REV_OLD && checksum(rsdp, sizeof(rsdp_descriptor_v1_t)))
     {
         main_sdt.header_paddr = (uint64_t) rsdp->rsdt_address;
@@ -74,7 +80,10 @@ int init_acpi(void)
         main_sdt.pointer_size = sizeof(uint64_t);
     }
     else
+    {
+        trace_acpi("Invalid ACPI revision");
         return -1;
+    }
     
     sdt_addr_offset = GET_ADDR_OFFSET(main_sdt.header_paddr);
     
@@ -83,7 +92,10 @@ int init_acpi(void)
     kernel_unmap_temporary_page((uint64_t) mapped_sdt_header);
     
     if (kernel_get_next_vaddr(sdt_size, &sdt_vaddr) < sdt_size)
+    {
+        trace_acpi("Could not find free vaddr");
         return -1;
+    }
     sdt_vaddr += sdt_addr_offset;
     
     kernel_map_memory(main_sdt.header_paddr, sdt_vaddr, sdt_size, PAGE_ACCESS_RX, PL0);

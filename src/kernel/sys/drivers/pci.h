@@ -122,7 +122,7 @@ typedef enum
     PCI_HEADER_0x2 = 0x2
 } pci_header_type_t;
 
-void scan_pci(void);
+int scan_pci(void);
 pci_devices_list_t* find_pci_devices(int class, int subclass, int program_interface);
 void delete_devices_list(pci_devices_list_t* list);
 

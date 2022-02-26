@@ -78,3 +78,13 @@ inline int put_pixel(uint32_t x, uint32_t y, uint8_t r, uint8_t g, uint8_t b)
 
     return 0;
 }
+
+uint32_t get_framebuffer_width(void)
+{
+    return framebuffer_info.width;
+}
+
+uint32_t get_framebuffer_height(void)
+{
+    return framebuffer_info.height;
+}

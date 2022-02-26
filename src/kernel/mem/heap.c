@@ -3,9 +3,12 @@
 #include "paging.h"
 #include "../utils/constants.h"
 #include "../utils/helpers/alloc.h"
+#include "../utils/helpers/log.h"
 #include <stddef.h>
 #include <math.h>
 #include <mem.h>
+
+#define trace_heap(msg, ...) trace("HEAP", msg, ##__VA_ARGS__)
 
 typedef struct heap
 {
@@ -97,14 +100,20 @@ static void combine_kernel_heap_backward(heap_segment_header_t* seg)
 int init_kernel_heap(uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t initial_size)
 {
     if (initial_size > ceil_vaddr - start_vaddr || initial_size < sizeof(heap_segment_header_t))
+    {
+        error("Invalid initial size");
         return -1;
+    }
     
     kernel_heap.ceil_vaddr = ceil_vaddr;
     kernel_heap.start_vaddr = start_vaddr;
     kernel_heap.end_vaddr = start_vaddr;
     kernel_heap.tail = NULL;
     if (expand_kernel_heap(initial_size) < initial_size)
+    {
+        error("Failed to allocate initial memory");
         return -1;
+    }
     kernel_heap.head = kernel_heap.tail;
 
     return 0;

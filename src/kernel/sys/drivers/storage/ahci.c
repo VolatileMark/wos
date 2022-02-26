@@ -4,9 +4,12 @@
 #include "../../../utils/constants.h"
 #include "../../../utils/macros.h"
 #include "../../../utils/helpers/alloc.h"
+#include "../../../utils/helpers/log.h"
 #include <stddef.h>
 #include <math.h>
 #include <mem.h>
+
+#define trace_ahci(msg, ...) trace("AHCI", msg, ##__VA_ARGS__)
 
 #define TIMEOUT_SPIN 1000000
 
@@ -426,11 +429,15 @@ static uint64_t init_ahci_controller(pci_header_0x0_t* pci_header)
 
     abar = map_abar(pci_header->bar5);
     if (abar == NULL)
+    {
+        trace_ahci("Could not map ABAR");
         return 0; /* ABAR mapping failed */
+    }
 
     entry = malloc(sizeof(ahci_controllers_list_entry_t));
     if (!(abar->cap & HBA_CAP_S64A) || entry == NULL)
     {
+        trace_ahci("64-bit addressing not supported for controller %x:%x", pci_header->common.vendor_id, pci_header->common.device_id);
         kernel_unmap_memory((uint64_t) abar, sizeof(hba_mem_t));
         return 0;
     }
@@ -538,7 +545,10 @@ static uint64_t ahci_read_bytes_limited(uint64_t device_coordinates, uint64_t ad
     port->is = (uint32_t) -1;
     slot = find_available_cmd_slot(port);
     if (slot == -1)
-        return -1;
+    {
+        trace_ahci("No command slot available for port %x", device_coordinates);
+        return 0;
+    }
     
     cmd_header = (hba_cmd_header_t*) port->clb;
     cmd_header += slot;
@@ -584,14 +594,20 @@ static uint64_t ahci_read_bytes_limited(uint64_t device_coordinates, uint64_t ad
         spin++
     );
     if (spin == TIMEOUT_SPIN)
+    {
+        trace_ahci("Port %x is hung", device_coordinates);
         return 0;
+    }
 
     port->ci = 1 << slot;
 
     while (1)
     {
         if (port->is & HBA_PxIS_TFES)
+        {
+            trace_ahci("Disk read error (port %x)", device_coordinates);
             return 0;
+        }
         else if (port->ci & (1 << slot))
             break;
     }

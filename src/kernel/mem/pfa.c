@@ -127,3 +127,13 @@ bitmap_t* get_page_bitmap(void)
 {
     return &page_bitmap;
 }
+
+uint64_t get_free_memory(void)
+{
+    return free_memory;
+}
+
+uint64_t get_used_memory(void)
+{
+    return used_memory;
+}

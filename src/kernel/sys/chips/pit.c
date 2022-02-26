@@ -2,8 +2,11 @@
 #include "../cpu/io.h"
 #include "../cpu/interrupts.h"
 #include "../../utils/helpers/alloc.h"
+#include "../../utils/helpers/log.h"
 #include <stddef.h>
 #include <mem.h>
+
+#define trace_pit(msg, ...) trace("PIT", msg, ##__VA_ARGS__)
 
 #define PIT_BASE_FREQUENCY 1193182
 
@@ -46,7 +49,10 @@ int register_pit_callback(isr_handler_t handler)
     {
         callbacks.start = calloc(1, sizeof(pit_callback_t));
         if (callbacks.start == NULL)
-            return 1;
+        {
+            trace_pit("Could not initialize PIT callback list");
+            return -1;
+        }
         callbacks.end = callbacks.start;
         callbacks.end->handler = handler;
     }
@@ -54,7 +60,10 @@ int register_pit_callback(isr_handler_t handler)
     {
         callbacks.end->next = calloc(1, sizeof(pit_callback_t));
         if (callbacks.end->next == NULL)
-            return 2;
+        {
+            trace_pit("Could not allocate next PIT callback entry");
+            return -1;
+        }
         callbacks.end = callbacks.end->next;
         callbacks.end->handler = handler;
     }

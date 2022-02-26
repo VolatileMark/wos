@@ -5,5 +5,7 @@
 
 int init_framebuffer_driver(void);
 int put_pixel(uint32_t x, uint32_t y, uint8_t r, uint8_t g, uint8_t b);
+uint32_t get_framebuffer_width(void);
+uint32_t get_framebuffer_height(void);
 
 #endif

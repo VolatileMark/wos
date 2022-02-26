@@ -1,9 +1,12 @@
 #include "pci.h"
 #include "acpi.h"
 #include "../../mem/paging.h"
+#include "../../utils/helpers/log.h"
 #include "../../utils/helpers/alloc.h"
 #include <stddef.h>
 #include <mem.h>
+
+#define trace_pci(msg, ...) trace("PCI", msg, ##__VA_ARGS__)
 
 static pci_devices_list_t devices_list;
 
@@ -74,15 +77,19 @@ static void enumerate_pci(mcfg_t* mcfg)
     }
 }
 
-void scan_pci(void)
+int scan_pci(void)
 {
     mcfg_t* mcfg;
     
     mcfg = (mcfg_t*) find_acpi_table(MCFG_SIG);
     if (mcfg == NULL)
-        return;
+    {
+        trace_pci("MCFG table not found");
+        return -1;
+    }
     memset(&devices_list, 0, sizeof(pci_devices_list_t));
     enumerate_pci(mcfg);
+    return 0;
 }
 
 pci_devices_list_t* find_pci_devices(int class, int subclass, int program_interface)
