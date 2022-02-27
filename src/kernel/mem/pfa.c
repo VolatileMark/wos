@@ -97,8 +97,7 @@ void init_pfa(void)
     uint64_t total_memory, bitmap_size, bitmap_paddr, bitmap_vaddr;
 
     total_memory = get_total_memory_of_type(MULTIBOOT_MEMORY_AVAILABLE);
-    free_memory = total_memory;
-    used_memory = 0;
+    free_memory = total_memory - used_memory;
 
     /* Initialize new bitmap */
     bitmap_size = ceil(((double) total_memory) / SIZE_4KB / 8.0);
@@ -118,9 +117,18 @@ void init_pfa(void)
 
 void restore_pfa(bitmap_t* current_bitmap)
 {
+    uint64_t i;
+
     last_page_index = 0;
     page_bitmap.buffer = current_bitmap->buffer;
     page_bitmap.size = current_bitmap->size;
+
+    used_memory = 0;
+    for (i = 0; i < page_bitmap.size * 8; i++)
+    {
+        if (bitmap_get(&page_bitmap, i))
+            used_memory += SIZE_4KB;
+    }
 }
 
 bitmap_t* get_page_bitmap(void)

@@ -4,7 +4,8 @@
 #include "../multiboot2.h"
 #include <stdint.h>
 
-void parse_multiboot_struct(uint64_t addr);
+int parse_multiboot_struct(uint64_t addr);
+int remap_struct(uint64_t struct_paddr);
 
 uint64_t get_multiboot_struct_size(void);
 struct multiboot_tag_mmap* get_multiboot_tag_mmap(void);

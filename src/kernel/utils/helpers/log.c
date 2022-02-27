@@ -1,4 +1,5 @@
 #include "log.h"
+#include "multiboot2-utils.h"
 #include "../psf.h"
 #include "../../sys/drivers/video/framebuffer.h"
 #include <stdarg.h>
@@ -81,8 +82,10 @@ void printf(const char* str, ...)
             putc((uint8_t) va_arg(ap, uint32_t));
             break;
         case 'p':
+            puts(utoa(va_arg(ap, uint64_t), tmp_str, 16));
+            break;
         case 'x':
-            puts(itoa((long) va_arg(ap, uint64_t), tmp_str, 16));
+            puts(itoa(va_arg(ap, long), tmp_str, 16));
             break;
         case 'd':
         case 'i':
@@ -94,7 +97,7 @@ void printf(const char* str, ...)
             puts(va_arg(ap, char*));
             break;
         case 'u':
-            puts(utoa(va_arg(ap, long), tmp_str, 10));
+            puts(utoa(va_arg(ap, uint64_t), tmp_str, 10));
             break;
         case '%':
             putc('%');
@@ -122,5 +125,7 @@ int init_logger(uint32_t width, uint32_t height)
     max_x = width / font_header.width;
     max_y = height / font_header.height;
     
+    info("Framebuffer found at %p has been remapped to %p", get_multiboot_tag_framebuffer()->common.framebuffer_addr, get_framebuffer_vaddr());
+
     return 0;
 }

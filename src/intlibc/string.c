@@ -80,10 +80,10 @@ int atoi(const char* str)
     return out;
 }
 
-char* itoa(int val, char* str, int base)
+char* itoa(long val, char* str, int base)
 {
     uint64_t i;
-    int num;
+    long num;
     
     i = 0;
     if (val < 0)
@@ -108,13 +108,20 @@ char* itoa(int val, char* str, int base)
     return str;
 }
 
-char* utoa(uint32_t val, char* str, int base)
+char* utoa(uint64_t val, char* str, int base)
 {
-    uint64_t i;
-    
+    uint64_t i, num;
+
     i = 0;
     do {
-        str[i++] = (val % base) + '0';
+        num = (val % base);
+        if (num >= 0xA)
+        {
+            num -= 0xA;
+            str[i++] = num + 'A';
+        }
+        else
+            str[i++] = num + '0';
     } while ((val /= base) > 0);
     str[i] = '\0';
 

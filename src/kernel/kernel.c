@@ -39,8 +39,7 @@ static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 
     init_paging();
     restore_pfa(current_bitmap);
-    parse_multiboot_struct(multiboot_struct_addr);
-    if (get_multiboot_struct_size() == 0)
+    if (parse_multiboot_struct(multiboot_struct_addr))
         return -1;
     
     init_mmap(get_multiboot_tag_mmap());
@@ -50,7 +49,11 @@ static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
     init_idt();
     init_isr();
 
-    init_framebuffer_driver();
+    if (remap_struct(multiboot_struct_addr))
+        return -1;
+
+    if (init_framebuffer_driver())
+        return -1;
     if (init_logger((get_framebuffer_width() * 3) / 4, get_framebuffer_height()))
         return -1;
 
@@ -82,7 +85,8 @@ void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
     if (kernel_init(multiboot_struct_addr, current_bitmap))
     {
-        error("Could not initialize kernel");
+        if (is_framebuffer_driver_initialized())
+            error("Could not initialize kernel");
         HALT();
     }
     info("Free memory: %d kB | Used memory: %d kB", get_free_memory() >> 10, get_used_memory() >> 10);

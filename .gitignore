@@ -9,3 +9,4 @@ build/
 .vagrant/
 
 tools/x86_64-elf-cross
+tools/ovmf-bins

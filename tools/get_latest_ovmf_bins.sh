@@ -4,7 +4,7 @@ BASE_URL="https://www.kraxel.org/repos/jenkins/edk2/"
 VER_TARGET="ovmf-x64"
 SUB_TARGET="pure-efi"
 WORKDIR="/tmp/osworkdir"
-DESTDIR=$(realpath "../ovmf-bins")
+DESTDIR=$(realpath "./ovmf-bins")
 
 mkdir -p "$DESTDIR"
 mkdir -p "$WORKDIR" && cd "$WORKDIR"

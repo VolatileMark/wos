@@ -6,7 +6,8 @@ BUILD_DIR = $(abspath build/)
 SOURCE_DIR = $(abspath src/)
 DATA_DIR = $(abspath data/)
 
-EMU = qemu-system-x86_64
+#EMU = qemu-system-x86_64
+EMU = /home/vagrant/qemu/bin/qemu-system-x86_64
 DBG = gdb
 
 EMU_FLAGS = -cdrom $(BUILD_DIR)/$(OS_NAME).iso \
@@ -23,7 +24,7 @@ DBG_FLAGS = -ex "target remote localhost:1234" \
 			-ex "set disassemble-next-line on" \
 			-ex "set step-mode on" \
 			-ex "set disassembly-flavor intel" \
-			-ex "add-symbol-file $(BUILD_DIR)/bootstrap/bootstrap.elf" -ex "add-symbol-file $(BUILD_DIR)/kernel/kernel.elf"
+			-ex "add-symbol-file $(BUILD_DIR)/kernel/kernel.elf" #-ex "add-symbol-file $(BUILD_DIR)/bootstrap/bootstrap.elf"
 
 
 

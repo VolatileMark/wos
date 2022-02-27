@@ -336,7 +336,7 @@ static void unmap_pci_header(uint64_t header_vaddr)
     kernel_unmap_temporary_page(header_vaddr + SIZE_4KB);
 }
 
-static ahci_device_type_t get_type(hba_port_t* port)
+static ahci_device_type_t get_port_type(hba_port_t* port)
 {
     uint8_t ipm, det;
 
@@ -394,7 +394,7 @@ static void stop_command_engine(hba_port_t* port)
     while (port->cmd & (HBA_PxCMD_CR | HBA_PxCMD_FR));
 }
 
-static void init_port(uint64_t controller_base, hba_port_t* port, uint64_t port_num, uint8_t max_cmd_slots, uint8_t max_ports)
+static void init_ahci_controller_port(uint64_t controller_base, hba_port_t* port, uint64_t port_num, uint8_t max_ports, uint8_t max_cmd_slots)
 {
     hba_cmd_header_t* cmd_header;
     uint8_t i;
@@ -420,9 +420,9 @@ static void init_port(uint64_t controller_base, hba_port_t* port, uint64_t port_
     start_command_engine(port);
 }
 
-static void init_ports(hba_mem_t* abar, pci_header_0x0_t* pci_header)
+static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_header)
 {
-    uint64_t controller_mem_size, controller_vaddr, controller_paddr, controller_pages;
+    uint64_t controller_mem_size, controller_base;
     uint32_t pi, i;
     uint8_t max_ports, ports, max_cmd_slots;
     ahci_device_type_t type;
@@ -432,36 +432,15 @@ static void init_ports(hba_mem_t* abar, pci_header_0x0_t* pci_header)
     max_cmd_slots = abar->cap.ncs + 1;
     ports = 0;
     controller_mem_size = CONTROLLER_MEM(max_ports, max_cmd_slots);
-    controller_pages = ceil((double) controller_mem_size / SIZE_4KB);
-    
-    if (kernel_get_next_vaddr(controller_mem_size, &controller_vaddr) < controller_mem_size)
-    {
-        trace_ahci("Could get vaddr for controller %x:%x", pci_header->common.vendor_id, pci_header->common.device_id);
-        return;
-    }
-
-    controller_paddr = request_pages(controller_pages);
-    if (controller_paddr == 0)
-    {
-        trace_ahci("Could not allocate physical memory for controller %x:%x", pci_header->common.vendor_id, pci_header->common.device_id);
-        return;
-    }
-
-    if (kernel_map_memory(controller_paddr, controller_vaddr, controller_mem_size, PAGE_ACCESS_RW, PL0) < controller_mem_size)
-    {
-        trace_ahci("Could not map memory for controller %x:%x", pci_header->common.vendor_id, pci_header->common.device_id);
-        free_pages(controller_paddr, controller_pages);
-        return;
-    }
+    controller_base = (uint64_t) malloc(controller_mem_size);
 
     for (i = 0; i < 32 && ports < max_ports; i++)
     {
         if (pi & 1)
         {
-            type = get_type(&abar->ports[i]);
+            type = get_port_type(&abar->ports[i]);
             switch (type)
             {
-            /* Do some cool shit */
             case AHCI_DEV_NULL:
                 break;
             case AHCI_DEV_SEMB:
@@ -470,7 +449,7 @@ static void init_ports(hba_mem_t* abar, pci_header_0x0_t* pci_header)
                 break;
             case AHCI_DEV_SATAPI:
             case AHCI_DEV_SATA:
-                init_port(controller_vaddr, &abar->ports[i], ports, max_cmd_slots, max_ports);
+                init_ahci_controller_port(controller_base, &abar->ports[i], ports, max_ports, max_cmd_slots);
                 break;
             }
             ++ports;
@@ -491,6 +470,16 @@ static uint64_t init_ahci_controller(pci_header_0x0_t* pci_header)
         return 0; /* ABAR mapping failed */
     }
 
+    abar->ghc.hr = 1;
+    SPIN(CONTROLLER_RESET_WAIT);
+
+    if (!abar->ghc.ae)
+    {
+        trace_ahci("AHCI is not supported by controller %x:%x", pci_header->common.vendor_id, pci_header->common.device_id);
+        kernel_unmap_memory((uint64_t) abar, sizeof(hba_mem_t));
+        return 0;
+    }
+
     entry = malloc(sizeof(ahci_controllers_list_entry_t));
     if (!(abar->cap.s64a) || entry == NULL)
     {
@@ -499,13 +488,7 @@ static uint64_t init_ahci_controller(pci_header_0x0_t* pci_header)
         return 0;
     }
 
-    /*
-    abar->ghc.hr = 1;
-    SPIN(CONTROLLER_RESET_WAIT);
-    abar->ghc.ae = 1;
-    */
-
-    init_ports(abar, pci_header);
+    init_ahci_controller_ports(abar, pci_header);
 
     entry->next = NULL;
     entry->abar = abar;

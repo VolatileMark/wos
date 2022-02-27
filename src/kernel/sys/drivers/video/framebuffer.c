@@ -1,5 +1,6 @@
 #include "framebuffer.h"
 #include "../../../mem/paging.h"
+#include "../../../utils/helpers/log.h"
 #include "../../../utils/helpers/multiboot2-utils.h"
 
 #define FRAMEBUFFER_DIRECT_COLOR 1
@@ -18,6 +19,7 @@ typedef struct
     uint32_t green_offset;
     uint32_t blue_mask;
     uint32_t blue_offset;
+    uint64_t checksum;
 } framebuffer_info_t;
 
 static framebuffer_info_t framebuffer_info;
@@ -36,7 +38,10 @@ static uint32_t get_mask(uint8_t size, uint8_t offset, uint32_t* out_offset)
 
 int init_framebuffer_driver(void)
 {
+    uint64_t i;
     struct multiboot_tag_framebuffer* framebuffer_tag;
+
+    framebuffer_info.checksum = 0;
 
     framebuffer_tag = get_multiboot_tag_framebuffer();
     if (framebuffer_tag->common.framebuffer_type != FRAMEBUFFER_DIRECT_COLOR)
@@ -60,6 +65,9 @@ int init_framebuffer_driver(void)
     framebuffer_info.red_mask = get_mask(framebuffer_tag->framebuffer_red_mask_size, framebuffer_tag->framebuffer_red_field_position, &framebuffer_info.red_offset);
     framebuffer_info.green_mask = get_mask(framebuffer_tag->framebuffer_green_mask_size, framebuffer_tag->framebuffer_green_field_position, &framebuffer_info.green_offset);
     framebuffer_info.blue_mask = get_mask(framebuffer_tag->framebuffer_blue_mask_size, framebuffer_tag->framebuffer_blue_field_position, &framebuffer_info.blue_offset);
+
+    for (i = 0; i < sizeof(framebuffer_info_t) - 1; i++)
+        framebuffer_info.checksum -= ((uint8_t*) &framebuffer_info)[i];
 
     return 0;
 }
@@ -87,4 +95,17 @@ uint32_t get_framebuffer_width(void)
 uint32_t get_framebuffer_height(void)
 {
     return framebuffer_info.height;
+}
+
+uint64_t get_framebuffer_vaddr(void)
+{
+    return framebuffer_info.addr;
+}
+
+int is_framebuffer_driver_initialized(void)
+{
+    uint64_t i, sum;
+    for (i = 0, sum = 0; i < sizeof(framebuffer_info_t); i++)
+        sum += ((uint8_t*) &framebuffer_info)[i];
+    return (sum == 0);
 }
