@@ -1,5 +1,5 @@
 #include "ahci.h"
-#include "../pci.h"
+#include "../bus/pci.h"
 #include "../../../mem/pfa.h"
 #include "../../../mem/paging.h"
 #include "../../../utils/constants.h"

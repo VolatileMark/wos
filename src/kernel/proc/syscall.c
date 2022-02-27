@@ -6,7 +6,6 @@
 #include "../utils/constants.h"
 #include "../utils/macros.h"
 #include "../utils/helpers/alloc.h"
-#include "../sys/drivers/pci.h"
 #include "../abi/vm-flags.h"
 #include <stdint.h>
 #include <stddef.h>

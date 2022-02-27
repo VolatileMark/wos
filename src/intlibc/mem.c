@@ -19,7 +19,7 @@ void memset(void* ptr, uint8_t c, uint64_t size)
     uint8_t* cptr;
     cptr = (uint8_t*) ptr;
     for (; size > 0; size--)
-        *cptr ++ = c;
+        *cptr++ = c;
 }
 
 void memcpy(void* dest, const void* src, uint64_t size)

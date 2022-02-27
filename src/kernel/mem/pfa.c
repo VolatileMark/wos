@@ -48,7 +48,7 @@ uint64_t request_pages(uint64_t num)
         }
     }
 
-    if (address == 0)
+    if (found == num)
         lock_pages(address, num);
     
     return address;
