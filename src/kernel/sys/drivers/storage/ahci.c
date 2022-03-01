@@ -304,10 +304,19 @@ struct hba_cmd_tbl
 } __attribute__((packed));
 typedef struct hba_cmd_tbl hba_cmd_tbl_t;
 
+typedef struct
+{
+    ahci_device_type_t type;
+    uint32_t index;
+    hba_port_t* port_ptr;
+} ahci_controller_port_descriptor_t;
+
 typedef struct ahci_controllers_list_entry
 {
     struct ahci_controllers_list_entry* next;
     hba_mem_t* abar;
+    uint64_t max_ports;
+    ahci_controller_port_descriptor_t* ports;
 } ahci_controllers_list_entry_t;
 
 typedef struct
@@ -394,7 +403,7 @@ static void stop_command_engine(hba_port_t* port)
     while (port->cmd & (HBA_PxCMD_CR | HBA_PxCMD_FR));
 }
 
-static void init_ahci_controller_port(uint64_t controller_base, hba_port_t* port, uint64_t port_num, uint8_t max_ports, uint8_t max_cmd_slots)
+static void init_ahci_controller_sata_port(uint64_t controller_base, hba_port_t* port, uint64_t port_num, uint8_t max_ports, uint8_t max_cmd_slots)
 {
     hba_cmd_header_t* cmd_header;
     uint8_t i;
@@ -420,8 +429,9 @@ static void init_ahci_controller_port(uint64_t controller_base, hba_port_t* port
     start_command_engine(port);
 }
 
-static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_header)
+static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_header, ahci_controllers_list_entry_t* entry)
 {
+    hba_port_t* port;
     uint64_t controller_mem_size, controller_base;
     uint32_t pi, i;
     uint8_t max_ports, ports, max_cmd_slots;
@@ -433,12 +443,14 @@ static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
     ports = 0;
     controller_mem_size = CONTROLLER_MEM(max_ports, max_cmd_slots);
     controller_base = (uint64_t) malloc(controller_mem_size);
+    entry->ports = calloc(max_ports, sizeof(ahci_controller_port_descriptor_t));
 
     for (i = 0; i < 32 && ports < max_ports; i++)
     {
         if (pi & 1)
         {
-            type = get_port_type(&abar->ports[i]);
+            port = &abar->ports[i];
+            type = get_port_type(port);
             switch (type)
             {
             case AHCI_DEV_NULL:
@@ -449,13 +461,18 @@ static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
                 break;
             case AHCI_DEV_SATAPI:
             case AHCI_DEV_SATA:
-                init_ahci_controller_port(controller_base, &abar->ports[i], ports, max_ports, max_cmd_slots);
+                init_ahci_controller_sata_port(controller_base, port, ports, max_ports, max_cmd_slots);
                 break;
             }
+            entry->ports[ports].type = type;
+            entry->ports[ports].index = i;
+            entry->ports[ports].port_ptr = port;
             ++ports;
         }
         pi >>= 1;
     }
+
+    entry->max_ports = max_ports;
 }
 
 static uint64_t init_ahci_controller(pci_header_0x0_t* pci_header)
@@ -467,7 +484,7 @@ static uint64_t init_ahci_controller(pci_header_0x0_t* pci_header)
     if (abar == NULL)
     {
         trace_ahci("Could not map ABAR");
-        return 0; /* ABAR mapping failed */
+        return 0;
     }
 
     abar->ghc.hr = 1;
@@ -488,7 +505,7 @@ static uint64_t init_ahci_controller(pci_header_0x0_t* pci_header)
         return 0;
     }
 
-    init_ahci_controller_ports(abar, pci_header);
+    init_ahci_controller_ports(abar, pci_header, entry);
 
     entry->next = NULL;
     entry->abar = abar;
@@ -507,7 +524,7 @@ int init_ahci_driver(void)
     pci_devices_list_t* controllers;
     pci_devices_list_entry_t* controller;
     pci_header_common_t* pci_header;
-    uint64_t controllers_online;
+    uint64_t controllers_online, i;
 
     memset(&ahci_controllers, 0, sizeof(ahci_controllers_list_t));
 
@@ -524,6 +541,8 @@ int init_ahci_driver(void)
         )
         {
             info("AHCI controller %x:%x initialized. New ID is %d", pci_header->vendor_id, pci_header->device_id, controllers_online);
+            for (i = 0; i < ahci_controllers.tail->max_ports; i++)
+                info("Port %d (type %d) is implemented for controller %d", ahci_controllers.tail->ports[i].index, ahci_controllers.tail->ports[i].type, controllers_online);
             ++controllers_online;
         }
         unmap_pci_header((uint64_t) pci_header);
@@ -535,14 +554,14 @@ int init_ahci_driver(void)
     return !(controllers_online > 0);
 }
 
-static hba_port_t* get_port(uint64_t coordinates)
+static hba_port_t* get_port(uint32_t coordinates)
 {
     ahci_controllers_list_entry_t* entry;
     uint32_t controller, port, i;
 
     i = 0;
-    port = coordinates & 0x00000000FFFFFFFF;
-    controller = (coordinates >> 32) & 0x00000000FFFFFFFF;
+    port = coordinates & 0x0000FFFF;
+    controller = coordinates >> 16;
 
     if (ahci_controllers.num_of_controllers < controller)
         return NULL;
@@ -554,9 +573,11 @@ static hba_port_t* get_port(uint64_t coordinates)
             return NULL;
         entry = entry->next;
     }
-
-    if (entry->abar->pi & (1 << port))
-        return &entry->abar->ports[port];
+    for (i = 0; i < entry->max_ports; i++)
+    {
+        if (entry->ports[i].index == port)
+            return entry->ports[i].port_ptr;
+    }
     return NULL;
 }
 
@@ -576,7 +597,7 @@ static int find_available_cmd_slot(hba_port_t* port)
     return -1;
 }
 
-static uint64_t ahci_read_bytes_limited(uint64_t device_coordinates, uint64_t address, uint64_t bytes, void* buffer)
+static uint64_t ahci_read_bytes_limited(uint32_t device_coordinates, uint64_t address, uint64_t bytes, void* buffer)
 {
     hba_port_t* port;
     hba_cmd_header_t* cmd_header;
@@ -664,7 +685,7 @@ static uint64_t ahci_read_bytes_limited(uint64_t device_coordinates, uint64_t ad
     return bytes;
 }
 
-uint64_t ahci_read_sectors(uint64_t device_coordinates, uint64_t address, uint64_t sectors_count, void* buffer)
+uint64_t ahci_read_sectors(uint32_t device_coordinates, uint64_t address, uint64_t sectors_count, void* buffer)
 {
     return ahci_read_bytes
     (
@@ -675,7 +696,7 @@ uint64_t ahci_read_sectors(uint64_t device_coordinates, uint64_t address, uint64
     );
 }
 
-uint64_t ahci_read_bytes(uint64_t device_coordinates, uint64_t address, uint64_t bytes_count, void* buffer)
+uint64_t ahci_read_bytes(uint32_t device_coordinates, uint64_t address, uint64_t bytes_count, void* buffer)
 {
     uint64_t bytes_read, bytes_read_now;
 

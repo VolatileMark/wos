@@ -26,6 +26,9 @@
 #include <string.h>
 #include <mem.h>
 
+/* This is just testing */
+#include "utils/helpers/alloc.h"
+
 static int gather_system_info(void)
 {
     if (init_acpi() || scan_pci())
@@ -78,7 +81,8 @@ static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 
 void launch_init(void)
 {
-    
+    void* test = malloc(640);
+    ahci_read_bytes(AHCI_DEV_COORDS(0, 2), 0, 640, test);
 }
 
 void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
