@@ -83,6 +83,7 @@ void launch_init(void)
 {
     void* test = malloc(640);
     ahci_read_bytes(AHCI_DEV_COORDS(0, 2), 0, 640, test);
+    info("HELL YEAH I READ SOME SHITE\n");
 }
 
 void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)

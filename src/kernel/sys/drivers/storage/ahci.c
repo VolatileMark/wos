@@ -415,7 +415,9 @@ static void init_ahci_controller_sata_port(uint64_t controller_base, hba_port_t*
     port->clb = controller_base + (port_num * cmd_headers_total_size);
     memset((void*) port->clb, 0, cmd_headers_total_size);
 
-    port->fb = controller_base + (max_ports * cmd_headers_total_size) + (port_num * sizeof(hba_fis_t));
+    //port->fb = controller_base + (max_ports * cmd_headers_total_size) + (port_num * sizeof(hba_fis_t));
+    port->fb = 0x0FFFFF00; // Change this address and see what happens (i dare you)
+    kernel_map_memory(request_pages(ceil((double) sizeof(hba_fis_t) / SIZE_4KB)), port->fb, sizeof(hba_fis_t), PAGE_ACCESS_RW, PL0);
     memset((void*) port->fb, 0, sizeof(hba_fis_t));
 
     cmd_header = (hba_cmd_header_t*) port->clb;
@@ -442,7 +444,7 @@ static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
     max_cmd_slots = abar->cap.ncs + 1;
     ports = 0;
     controller_mem_size = CONTROLLER_MEM(max_ports, max_cmd_slots);
-    controller_base = (uint64_t) malloc(controller_mem_size);
+    controller_base = (uint64_t) aligned_alloc(SIZE_4KB, controller_mem_size);
     entry->ports = calloc(max_ports, sizeof(ahci_controller_port_descriptor_t));
 
     for (i = 0; i < 32 && ports < max_ports; i++)
@@ -624,7 +626,7 @@ static uint64_t ahci_read_bytes_limited(uint32_t device_coordinates, uint64_t ad
     cmd_header += slot;
     cmd_header->cmd_fis_length = (uint8_t) (sizeof(fis_reg_h2d_t) / sizeof(uint32_t));
     cmd_header->write = 0;
-    cmd_header->prdt_length = (uint16_t)(ceil((double) bytes / SIZE_nMB(4)) * HBA_PORT_PRDT_ENTRIES);
+    cmd_header->prdt_length = (uint16_t) ceil((double) bytes / SIZE_nMB(4));
     
     cmd_tbl = (hba_cmd_tbl_t*) cmd_header->cmd_table_base_addr;
     memset(cmd_tbl, 0, sizeof(hba_cmd_tbl_t) + (cmd_header->prdt_length - 1) * sizeof(hba_prdt_entry_t));
@@ -671,15 +673,19 @@ static uint64_t ahci_read_bytes_limited(uint32_t device_coordinates, uint64_t ad
 
     port->ci = 1 << slot;
 
-    while (1)
+    while ((port->ci & (1 << slot)))
     {
         if (port->is & HBA_PxIS_TFES)
         {
             trace_ahci("Disk read error (port %x)", device_coordinates);
             return 0;
         }
-        else if (port->ci & (1 << slot))
-            break;
+    }
+
+    if (port->is & HBA_PxIS_TFES)
+    {
+        trace_ahci("Disk read error (port %x)", device_coordinates);
+        return 0;
     }
 
     return bytes;

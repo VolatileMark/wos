@@ -1,6 +1,7 @@
 #include "framebuffer.h"
 #include "../../../mem/paging.h"
 #include "../../../utils/helpers/log.h"
+#include "../../../utils/helpers/checksum.h"
 #include "../../../utils/helpers/multiboot2-utils.h"
 
 #define FRAMEBUFFER_DIRECT_COLOR 1
@@ -38,7 +39,6 @@ static uint32_t get_mask(uint8_t size, uint8_t offset, uint32_t* out_offset)
 
 int init_framebuffer_driver(void)
 {
-    uint64_t i;
     struct multiboot_tag_framebuffer* framebuffer_tag;
 
     framebuffer_info.checksum = 0;
@@ -66,8 +66,7 @@ int init_framebuffer_driver(void)
     framebuffer_info.green_mask = get_mask(framebuffer_tag->framebuffer_green_mask_size, framebuffer_tag->framebuffer_green_field_position, &framebuffer_info.green_offset);
     framebuffer_info.blue_mask = get_mask(framebuffer_tag->framebuffer_blue_mask_size, framebuffer_tag->framebuffer_blue_field_position, &framebuffer_info.blue_offset);
 
-    for (i = 0; i < sizeof(framebuffer_info_t) - 1; i++)
-        framebuffer_info.checksum -= ((uint8_t*) &framebuffer_info)[i];
+    gen_struct_checksum64(&framebuffer_info, sizeof(framebuffer_info_t));
 
     return 0;
 }
@@ -104,8 +103,5 @@ uint64_t get_framebuffer_vaddr(void)
 
 int is_framebuffer_driver_initialized(void)
 {
-    uint64_t i, sum;
-    for (i = 0, sum = 0; i < sizeof(framebuffer_info_t); i++)
-        sum += ((uint8_t*) &framebuffer_info)[i];
-    return (sum == 0);
+    return check_struct_checksum64(&framebuffer_info, sizeof(framebuffer_info_t));
 }

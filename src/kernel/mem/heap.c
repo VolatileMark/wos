@@ -119,7 +119,7 @@ int init_kernel_heap(uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t initial
     return 0;
 }
 
-uint64_t allocate_kernel_heap_memory(uint64_t size)
+heap_segment_header_t* allocate_kernel_heap_memory(uint64_t size)
 {
     heap_segment_header_t* seg;
     heap_segment_header_t* new;
@@ -147,13 +147,11 @@ uint64_t allocate_kernel_heap_memory(uint64_t size)
     seg->size = size;
     seg->next = new;
 
-    return seg->data;
+    return seg;
 }
 
-void free_kernel_heap_memory(uint64_t addr)
+void free_kernel_heap_memory(heap_segment_header_t* seg)
 {
-    heap_segment_header_t* seg;
-    seg = (heap_segment_header_t*) (addr - sizeof(heap_segment_header_t));
     seg->free = 1;
     combine_kernel_heap_forward(seg);
     combine_kernel_heap_backward(seg);
