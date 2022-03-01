@@ -26,9 +26,6 @@
 #include <string.h>
 #include <mem.h>
 
-/* This is just testing */
-#include "utils/helpers/alloc.h"
-
 static int gather_system_info(void)
 {
     if (init_acpi() || scan_pci())
@@ -36,7 +33,7 @@ static int gather_system_info(void)
     return 0;
 }
 
-static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
+static int init_kernel(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
     disable_interrupts();
 
@@ -55,10 +52,11 @@ static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
     if (remap_struct(multiboot_struct_addr))
         return -1;
 
+    if (init_logger())
+        return -1;
     if (init_framebuffer_driver())
         return -1;
-    if (init_logger((get_framebuffer_width() * 3) / 4, get_framebuffer_height()))
-        return -1;
+    resize_logger_viewport(get_framebuffer_width(), get_framebuffer_height());
 
     if (init_kernel_heap(KERNEL_HEAP_START_ADDR, KERNEL_HEAP_CEIL_ADDR, SIZE_4KB))
         return -1;
@@ -81,14 +79,11 @@ static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 
 void launch_init(void)
 {
-    void* test = malloc(640);
-    ahci_read_bytes(AHCI_DEV_COORDS(0, 2), 0, 640, test);
-    info("HELL YEAH I READ SOME SHITE\n");
 }
 
 void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
-    if (kernel_init(multiboot_struct_addr, current_bitmap))
+    if (init_kernel(multiboot_struct_addr, current_bitmap))
     {
         if (is_framebuffer_driver_initialized())
             error("Could not initialize kernel");

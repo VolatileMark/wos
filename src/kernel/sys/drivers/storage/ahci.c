@@ -315,6 +315,8 @@ typedef struct ahci_controllers_list_entry
 {
     struct ahci_controllers_list_entry* next;
     hba_mem_t* abar;
+    uint64_t base_addr;
+    uint64_t pages;
     uint64_t max_ports;
     ahci_controller_port_descriptor_t* ports;
 } ahci_controllers_list_entry_t;
@@ -415,9 +417,7 @@ static void init_ahci_controller_sata_port(uint64_t controller_base, hba_port_t*
     port->clb = controller_base + (port_num * cmd_headers_total_size);
     memset((void*) port->clb, 0, cmd_headers_total_size);
 
-    //port->fb = controller_base + (max_ports * cmd_headers_total_size) + (port_num * sizeof(hba_fis_t));
-    port->fb = 0x0FFFFF00; // Change this address and see what happens (i dare you)
-    kernel_map_memory(request_pages(ceil((double) sizeof(hba_fis_t) / SIZE_4KB)), port->fb, sizeof(hba_fis_t), PAGE_ACCESS_RW, PL0);
+    port->fb = controller_base + (max_ports * cmd_headers_total_size) + (port_num * sizeof(hba_fis_t));
     memset((void*) port->fb, 0, sizeof(hba_fis_t));
 
     cmd_header = (hba_cmd_header_t*) port->clb;
@@ -434,7 +434,7 @@ static void init_ahci_controller_sata_port(uint64_t controller_base, hba_port_t*
 static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_header, ahci_controllers_list_entry_t* entry)
 {
     hba_port_t* port;
-    uint64_t controller_mem_size, controller_base;
+    uint64_t controller_mem_size;
     uint32_t pi, i;
     uint8_t max_ports, ports, max_cmd_slots;
     ahci_device_type_t type;
@@ -443,8 +443,20 @@ static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
     max_ports = abar->cap.np + 1;
     max_cmd_slots = abar->cap.ncs + 1;
     ports = 0;
+
     controller_mem_size = CONTROLLER_MEM(max_ports, max_cmd_slots);
-    controller_base = (uint64_t) aligned_alloc(SIZE_4KB, controller_mem_size);
+
+    entry->pages = ceil((double) controller_mem_size / SIZE_4KB);
+    entry->base_addr = request_pages(entry->pages);
+    if (entry->base_addr == 0)
+        return;
+    
+    if (kernel_map_memory(entry->base_addr, entry->base_addr, controller_mem_size, PAGE_ACCESS_RW, PL0) < controller_mem_size)
+    {
+        free_pages(entry->base_addr, entry->pages);
+        return;
+    }
+
     entry->ports = calloc(max_ports, sizeof(ahci_controller_port_descriptor_t));
 
     for (i = 0; i < 32 && ports < max_ports; i++)
@@ -463,7 +475,7 @@ static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
                 break;
             case AHCI_DEV_SATAPI:
             case AHCI_DEV_SATA:
-                init_ahci_controller_sata_port(controller_base, port, ports, max_ports, max_cmd_slots);
+                init_ahci_controller_sata_port(entry->base_addr, port, ports, max_ports, max_cmd_slots);
                 break;
             }
             entry->ports[ports].type = type;
@@ -599,7 +611,7 @@ static int find_available_cmd_slot(hba_port_t* port)
     return -1;
 }
 
-static uint64_t ahci_read_bytes_limited(uint32_t device_coordinates, uint64_t address, uint64_t bytes, void* buffer)
+static uint64_t ahci_read_bytes_capped(uint32_t device_coordinates, uint64_t address, uint64_t bytes, void* buffer)
 {
     hba_port_t* port;
     hba_cmd_header_t* cmd_header;
@@ -673,19 +685,15 @@ static uint64_t ahci_read_bytes_limited(uint32_t device_coordinates, uint64_t ad
 
     port->ci = 1 << slot;
 
-    while ((port->ci & (1 << slot)))
+    while (1)
     {
         if (port->is & HBA_PxIS_TFES)
         {
             trace_ahci("Disk read error (port %x)", device_coordinates);
             return 0;
         }
-    }
-
-    if (port->is & HBA_PxIS_TFES)
-    {
-        trace_ahci("Disk read error (port %x)", device_coordinates);
-        return 0;
+        else if (!(port->ci & (1 << slot)))
+            break;
     }
 
     return bytes;
@@ -709,7 +717,7 @@ uint64_t ahci_read_bytes(uint32_t device_coordinates, uint64_t address, uint64_t
     bytes_read = 0;
     while (bytes_count > 0)
     {
-        bytes_read_now = ahci_read_bytes_limited(device_coordinates, address, bytes_count, buffer);
+        bytes_read_now = ahci_read_bytes_capped(device_coordinates, address, bytes_count, buffer);
         if (bytes_read_now == 0)
             return bytes_read;
         bytes_read += bytes_read_now;

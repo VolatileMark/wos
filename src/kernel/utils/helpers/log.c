@@ -5,8 +5,12 @@
 #include <stdarg.h>
 #include <string.h>
 
+#define DEFAULT_WIDTH 800
+#define DEFAULT_HEIGHT 600
+
 static uint32_t cursor_x, cursor_y;
 static uint32_t max_x, max_y;
+static uint32_t offset_x, offset_y;
 extern volatile psf2_file_t _binary_font_psf_start;
 
 #define font_header _binary_font_psf_start.header
@@ -27,8 +31,8 @@ static void putc(char c)
     default:
         glyph_offset = c * font_header.bytes_per_glyph;
         
-        sx = cursor_x * font_header.width;
-        sy = cursor_y * font_header.height;
+        sx = (cursor_x + offset_x) * font_header.width;
+        sy = (cursor_y + offset_y) * font_header.height;
 
         for (y = 0; y < font_header.height; y++)
         {
@@ -108,7 +112,7 @@ void printf(const char* str, ...)
     va_end(ap);
 }
 
-int init_logger(uint32_t width, uint32_t height)
+int init_logger(void)
 {
     cursor_x = 0;
     cursor_y = 0;
@@ -122,10 +126,29 @@ int init_logger(uint32_t width, uint32_t height)
     )
         return -1;
     
+    max_x = DEFAULT_WIDTH / font_header.width;
+    max_y = DEFAULT_HEIGHT / font_header.height;
+
+    offset_x = 0;
+    offset_y = 0;
+    
+    return 0;
+}
+
+void resize_logger_viewport(uint32_t width, uint32_t height)
+{
     max_x = width / font_header.width;
     max_y = height / font_header.height;
-    
-    info("Framebuffer found at %p has been remapped to %p", get_multiboot_tag_framebuffer()->common.framebuffer_addr, get_framebuffer_vaddr());
+}
 
-    return 0;
+void offset_logger_viewport(uint32_t x, uint32_t y)
+{
+    offset_x = x / font_header.width;
+    offset_y = y / font_header.height;
+}
+
+void set_cursor_pos(uint32_t cx, uint32_t cy)
+{
+    cursor_x = cx;
+    cursor_y = cy;
 }

@@ -68,6 +68,8 @@ int init_framebuffer_driver(void)
 
     gen_struct_checksum64(&framebuffer_info, sizeof(framebuffer_info_t));
 
+    info("Framebuffer found at %p has been remapped to %p", framebuffer_tag->common.framebuffer_addr, framebuffer_info.addr);
+
     return 0;
 }
 
