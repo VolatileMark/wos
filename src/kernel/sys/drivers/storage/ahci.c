@@ -648,7 +648,7 @@ static uint64_t ahci_read_bytes_capped(uint32_t device_coordinates, uint64_t add
     hba_cmd_header_t* cmd_header;
     hba_cmd_tbl_t* cmd_tbl;
     fis_reg_h2d_t* cmd_fis;
-    uint64_t spin, i, count;
+    uint64_t spin, i, count, buffer_addr;
     int slot;
 
     if (bytes == 0)
@@ -656,6 +656,10 @@ static uint64_t ahci_read_bytes_capped(uint32_t device_coordinates, uint64_t add
     bytes = minu(bytes, SIZE_nMB(4) * HBA_PORT_PRDT_ENTRIES);
 
     desc = get_port(device_coordinates);
+    if (desc == NULL)
+        return 0;
+    
+    buffer_addr = (uint64_t) buffer;
 
     desc->port->is = (uint32_t) -1;
     slot = find_available_cmd_slot(desc->port);
@@ -673,18 +677,18 @@ static uint64_t ahci_read_bytes_capped(uint32_t device_coordinates, uint64_t add
     
     cmd_tbl = (hba_cmd_tbl_t*) desc->ctb_vaddr;
     cmd_tbl += slot;
-    memset(cmd_tbl, 0, sizeof(hba_cmd_tbl_t) + (cmd_header->prdt_length - 1) * sizeof(hba_prdt_entry_t));
+    memset(cmd_tbl, 0, sizeof(hba_cmd_tbl_t));
 
     count = bytes;
     for (i = 0; i < cmd_header->prdt_length - 1; i++)
     {
-        cmd_tbl->prdt_entry[i].data_base_address = kernel_get_paddr((uint64_t) buffer);
+        cmd_tbl->prdt_entry[i].data_base_address = kernel_get_paddr(buffer_addr);
         cmd_tbl->prdt_entry[i].data_byte_count = SIZE_nMB(4) - 1;
         cmd_tbl->prdt_entry[i].interrupt_completion = 1;
-        buffer = (void*) (((uint64_t) buffer) + SIZE_nMB(4));
+        buffer_addr += SIZE_nMB(4);
         count -= SIZE_nMB(4);
     }
-    cmd_tbl->prdt_entry[i].data_base_address = kernel_get_paddr((uint64_t) buffer);
+    cmd_tbl->prdt_entry[i].data_base_address = kernel_get_paddr(buffer_addr);
     cmd_tbl->prdt_entry[i].data_byte_count = count - 1;
     cmd_tbl->prdt_entry[i].interrupt_completion = 1;
 
@@ -717,15 +721,19 @@ static uint64_t ahci_read_bytes_capped(uint32_t device_coordinates, uint64_t add
 
     desc->port->ci = 1 << slot;
 
-    while (1)
+    while (desc->port->ci & (1 << slot))
     {
         if (desc->port->is & HBA_PxIS_TFES)
         {
             trace_ahci("Disk read error (port %x)", device_coordinates);
             return 0;
         }
-        else if (!(desc->port->ci & (1 << slot)))
-            break;
+    }
+
+    if (desc->port->is & HBA_PxIS_TFES)
+    {
+        trace_ahci("Disk read error (port %x)", device_coordinates);
+        return 0;
     }
 
     return bytes;

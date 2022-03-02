@@ -29,7 +29,7 @@ static void putc(char c)
         ++cursor_y;
         break;
     default:
-        glyph_offset = c * font_header.bytes_per_glyph;
+        glyph_offset = ((uint8_t) c) * font_header.bytes_per_glyph;
         
         sx = (cursor_x + offset_x) * font_header.width;
         sy = (cursor_y + offset_y) * font_header.height;

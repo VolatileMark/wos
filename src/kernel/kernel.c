@@ -82,7 +82,7 @@ void launch_init(void)
 {
     char* buffer = aligned_alloc(0x1000, 2048);
     memset(buffer, 0, 2048);
-    ahci_read_bytes(AHCI_DEV_COORDS(0, 2), 0, 2048, buffer);
+    ahci_read_bytes(AHCI_DEV_COORDS(0, 2), 4096, 2048, buffer);
     printf("%s\n", buffer);
 }
 
