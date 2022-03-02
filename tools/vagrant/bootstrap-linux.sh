@@ -1,6 +1,6 @@
 #!/bin/bash
 
-bash "/workspace/tools/vagrant/bootstrap_common.sh"
+bash "/workspace/tools/vagrant/bootstrap-common.sh"
 
 echo "AddressFamily inet" | tee -a "/etc/ssh/sshd_config.d/x11linuxredirection.conf"
 echo "X11Forwarding yes" | tee -a "/etc/ssh/sshd_config.d/x11linuxredirection.conf"

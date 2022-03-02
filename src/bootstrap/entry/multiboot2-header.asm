@@ -19,8 +19,8 @@ multiboot2_header:
     dw 5 ; Type
     dw 1 ; Is optional
     dd 20 ; Size (in bytes)
-    dd 1024 ; Requested width
-    dd 768 ; Requested height
+    dd 1280 ; Requested width
+    dd 720 ; Requested height
     dd 32 ; Requested color depth
     ; Module alignment tag
     align MULTIBOOT2_ALIGN

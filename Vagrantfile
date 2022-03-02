@@ -24,9 +24,9 @@ Vagrant.configure("2") do |config|
   config.ssh.forward_agent = true
   config.ssh.forward_x11 = true
   if OS.windows?
-    config.vm.provision :shell, path: "tools/vagrant/bootstrap_windows.sh"
+    config.vm.provision :shell, path: "tools/vagrant/bootstrap-windows.sh"
   elsif OS.linux?
-    config.vm.provision :shell, path: "tools/vagrant/bootstrap_linux.sh"
+    config.vm.provision :shell, path: "tools/vagrant/bootstrap-linux.sh"
   end
   config.vm.provider "virtualbox" do |v|
     v.memory = 4096

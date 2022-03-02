@@ -4,18 +4,30 @@ OS_NAME = wos
 
 BUILD_DIR = $(abspath build/)
 SOURCE_DIR = $(abspath src/)
-DATA_DIR = $(abspath data/)
+OVMF_DIR = $(abspath tools/ovmf-bins)
 
 #EMU = qemu-system-x86_64
 EMU = /home/vagrant/qemu/bin/qemu-system-x86_64
 DBG = gdb
 
-EMU_FLAGS = -cdrom $(BUILD_DIR)/$(OS_NAME).iso \
-			-m 256M \
-			-cpu qemu64 \
-			-vga std \
-			-net none \
-			-machine q35
+MKSTANDALONE = $(abspath tools/x86_64-grub2/bin/grub-mkstandalone)
+MKRESCUE = grub-mkrescue
+
+EMU_FLAGS_LEGACY = -cdrom $(BUILD_DIR)/$(OS_NAME).iso \
+				   -m 256M \
+				   -cpu qemu64 \
+				   -vga std \
+				   -net none \
+				   -machine q35
+
+EMU_FLAGS_UEFI = -drive file=$(BUILD_DIR)/$(OS_NAME).img,format=raw \
+				 -m 256M \
+				 -cpu qemu64 \
+				 -vga std \
+				 -drive if=pflash,format=raw,unit=0,file="$(OVMF_DIR)/OVMF_CODE-pure-efi.fd",readonly=on \
+				 -drive if=pflash,format=raw,unit=1,file="$(OVMF_DIR)/OVMF_VARS-pure-efi.fd" \
+				 -net none \
+				 -machine q35
 
 EMU_DBG_FLAGS = -s -d guest_errors,cpu_reset,int -no-reboot -no-shutdown
 
@@ -28,8 +40,16 @@ DBG_FLAGS = -ex "target remote localhost:1234" \
 
 
 
-.PHONY: all
-all: build iso
+.PHONY: default
+default: legacy
+
+.PHONY: legacy
+legacy: build iso
+
+.PHONY: uefi
+uefi: build img
+
+
 
 .PHONY: build
 build: build-intlibc build-bootstrap build-kernel
@@ -46,25 +66,58 @@ build-bootstrap:
 build-intlibc:
 	$(MAKE) -C $(SOURCE_DIR)/intlibc SOURCE_DIR="$(SOURCE_DIR)/intlibc" BUILD_DIR="$(BUILD_DIR)/intlibc"
 
+
+
 .PHONY: run
-run:
-	$(EMU) $(EMU_FLAGS)
+run: run-legacy
 
 .PHONY: debug
-debug:
-	$(EMU) $(EMU_FLAGS) $(EMU_DBG_FLAGS) & $(DBG) $(DBG_FLAGS)
+debug: debug-legacy
+
+.PHONY: run-legacy
+run-legacy:
+	$(EMU) $(EMU_FLAGS_LEGACY)
+
+.PHONY: debug-legacy
+debug-legacy:
+	$(EMU) $(EMU_FLAGS_LEGACY) $(EMU_DBG_FLAGS) & $(DBG) $(DBG_FLAGS)
+
+.PHONY: run-uefi
+run-uefi:
+	$(EMU) $(EMU_FLAGS_UEFI)
+
+.PHONY: debug-uefi
+debug-uefi:
+	$(EMU) $(EMU_FLAGS_UEFI) $(EMU_DBG_FLAGS) & $(DBG) $(DBG_FLAGS)
+
+
 
 .PHONY: iso
-iso: cfg-file
+iso: $(BUILD_DIR)/iso/boot/grub/grub.cfg
 	cp -f $(BUILD_DIR)/bootstrap/bootstrap.elf $(BUILD_DIR)/iso/boot/wboot.elf
 	cp -f $(BUILD_DIR)/kernel/kernel.elf $(BUILD_DIR)/iso/boot/wkernel.elf
 	@rm -f $(BUILD_DIR)/$(OS_NAME).iso
-	grub-mkrescue -o $(BUILD_DIR)/$(OS_NAME).iso $(BUILD_DIR)/iso
+	$(MKRESCUE) -o $(BUILD_DIR)/$(OS_NAME).iso $(BUILD_DIR)/iso
 
-.PHONY: cfg-file
-cfg-file:
-	@mkdir -p $(BUILD_DIR)/iso/boot/grub
+.PHONY: img
+img: $(BUILD_DIR)/$(OS_NAME).img $(BUILD_DIR)/grub/BOOTX64.EFI $(BUILD_DIR)/img/boot/grub/grub.cfg
+	@mkdir -p $(BUILD_DIR)/img/boot
+	cp -f $(BUILD_DIR)/bootstrap/bootstrap.elf $(BUILD_DIR)/img/boot/wboot.elf
+	cp -f $(BUILD_DIR)/kernel/kernel.elf $(BUILD_DIR)/img/boot/wkernel.elf
+	mformat -i $< -F ::
+	mmd -i $< ::/EFI
+	mmd -i $< ::/EFI/BOOT
+	mcopy -i $< $(BUILD_DIR)/grub/BOOTX64.EFI ::/EFI/BOOT
+	mcopy -si $< $(BUILD_DIR)/img/* ::
+
+$(BUILD_DIR)/$(OS_NAME).img: 
+	@mkdir -p $(BUILD_DIR)
+	dd if=/dev/zero of=$@ bs=512 count=93750
+
+$(BUILD_DIR)/iso/boot/grub/grub.cfg:
+	@mkdir -p $(dir $@)
 	printf "\
+	insmod all_video\n\
 	set timeout=0\n\
 	set default=0\n\
 	menuentry "$(OS_NAME)" {\n\
@@ -72,16 +125,53 @@ cfg-file:
 		module2 /boot/wkernel.elf\n\
 		boot\n\
 	}\n\
-	" > $(BUILD_DIR)/iso/boot/grub/grub.cfg
+	" > $@
+
+$(BUILD_DIR)/img/boot/grub/grub.cfg:
+	@mkdir -p $(dir $@)
+	printf "\
+	insmod part_msdos\n\
+	insmod all_video\n\
+	set root=(hd0,msdos1)\n\
+	set timeout=0\n\
+	set default=0\n\
+	menuentry "$(OS_NAME)" {\n\
+		multiboot2 /boot/wboot.elf\n\
+		module2 /boot/wkernel.elf\n\
+		boot\n\
+	}\n\
+	" > $@
+
+$(BUILD_DIR)/grub/grub-memdisk.cfg:
+	@mkdir -p $(dir $@)
+	printf "\
+	insmod part_msdos\n\
+	configfile (hd0,msdos1)/boot/grub/grub.cfg\n\
+	" > $@
+
+$(BUILD_DIR)/grub/BOOTX64.EFI: $(BUILD_DIR)/grub/grub-memdisk.cfg
+	$(MKSTANDALONE) -O x86_64-efi -o $@ "boot/grub/grub.cfg=$<"
+
+
 
 .PHONY: clean
 clean:
 	find $(BUILD_DIR) -name '*.o' -delete
+	find $(BUILD_DIR) -name '*.so' -delete
 	find $(BUILD_DIR) -name '*.elf' -delete
 	find $(BUILD_DIR) -name '*.bin' -delete
 	find $(BUILD_DIR) -name '*.a' -delete
+	find $(BUILD_DIR) -name '*.cfg' -delete
+	find $(BUILD_DIR) -name '*.EFI' -delete
 	rm -f $(BUILD_DIR)/initrd/initrd
 
 .PHONY: clean-all
 clean-all:
 	rm -rf $(BUILD_DIR)
+
+
+
+.PHONY: grub-version
+grub-version:
+	@grub-mkrescue --version
+	@grub-mkstandalone --version

@@ -49,5 +49,7 @@ make all-target-libgcc -j$(nproc)
 make install-gcc
 make install-target-libgcc
 
+rm -rf "$WORKDIR"
+
 echo
 echo "Script finished executing. Be sure to check the output for errors."
