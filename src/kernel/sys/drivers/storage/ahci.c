@@ -308,14 +308,18 @@ typedef struct
 {
     ahci_device_type_t type;
     uint32_t index;
-    hba_port_t* port_ptr;
+    uint64_t clb_vaddr;
+    uint64_t fb_vaddr;
+    uint64_t ctb_vaddr;
+    hba_port_t* port;
 } ahci_controller_port_descriptor_t;
 
 typedef struct ahci_controllers_list_entry
 {
     struct ahci_controllers_list_entry* next;
     hba_mem_t* abar;
-    uint64_t base_addr;
+    uint64_t base_paddr;
+    uint64_t base_vaddr;
     uint64_t pages;
     uint64_t max_ports;
     ahci_controller_port_descriptor_t* ports;
@@ -405,27 +409,43 @@ static void stop_command_engine(hba_port_t* port)
     while (port->cmd & (HBA_PxCMD_CR | HBA_PxCMD_FR));
 }
 
-static void init_ahci_controller_sata_port(uint64_t controller_base, hba_port_t* port, uint64_t port_num, uint8_t max_ports, uint8_t max_cmd_slots)
+static void init_ahci_controller_sata_port
+(
+    uint64_t controller_base_paddr, 
+    uint64_t controller_base_vaddr,
+    hba_port_t* port, 
+    uint64_t port_num, 
+    uint8_t max_ports, 
+    uint8_t max_cmd_slots,
+    ahci_controller_port_descriptor_t* desc
+)
 {
     hba_cmd_header_t* cmd_header;
     uint8_t i;
     uint64_t cmd_headers_total_size;
+    uint64_t clb_offset, fb_offset, ctb_offset;
 
     stop_command_engine(port);
 
     cmd_headers_total_size = sizeof(hba_cmd_header_t) * max_cmd_slots;
-    port->clb = controller_base + (port_num * cmd_headers_total_size);
-    memset((void*) port->clb, 0, cmd_headers_total_size);
+    clb_offset = (port_num * cmd_headers_total_size);
+    port->clb = controller_base_paddr + clb_offset;
+    desc->clb_vaddr = controller_base_vaddr + clb_offset;
+    memset((void*) desc->clb_vaddr, 0, cmd_headers_total_size);
 
-    port->fb = controller_base + (max_ports * cmd_headers_total_size) + (port_num * sizeof(hba_fis_t));
-    memset((void*) port->fb, 0, sizeof(hba_fis_t));
+    fb_offset = (cmd_headers_total_size * max_ports) + (sizeof(hba_fis_t) * port_num);
+    port->fb = controller_base_paddr + fb_offset;
+    desc->fb_vaddr = controller_base_vaddr + fb_offset;
+    memset((void*) desc->fb_vaddr, 0, sizeof(hba_fis_t));
 
-    cmd_header = (hba_cmd_header_t*) port->clb;
+    cmd_header = (hba_cmd_header_t*) (controller_base_vaddr + clb_offset);
+    ctb_offset = ((cmd_headers_total_size + sizeof(hba_fis_t)) * max_ports);
+    desc->ctb_vaddr = controller_base_vaddr + ctb_offset;
     for (i = 0; i < max_cmd_slots; i++)
     {
         cmd_header[i].prdt_length = HBA_PORT_PRDT_ENTRIES;
-        cmd_header[i].cmd_table_base_addr = controller_base + ((cmd_headers_total_size + sizeof(hba_fis_t)) * max_ports) + (sizeof(hba_cmd_tbl_t) * i);
-        memset((void*) cmd_header[i].cmd_table_base_addr, 0, sizeof(hba_cmd_tbl_t));
+        cmd_header[i].cmd_table_base_addr = controller_base_paddr + ctb_offset + (sizeof(hba_cmd_tbl_t) * i);
+        memset((void*) (desc->ctb_vaddr + (sizeof(hba_cmd_tbl_t) * i)), 0, sizeof(hba_cmd_tbl_t));
     }
 
     start_command_engine(port);
@@ -445,15 +465,17 @@ static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
     ports = 0;
 
     controller_mem_size = CONTROLLER_MEM(max_ports, max_cmd_slots);
+    if (kernel_get_next_vaddr(controller_mem_size, &entry->base_vaddr) < controller_mem_size)
+        return;
 
     entry->pages = ceil((double) controller_mem_size / SIZE_4KB);
-    entry->base_addr = request_pages(entry->pages);
-    if (entry->base_addr == 0)
+    entry->base_paddr = request_pages(entry->pages);
+    if (entry->base_paddr == 0)
         return;
-    
-    if (kernel_map_memory(entry->base_addr, entry->base_addr, controller_mem_size, PAGE_ACCESS_RW, PL0) < controller_mem_size)
+
+    if (kernel_map_memory(entry->base_paddr, entry->base_vaddr, controller_mem_size, PAGE_ACCESS_RW, PL0) < controller_mem_size)
     {
-        free_pages(entry->base_addr, entry->pages);
+        free_pages(entry->base_paddr, entry->pages);
         return;
     }
 
@@ -475,12 +497,21 @@ static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
                 break;
             case AHCI_DEV_SATAPI:
             case AHCI_DEV_SATA:
-                init_ahci_controller_sata_port(entry->base_addr, port, ports, max_ports, max_cmd_slots);
+                init_ahci_controller_sata_port
+                (
+                    entry->base_paddr, 
+                    entry->base_vaddr, 
+                    port, 
+                    ports, 
+                    max_ports, 
+                    max_cmd_slots, 
+                    &entry->ports[ports]
+                );
                 break;
             }
             entry->ports[ports].type = type;
             entry->ports[ports].index = i;
-            entry->ports[ports].port_ptr = port;
+            entry->ports[ports].port = port;
             ++ports;
         }
         pi >>= 1;
@@ -568,7 +599,7 @@ int init_ahci_driver(void)
     return !(controllers_online > 0);
 }
 
-static hba_port_t* get_port(uint32_t coordinates)
+static ahci_controller_port_descriptor_t* get_port(uint32_t coordinates)
 {
     ahci_controllers_list_entry_t* entry;
     uint32_t controller, port, i;
@@ -590,7 +621,7 @@ static hba_port_t* get_port(uint32_t coordinates)
     for (i = 0; i < entry->max_ports; i++)
     {
         if (entry->ports[i].index == port)
-            return entry->ports[i].port_ptr;
+            return &entry->ports[i];
     }
     return NULL;
 }
@@ -613,7 +644,7 @@ static int find_available_cmd_slot(hba_port_t* port)
 
 static uint64_t ahci_read_bytes_capped(uint32_t device_coordinates, uint64_t address, uint64_t bytes, void* buffer)
 {
-    hba_port_t* port;
+    ahci_controller_port_descriptor_t* desc;
     hba_cmd_header_t* cmd_header;
     hba_cmd_tbl_t* cmd_tbl;
     fis_reg_h2d_t* cmd_fis;
@@ -624,35 +655,36 @@ static uint64_t ahci_read_bytes_capped(uint32_t device_coordinates, uint64_t add
         return 0;
     bytes = minu(bytes, SIZE_nMB(4) * HBA_PORT_PRDT_ENTRIES);
 
-    port = get_port(device_coordinates);
+    desc = get_port(device_coordinates);
 
-    port->is = (uint32_t) -1;
-    slot = find_available_cmd_slot(port);
+    desc->port->is = (uint32_t) -1;
+    slot = find_available_cmd_slot(desc->port);
     if (slot == -1)
     {
         trace_ahci("No command slot available for port %x", device_coordinates);
         return 0;
     }
     
-    cmd_header = (hba_cmd_header_t*) port->clb;
+    cmd_header = (hba_cmd_header_t*) desc->clb_vaddr;
     cmd_header += slot;
     cmd_header->cmd_fis_length = (uint8_t) (sizeof(fis_reg_h2d_t) / sizeof(uint32_t));
     cmd_header->write = 0;
     cmd_header->prdt_length = (uint16_t) ceil((double) bytes / SIZE_nMB(4));
     
-    cmd_tbl = (hba_cmd_tbl_t*) cmd_header->cmd_table_base_addr;
+    cmd_tbl = (hba_cmd_tbl_t*) desc->ctb_vaddr;
+    cmd_tbl += slot;
     memset(cmd_tbl, 0, sizeof(hba_cmd_tbl_t) + (cmd_header->prdt_length - 1) * sizeof(hba_prdt_entry_t));
 
     count = bytes;
     for (i = 0; i < cmd_header->prdt_length - 1; i++)
     {
-        cmd_tbl->prdt_entry[i].data_base_address = (uint64_t) buffer;
+        cmd_tbl->prdt_entry[i].data_base_address = kernel_get_paddr((uint64_t) buffer);
         cmd_tbl->prdt_entry[i].data_byte_count = SIZE_nMB(4) - 1;
         cmd_tbl->prdt_entry[i].interrupt_completion = 1;
         buffer = (void*) (((uint64_t) buffer) + SIZE_nMB(4));
         count -= SIZE_nMB(4);
     }
-    cmd_tbl->prdt_entry[i].data_base_address = (uint64_t) buffer;
+    cmd_tbl->prdt_entry[i].data_base_address = kernel_get_paddr((uint64_t) buffer);
     cmd_tbl->prdt_entry[i].data_byte_count = count - 1;
     cmd_tbl->prdt_entry[i].interrupt_completion = 1;
 
@@ -674,7 +706,7 @@ static uint64_t ahci_read_bytes_capped(uint32_t device_coordinates, uint64_t add
     for 
     (
         spin = 0; 
-        (port->tfd & (AHCI_ATA_DEV_BUSY | AHCI_ATA_DEV_DRQ)) && (spin < TIMEOUT_SPIN); 
+        (desc->port->tfd & (AHCI_ATA_DEV_BUSY | AHCI_ATA_DEV_DRQ)) && (spin < TIMEOUT_SPIN); 
         spin++
     );
     if (spin == TIMEOUT_SPIN)
@@ -683,16 +715,16 @@ static uint64_t ahci_read_bytes_capped(uint32_t device_coordinates, uint64_t add
         return 0;
     }
 
-    port->ci = 1 << slot;
+    desc->port->ci = 1 << slot;
 
     while (1)
     {
-        if (port->is & HBA_PxIS_TFES)
+        if (desc->port->is & HBA_PxIS_TFES)
         {
             trace_ahci("Disk read error (port %x)", device_coordinates);
             return 0;
         }
-        else if (!(port->ci & (1 << slot)))
+        else if (!(desc->port->ci & (1 << slot)))
             break;
     }
 

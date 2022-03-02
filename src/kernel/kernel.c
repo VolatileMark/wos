@@ -77,8 +77,13 @@ static int init_kernel(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
     return 0;
 }
 
+#include "utils/helpers/alloc.h"
 void launch_init(void)
 {
+    char* buffer = aligned_alloc(0x1000, 2048);
+    memset(buffer, 0, 2048);
+    ahci_read_bytes(AHCI_DEV_COORDS(0, 2), 0, 2048, buffer);
+    printf("%s\n", buffer);
 }
 
 void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)

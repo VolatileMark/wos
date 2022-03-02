@@ -1,6 +1,6 @@
 #include "bitmap.h"
 
-uint8_t bitmap_set(bitmap_t* bitmap, uint64_t index, uint8_t value)
+inline uint8_t bitmap_set(bitmap_t* bitmap, uint64_t index, uint8_t value)
 {
     uint64_t byte_index;
     uint8_t bit_index, bit_mask;
@@ -15,7 +15,7 @@ uint8_t bitmap_set(bitmap_t* bitmap, uint64_t index, uint8_t value)
     return 1;
 }
 
-uint8_t bitmap_get(bitmap_t* bitmap, uint64_t index)
+inline uint8_t bitmap_get(bitmap_t* bitmap, uint64_t index)
 {
     uint64_t byte_index;
     uint8_t bit_index, bit_mask;
