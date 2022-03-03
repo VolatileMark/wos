@@ -1,7 +1,8 @@
 #include "acpi.h"
 #include "../../../mem/paging.h"
-#include "../../../utils/helpers/log.h"
+#include "../../../utils/log.h"
 #include "../../../utils/helpers/multiboot2-utils.h"
+#include "stdint.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -103,6 +104,16 @@ int init_acpi(void)
 
     main_sdt.entries = (main_sdt.header->length - sizeof(sdt_header_t)) / main_sdt.pointer_size;
     
+    info
+    (
+        "ACPI rev. %u.0 %cSDT located at %p, mapped at %p, has %u entries", 
+        (main_sdt.pointer_size == sizeof(uint32_t)) ? 1 : 0,
+        (main_sdt.pointer_size == sizeof(uint32_t)) ? 'R' : 'X',
+        main_sdt.header_paddr, 
+        main_sdt.header, 
+        main_sdt.entries
+    );
+
     return 0;
 }
 

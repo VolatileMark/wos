@@ -13,7 +13,7 @@ DBG = gdb
 MKSTANDALONE = $(abspath tools/x86_64-grub2/bin/grub-mkstandalone)
 MKRESCUE = grub-mkrescue
 
-EMU_FLAGS_LEGACY = -cdrom $(BUILD_DIR)/$(OS_NAME).iso \
+EMU_FLAGS_LEGACY = -drive file=$(BUILD_DIR)/$(OS_NAME).iso,format=raw \
 				   -m 256M \
 				   -cpu qemu64 \
 				   -vga std \

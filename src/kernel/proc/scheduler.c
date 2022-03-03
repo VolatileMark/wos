@@ -1,5 +1,4 @@
 #include "scheduler.h"
-#include "../kernel.h"
 #include "../sys/cpu/gdt.h"
 #include "../sys/cpu/isr.h"
 #include "../sys/cpu/tss.h"
@@ -7,11 +6,15 @@
 #include "../utils/constants.h"
 #include "../sys/chips/pic.h"
 #include "../sys/chips/pit.h"
+#include "../utils/macros.h"
 #include "../utils/helpers/alloc.h"
+#include "../utils/log.h"
 #include "../utils/elf.h"
 #include <stddef.h>
 #include <math.h>
 #include <mem.h>
+
+#define trace_scheduler(msg, ...) trace("SCHD", msg, ##__VA_ARGS__)
 
 #define SCHEDULER_PIT_INTERVAL 2 /* ms */
 #define SCHEDULER_TIME_SLICE (5 * SCHEDULER_PIT_INTERVAL)
@@ -148,7 +151,10 @@ static int schedule_process(process_list_t* pss, process_t* ps)
     
     entry = malloc(sizeof(process_list_entry_t));
     if (entry == NULL)
+    {
+        trace_scheduler("Could not allocate space for process entry");
         return -1;
+    }
     
     entry->ps = ps;
     entry->next = NULL;
@@ -200,6 +206,8 @@ static int remove_process(process_list_t* pss, uint64_t pid, uint8_t should_dele
         prev = current;
         current = current->next;
     }
+
+    trace_scheduler("Process %u not found. Could not remove process", pid);
 
     return -1;
 }
@@ -253,7 +261,10 @@ int num_children_of_process(uint64_t parent_pid)
 int replace_process(process_t* old, process_t* new)
 {
     if (remove_process(&runnable_pss, old->pid, 1))
+    {
+        trace_scheduler("Failed to replace process %u", old->pid);
         return -1;
+    }
     return schedule_runnable_process(new);
 }
 
@@ -305,7 +316,10 @@ void run_scheduler(void)
     
     ps = get_next_runnable_process();
     if (ps == NULL)
-        launch_init(); /* Set a default launch function */
+    {
+        trace_scheduler("No process to execute. Halting...");
+        HALT();
+    }
     
     tss_set_kernel_stack(ps->kernel_stack_start_vaddr + PROC_INITIAL_STACK_SIZE - sizeof(uint64_t));
     kernel_inject_pml4(ps->pml4);

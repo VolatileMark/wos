@@ -1,12 +1,10 @@
-#include "log.h"
+#include "screen.h"
 #include "multiboot2-utils.h"
 #include "../psf.h"
+#include "../log.h"
 #include "../../sys/drivers/video/framebuffer.h"
 #include <stdarg.h>
 #include <string.h>
-
-#define DEFAULT_WIDTH 800
-#define DEFAULT_HEIGHT 600
 
 static uint32_t cursor_x, cursor_y;
 static uint32_t max_x, max_y;
@@ -86,7 +84,7 @@ void printf(const char* str, ...)
             putc((uint8_t) va_arg(ap, uint32_t));
             break;
         case 'p':
-            puts(utoa(va_arg(ap, uint64_t), tmp_str, 16));
+            puts(utoan(va_arg(ap, uint64_t), tmp_str, 16, 16));
             break;
         case 'x':
             puts(itoa(va_arg(ap, long), tmp_str, 16));
@@ -112,7 +110,7 @@ void printf(const char* str, ...)
     va_end(ap);
 }
 
-int init_logger(void)
+int init_screen(void)
 {
     cursor_x = 0;
     cursor_y = 0;
@@ -126,22 +124,27 @@ int init_logger(void)
     )
         return -1;
     
-    max_x = DEFAULT_WIDTH / font_header.width;
-    max_y = DEFAULT_HEIGHT / font_header.height;
+    max_x = get_framebuffer_width() / font_header.width;
+    max_y = get_framebuffer_height() / font_header.height;
+    if (!(max_x && max_y))
+        return -1;
 
     offset_x = 0;
     offset_y = 0;
-    
+
+    info("Framebuffer found at %p has been remapped to %p, has size %u bytes", get_multiboot_tag_framebuffer()->common.framebuffer_addr, get_framebuffer_vaddr(), get_framebuffer_size());
+    info("Screen utility initialized. Resolution is %ux%u pixels or %ux%u characters", get_framebuffer_width(), get_framebuffer_height(), max_x, max_y);
+
     return 0;
 }
 
-void resize_logger_viewport(uint32_t width, uint32_t height)
+void resize_screen_viewport(uint32_t width, uint32_t height)
 {
     max_x = width / font_header.width;
     max_y = height / font_header.height;
 }
 
-void offset_logger_viewport(uint32_t x, uint32_t y)
+void offset_screen_viewport(uint32_t x, uint32_t y)
 {
     offset_x = x / font_header.width;
     offset_y = y / font_header.height;
@@ -151,4 +154,16 @@ void set_cursor_pos(uint32_t cx, uint32_t cy)
 {
     cursor_x = cx;
     cursor_y = cy;
+}
+
+int is_screen_initialized(void)
+{
+    return
+    (
+        font_header.magic == PSF2_FONT_MAGIC &&
+        font_header.version == 0 &&
+        font_header.flags == 0 &&
+        font_header.width == 8 &&
+        max_x && max_y
+    );
 }

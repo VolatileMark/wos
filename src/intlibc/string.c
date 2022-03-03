@@ -1,4 +1,5 @@
 #include "string.h"
+#include "mem.h"
 
 uint64_t strlen(const char* str)
 {
@@ -124,6 +125,29 @@ char* utoa(uint64_t val, char* str, int base)
             str[i++] = num + '0';
     } while ((val /= base) > 0);
     str[i] = '\0';
+
+    strrev(str);
+    return str;
+}
+
+char* utoan(uint64_t val, char* str, int base, int n)
+{
+    uint64_t i, num;
+
+    memset(str, '0', n);
+
+    i = 0;
+    do {
+        num = (val % base);
+        if (num >= 0xA)
+        {
+            num -= 0xA;
+            str[i++] = num + 'A';
+        }
+        else
+            str[i++] = num + '0';
+    } while ((val /= base) > 0 && i < n);
+    str[n] = '\0';
 
     strrev(str);
     return str;

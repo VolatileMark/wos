@@ -1,7 +1,6 @@
 #include "multiboot2-utils.h"
 #include "../../mem/paging.h"
 #include "../macros.h"
-#include "log.h"
 #include <mem.h>
 #include <stddef.h>
 
@@ -19,13 +18,10 @@ int remap_struct(uint64_t struct_paddr)
     uint64_t struct_vaddr;
     kernel_unmap_memory(0, SIZE_nMB(16));
     if (kernel_get_next_vaddr(struct_size, &struct_vaddr) < struct_size)
-    {
-        trace_multiboot("Could not get vaddr for multiboot struct");
         return -1;
-    }
     if (kernel_map_memory(struct_paddr, struct_vaddr, struct_size, PAGE_ACCESS_RO, PL0) < struct_size)
     {
-        trace_multiboot("Could not map multiboot struct");
+        kernel_unmap_memory(struct_vaddr, struct_size);
         return -1;
     }
 
@@ -44,10 +40,7 @@ int parse_multiboot_struct(uint64_t addr)
 
     struct_size = (uint64_t) *((uint32_t*) addr);
     if (struct_size == 0)
-    {
-        trace_multiboot("Multiboot structure size is 0");
         return -1;
-    }
 
     mmap = NULL;
     kernel_elf = NULL;

@@ -1,14 +1,7 @@
 #ifndef __LOG_H__
 #define __LOG_H__
 
-#include <stdint.h>
-
-void printf(const char* str, ...);
-int init_logger(void);
-
-void resize_logger_viewport(uint32_t width, uint32_t height);
-void offset_logger_viewport(uint32_t x, uint32_t y);
-void set_cursor_pos(uint32_t cx, uint32_t cy);
+#include "helpers/screen.h"
 
 #define log(lvl, msg, ...) printf("[" lvl "] " msg "\n", ##__VA_ARGS__)
 

@@ -3,7 +3,7 @@
 #include "paging.h"
 #include "../utils/constants.h"
 #include "../utils/helpers/alloc.h"
-#include "../utils/helpers/log.h"
+#include "../utils/log.h"
 #include <stddef.h>
 #include <math.h>
 #include <mem.h>
@@ -101,7 +101,7 @@ int init_kernel_heap(uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t initial
 {
     if (initial_size > ceil_vaddr - start_vaddr || initial_size < sizeof(heap_segment_header_t))
     {
-        error("Invalid initial size");
+        trace_heap("Invalid initial size");
         return -1;
     }
     
@@ -111,10 +111,12 @@ int init_kernel_heap(uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t initial
     kernel_heap.tail = NULL;
     if (expand_kernel_heap(initial_size) < initial_size)
     {
-        error("Failed to allocate initial memory");
+        trace_heap("Failed to allocate initial memory");
         return -1;
     }
     kernel_heap.head = kernel_heap.tail;
+
+    info("Kernel heap initialized at %p with size %u kB", kernel_heap.start_vaddr, initial_size >> 10);
 
     return 0;
 }

@@ -2,11 +2,11 @@
 #include "../cpu/io.h"
 #include "../cpu/interrupts.h"
 #include "../../utils/helpers/alloc.h"
-#include "../../utils/helpers/log.h"
+#include "../../utils/log.h"
 #include <stddef.h>
 #include <mem.h>
 
-#define trace_pit(msg, ...) trace("PIT", msg, ##__VA_ARGS__)
+#define trace_pit(msg, ...) trace("PINT", msg, ##__VA_ARGS__)
 
 #define PIT_BASE_FREQUENCY 1193182
 

@@ -5,7 +5,7 @@
 #include "../../../utils/constants.h"
 #include "../../../utils/macros.h"
 #include "../../../utils/helpers/alloc.h"
-#include "../../../utils/helpers/log.h"
+#include "../../../utils/log.h"
 #include <stddef.h>
 #include <math.h>
 #include <mem.h>
@@ -598,9 +598,9 @@ int init_ahci_driver(void)
             init_ahci_controller((pci_header_0x0_t*) pci_header)
         )
         {
-            info("AHCI controller %x:%x initialized. New ID is %d", pci_header->vendor_id, pci_header->device_id, controllers_online);
+            info("AHCI controller %x:%x initialized. New controller ID is %u", pci_header->vendor_id, pci_header->device_id, controllers_online);
             for (i = 0; i < ahci_controllers.tail->max_ports; i++)
-                info("Port %d (type %d) is implemented for controller %d", ahci_controllers.tail->ports[i].index, ahci_controllers.tail->ports[i].type, controllers_online);
+                info("Port %u (type %u) is implemented for AHCI controller %u", ahci_controllers.tail->ports[i].index, ahci_controllers.tail->ports[i].type, controllers_online);
             ++controllers_online;
         }
         unmap_pci_header((uint64_t) pci_header);

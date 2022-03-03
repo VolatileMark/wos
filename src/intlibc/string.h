@@ -11,5 +11,6 @@ char* strrev(char* str);
 int atoi(const char* str);
 char* itoa(long val, char* str, int base);
 char* utoa(uint64_t val, char* str, int base);
+char* utoan(uint64_t val, char* str, int base, int n);
 
 #endif

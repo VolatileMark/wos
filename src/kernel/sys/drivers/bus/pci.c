@@ -1,12 +1,12 @@
 #include "pci.h"
 #include "../power/acpi.h"
 #include "../../../mem/paging.h"
-#include "../../../utils/helpers/log.h"
+#include "../../../utils/log.h"
 #include "../../../utils/helpers/alloc.h"
 #include <stddef.h>
 #include <mem.h>
 
-#define trace_pci(msg, ...) trace("PCI", msg, ##__VA_ARGS__)
+#define trace_pci(msg, ...) trace("PCIB", msg, ##__VA_ARGS__)
 
 static pci_devices_list_t devices_list;
 
@@ -29,6 +29,8 @@ static void enumerate_function(uint64_t address, uint64_t num)
     else
         devices_list.tail->next = new_entry;
     devices_list.tail = new_entry;
+
+    info("PCI device %x:%x found of type %x:%x:%x", header->vendor_id, header->device_id, header->class_code, header->subclass, header->program_interface);
 
     kernel_unmap_temporary_page((uint64_t) header);
 }
