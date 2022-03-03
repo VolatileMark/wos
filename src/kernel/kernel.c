@@ -80,9 +80,9 @@ static int init_kernel(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 #include "utils/helpers/alloc.h"
 void launch_init(void)
 {
-    char* buffer = aligned_alloc(0x1000, 2048);
-    memset(buffer, 0, 2048);
-    ahci_read_bytes(AHCI_DEV_COORDS(0, 2), 4096, 2048, buffer);
+    char* buffer = aligned_alloc(0x1000, 4096);
+    memset(buffer, 0, 4096);
+    ahci_read_bytes(AHCI_DEV_COORDS(0, 2), 0, 4096, buffer);
     printf("%s\n", buffer);
 }
 

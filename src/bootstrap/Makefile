@@ -19,9 +19,9 @@ ASM_OBJS = $(patsubst $(SOURCE_DIR)%.asm, $(BUILD_DIR)%_asm.o, $(ASM_SRCS))
 
 LDS = $(SOURCE_DIR)/Linker.ld
 
-AC_FLAGS = -I $(SOURCE_DIR) -f elf64 -F dwarf -g
-CC_FLAGS = -I $(INTLIBC_INCLUDE) -g -DLIBC_UTILS_ONLY -std=c99 -m64 -Wall -Werror -ffreestanding -mcmodel=kernel -mno-red-zone -nostdinc -nostartfiles -nodefaultlibs -nostdlib
-LD_FLAGS = -T $(LDS) -nostdlib -z max-page-size=4096
+AC_FLAGS = -I$(SOURCE_DIR) -f elf64 -F dwarf -g
+CC_FLAGS = -I$(INTLIBC_INCLUDE) -g -DLIBC_UTILS_ONLY -std=c99 -m64 -Wall -Werror -ffreestanding -mcmodel=kernel -mno-red-zone -nostdinc -nostartfiles -nodefaultlibs -nostdlib
+LD_FLAGS = -T$(LDS) -nostdlib -z max-page-size=4096
 
 
 

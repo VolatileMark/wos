@@ -13,7 +13,6 @@
 #define trace_ahci(msg, ...) trace("AHCI", msg, ##__VA_ARGS__)
 
 #define TIMEOUT_SPIN 1000000
-#define CONTROLLER_RESET_WAIT 1000
 
 #define HBA_PxCMD_ST 0x0001
 #define HBA_PxCMD_FRE 0x0010
@@ -281,7 +280,7 @@ struct hba_cmd_header
     uint16_t prdt_length;
     uint32_t prdt_count;
     uint64_t cmd_table_base_addr;
-    uint64_t reserved1[2];
+    uint32_t reserved1[4];
 } __attribute__((packed));
 typedef struct hba_cmd_header hba_cmd_header_t;
 
@@ -532,9 +531,15 @@ static uint64_t init_ahci_controller(pci_header_0x0_t* pci_header)
         return 0;
     }
 
+    /* Reset the controller */
     abar->ghc.hr = 1;
-    SPIN(CONTROLLER_RESET_WAIT);
+    while (abar->ghc.hr != 0);
 
+    /* Enable AHCI mode */
+    if (!abar->cap.sam)
+        abar->ghc.ae = 1;
+
+    /* Check if AHCI mode was enabled */
     if (!abar->ghc.ae)
     {
         trace_ahci("AHCI is not supported by controller %x:%x", pci_header->common.vendor_id, pci_header->common.device_id);
@@ -542,10 +547,18 @@ static uint64_t init_ahci_controller(pci_header_0x0_t* pci_header)
         return 0;
     }
 
-    entry = malloc(sizeof(ahci_controllers_list_entry_t));
-    if (!(abar->cap.s64a) || entry == NULL)
+    /* Check if 64-bit addressing is supported */
+    if (!(abar->cap.s64a))
     {
         trace_ahci("64-bit addressing not supported by controller %x:%x", pci_header->common.vendor_id, pci_header->common.device_id);
+        kernel_unmap_memory((uint64_t) abar, sizeof(hba_mem_t));
+        return 0;
+    }
+
+    entry = malloc(sizeof(ahci_controllers_list_entry_t));
+    if (entry == NULL)
+    {
+        trace_ahci("Could not allocate entry for controller %x:%x", pci_header->common.vendor_id, pci_header->common.device_id);
         kernel_unmap_memory((uint64_t) abar, sizeof(hba_mem_t));
         return 0;
     }
@@ -659,8 +672,6 @@ static uint64_t ahci_read_bytes_capped(uint32_t device_coordinates, uint64_t add
     if (desc == NULL)
         return 0;
     
-    buffer_addr = (uint64_t) buffer;
-
     desc->port->is = (uint32_t) -1;
     slot = find_available_cmd_slot(desc->port);
     if (slot == -1)
@@ -679,6 +690,7 @@ static uint64_t ahci_read_bytes_capped(uint32_t device_coordinates, uint64_t add
     cmd_tbl += slot;
     memset(cmd_tbl, 0, sizeof(hba_cmd_tbl_t));
 
+    buffer_addr = (uint64_t) buffer;
     count = bytes;
     for (i = 0; i < cmd_header->prdt_length - 1; i++)
     {
@@ -721,19 +733,15 @@ static uint64_t ahci_read_bytes_capped(uint32_t device_coordinates, uint64_t add
 
     desc->port->ci = 1 << slot;
 
-    while (desc->port->ci & (1 << slot))
+    while (1)
     {
         if (desc->port->is & HBA_PxIS_TFES)
         {
             trace_ahci("Disk read error (port %x)", device_coordinates);
             return 0;
         }
-    }
-
-    if (desc->port->is & HBA_PxIS_TFES)
-    {
-        trace_ahci("Disk read error (port %x)", device_coordinates);
-        return 0;
+        else if (!(desc->port->ci & (1 << slot)))
+            break;
     }
 
     return bytes;

@@ -23,9 +23,9 @@ FONT_OBJ = $(patsubst $(SOURCE_DIR)%.psf, $(BUILD_DIR)%.o, $(FONT_SRC))
 
 LDS = $(SOURCE_DIR)/Linker.ld
 
-AC_FLAGS = -I $(SOURCE_DIR) -f elf64 -F dwarf -g
-CC_FLAGS = -I $(INTLIBC_INCLUDE) -g -std=c99 -m64 -Wall -Werror -ffreestanding -mcmodel=kernel -mno-red-zone -nostdinc -nostartfiles -nodefaultlibs -nostdlib
-LD_FLAGS = -T $(LDS) -nostdlib -z max-page-size=4096
+AC_FLAGS = -I$(SOURCE_DIR) -f elf64 -F dwarf -g
+CC_FLAGS = -I$(INTLIBC_INCLUDE) -g -std=c99 -m64 -Wall -Werror -ffreestanding -mcmodel=kernel -mno-red-zone -nostdinc -nostartfiles -nodefaultlibs -nostdlib
+LD_FLAGS = -T$(LDS) -nostdlib -z max-page-size=4096
 
 
 
