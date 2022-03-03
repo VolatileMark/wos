@@ -28,9 +28,10 @@ int remap_struct(uint64_t struct_paddr)
     mmap = (struct multiboot_tag_mmap*) (struct_vaddr + (((uint64_t) mmap) - struct_paddr));
     kernel_elf = (struct multiboot_tag_module*) (struct_vaddr + (((uint64_t) kernel_elf) - struct_paddr));
     framebuffer = (struct multiboot_tag_framebuffer*) (struct_vaddr + (((uint64_t) framebuffer) - struct_paddr));
-    new_acpi = (struct multiboot_tag_new_acpi*) (struct_vaddr + (((uint64_t) new_acpi) - struct_paddr));
     old_acpi = (struct multiboot_tag_old_acpi*) (struct_vaddr + (((uint64_t) old_acpi) - struct_paddr));
-
+    if (new_acpi != NULL)
+        new_acpi = (struct multiboot_tag_new_acpi*) (struct_vaddr + (((uint64_t) new_acpi) - struct_paddr));
+    
     return 0;
 }
 
@@ -45,8 +46,8 @@ int parse_multiboot_struct(uint64_t addr)
     mmap = NULL;
     kernel_elf = NULL;
     framebuffer = NULL;
-    new_acpi = NULL;
     old_acpi = NULL;
+    new_acpi = NULL;
 
     for 
     (
@@ -74,6 +75,15 @@ int parse_multiboot_struct(uint64_t addr)
             break;
         }
     }
+
+    if 
+    (
+        mmap == NULL ||
+        kernel_elf == NULL ||
+        framebuffer == NULL ||
+        old_acpi == NULL
+    )
+        return -1;
 
     return 0;
 }

@@ -132,7 +132,7 @@ int init_screen(void)
     offset_x = 0;
     offset_y = 0;
 
-    info("Framebuffer found at %p has been remapped to %p, has size %u bytes", get_multiboot_tag_framebuffer()->common.framebuffer_addr, get_framebuffer_vaddr(), get_framebuffer_size());
+    info("Framebuffer found at %p, mapped at %p, has size %u bytes", get_multiboot_tag_framebuffer()->common.framebuffer_addr, get_framebuffer_vaddr(), get_framebuffer_size());
     info("Screen utility initialized. Resolution is %ux%u pixels or %ux%u characters", get_framebuffer_width(), get_framebuffer_height(), max_x, max_y);
 
     return 0;

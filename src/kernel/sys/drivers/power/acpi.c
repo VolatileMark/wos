@@ -2,6 +2,7 @@
 #include "../../../mem/paging.h"
 #include "../../../utils/log.h"
 #include "../../../utils/helpers/multiboot2-utils.h"
+#include "../../../utils/helpers/checksum.h"
 #include "stdint.h"
 #include <stddef.h>
 #include <string.h>
@@ -44,18 +45,9 @@ static sdt_t main_sdt;
 
 static rsdp_descriptor_v1_t* get_rsdp(void)
 {
-    struct multiboot_tag_old_acpi* old;
-    old = get_multiboot_tag_old_acpi();
-    return (rsdp_descriptor_v1_t*) ((old == NULL) ? get_multiboot_tag_new_acpi()->rsdp : old->rsdp);
-}
-
-static int checksum(void* rsdp, uint64_t size)
-{
-    uint64_t i;
-    uint8_t checksum;
-    for (i = 0, checksum = 0; i < size; i++)
-        checksum += ((char*) rsdp)[i];
-    return (checksum == 0);
+    struct multiboot_tag_new_acpi* new;
+    new = get_multiboot_tag_new_acpi();
+    return (rsdp_descriptor_v1_t*) ((new == NULL) ? get_multiboot_tag_old_acpi()->rsdp : new->rsdp);
 }
 
 int init_acpi(void)
@@ -70,12 +62,12 @@ int init_acpi(void)
         trace_acpi("RSDP signature mismatch");
         return -1;
     }
-    if (rsdp->revision == ACPI_REV_OLD && checksum(rsdp, sizeof(rsdp_descriptor_v1_t)))
+    if (rsdp->revision == ACPI_REV_OLD && checksum8(rsdp, sizeof(rsdp_descriptor_v1_t)))
     {
         main_sdt.header_paddr = (uint64_t) rsdp->rsdt_address;
         main_sdt.pointer_size = sizeof(uint32_t);
     }
-    else if (rsdp->revision >= ACPI_REV_NEW && checksum(rsdp, sizeof(rsdp_descriptor_v2_t)))
+    else if (rsdp->revision >= ACPI_REV_NEW && checksum8(rsdp, sizeof(rsdp_descriptor_v2_t)))
     {
         main_sdt.header_paddr = ((rsdp_descriptor_v2_t*) rsdp)->xsdt_address;
         main_sdt.pointer_size = sizeof(uint64_t);
@@ -107,7 +99,7 @@ int init_acpi(void)
     info
     (
         "ACPI rev. %u.0 %cSDT located at %p, mapped at %p, has %u entries", 
-        (main_sdt.pointer_size == sizeof(uint32_t)) ? 1 : 0,
+        (main_sdt.pointer_size == sizeof(uint32_t)) ? 1 : 2,
         (main_sdt.pointer_size == sizeof(uint32_t)) ? 'R' : 'X',
         main_sdt.header_paddr, 
         main_sdt.header, 

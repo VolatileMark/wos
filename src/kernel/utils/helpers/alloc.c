@@ -61,7 +61,7 @@ void free(void* ptr)
     if 
     (
         alignhd->magic == ALIGN_HEADER_MAGIC &&
-        check_struct_checksum16(alignhd, sizeof(align_header_t))
+        checksum16(alignhd, sizeof(align_header_t))
     )
         seg = (heap_segment_header_t*) (((uint64_t) ptr) - alignhd->offset);
     else

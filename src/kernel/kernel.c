@@ -51,6 +51,6 @@ void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
             error("Could not initialize kernel");
         HALT();
     }
-    info("Free memory: %u kB | Used memory: %u kB", get_free_memory() >> 10, get_used_memory() >> 10);
+    info("Kernel initialized (FREE: %u kB | USED: %u kB)", get_free_memory() >> 10, get_used_memory() >> 10);
     HALT();
 }
