@@ -1,4 +1,5 @@
 #include "kernel.h"
+#include "sys/drivers/storage/disk-mgr.h"
 
 static int init_kernel(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
@@ -28,9 +29,10 @@ static int init_kernel(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
         return -1;
     
     init_syscalls();
+    init_disk_manager();
     init_vfs();
     init_pit();
-    
+
     if 
     (
         init_scheduler() || 

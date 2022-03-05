@@ -826,12 +826,12 @@ void kernel_inject_pml4(page_table_t pml4)
     merge_pml4_with_pml4(kernel_pml4, pml4, KERNEL_HEAP_START_ADDR);
 }
 
-int kernel_set_pte_flag(uint64_t vaddr, PAGE_FLAG flag)
+int kernel_set_pte_flag(uint64_t vaddr, page_flag_t flag)
 {
     return pml4_set_pte_flag(kernel_pml4, vaddr, flag);
 }
 
-int pml4_set_pte_flag(page_table_t pml4, uint64_t vaddr, PAGE_FLAG flag)
+int pml4_set_pte_flag(page_table_t pml4, uint64_t vaddr, page_flag_t flag)
 {
     page_table_t pt;
     page_table_entry_t entry;
@@ -870,12 +870,12 @@ int pml4_set_pte_flag(page_table_t pml4, uint64_t vaddr, PAGE_FLAG flag)
     return 0;
 }
 
-int kernel_reset_pte_flag(uint64_t vaddr, PAGE_FLAG flag)
+int kernel_reset_pte_flag(uint64_t vaddr, page_flag_t flag)
 {
     return pml4_set_pte_flag(kernel_pml4, vaddr, flag);
 }
 
-int pml4_reset_pte_flag(page_table_t pml4, uint64_t vaddr, PAGE_FLAG flag)
+int pml4_reset_pte_flag(page_table_t pml4, uint64_t vaddr, page_flag_t flag)
 {
     page_table_t pt;
     page_table_entry_t entry;
@@ -914,12 +914,12 @@ int pml4_reset_pte_flag(page_table_t pml4, uint64_t vaddr, PAGE_FLAG flag)
     return 0;
 }
 
-int kernel_flag_memory_area(uint64_t vaddr, uint64_t size, PAGE_FLAG flag)
+int kernel_flag_memory_area(uint64_t vaddr, uint64_t size, page_flag_t flag)
 {
     return pml4_flag_memory_area(kernel_pml4, vaddr, size, flag);
 }
 
-int pml4_flag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, PAGE_FLAG flag)
+int pml4_flag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, page_flag_t flag)
 {
     vaddr = alignd(vaddr, SIZE_4KB);
     size = alignu(size, SIZE_4KB);
@@ -935,12 +935,12 @@ int pml4_flag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, PAGE
     return 0;
 }
 
-int kernel_unflag_memory_area(uint64_t vaddr, uint64_t size, PAGE_FLAG flag)
+int kernel_unflag_memory_area(uint64_t vaddr, uint64_t size, page_flag_t flag)
 {
     return pml4_unflag_memory_area(kernel_pml4, vaddr, size, flag);
 }
 
-int pml4_unflag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, PAGE_FLAG flag)
+int pml4_unflag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, page_flag_t flag)
 {
     vaddr = alignd(vaddr, SIZE_4KB);
     size = alignu(size, SIZE_4KB);

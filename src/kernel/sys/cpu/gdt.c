@@ -40,7 +40,7 @@ typedef enum
     GDT_SEG_NULL,
     GDT_SEG_CODE,
     GDT_SEG_DATA
-} GDT_SEG_TYPE;
+} gdt_segment_type_t;
 
 __attribute__((aligned(SIZE_4KB))) gdt_entry_t gdt[GDT_NUM_ENTRIES];
 __attribute__((aligned(SIZE_4KB))) gdt_descriptor_t gdt_descriptor;
@@ -57,7 +57,7 @@ static uint16_t create_gdt_entry
     uint32_t base, 
     uint32_t limit, 
     privilege_level_t privilege_level,
-    GDT_SEG_TYPE type
+    gdt_segment_type_t type
 )
 {
     gdt_entry_t* entry;

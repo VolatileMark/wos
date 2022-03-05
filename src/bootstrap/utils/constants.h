@@ -1,6 +1,8 @@
 #ifndef __CONSTANTS_H__
 #define __CONSTANTS_H__
 
+#include <stdint.h>
+
 #define SIZE_4KB 0x1000
 #define SIZE_1MB 0x100000
 

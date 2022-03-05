@@ -6,22 +6,6 @@
 
 #define FRAMEBUFFER_DIRECT_COLOR 1
 
-typedef struct
-{
-    uint64_t addr;
-    uint64_t size;
-    uint64_t width;
-    uint64_t height;
-    uint64_t pitch;
-    uint64_t bytes_per_pixel;
-    uint32_t red_mask;
-    uint32_t red_offset;
-    uint32_t green_mask;
-    uint32_t green_offset;
-    uint32_t blue_mask;
-    uint32_t blue_offset;
-} framebuffer_info_t;
-
 static framebuffer_info_t framebuffer_info;
 
 static uint32_t get_mask(uint8_t size, uint8_t offset, uint32_t* out_offset)
@@ -66,7 +50,7 @@ int init_framebuffer_driver(void)
     return 0;
 }
 
-inline int put_pixel(uint32_t x, uint32_t y, uint8_t r, uint8_t g, uint8_t b)
+inline int put_pixel(uint32_t x, uint32_t y, uint32_t color)
 {
     uint32_t* pixel_data;
     
@@ -74,11 +58,14 @@ inline int put_pixel(uint32_t x, uint32_t y, uint8_t r, uint8_t g, uint8_t b)
         return -1;
     
     pixel_data = (uint32_t*) (framebuffer_info.addr + ((x * framebuffer_info.bytes_per_pixel) + (y * framebuffer_info.pitch)));
-    *pixel_data = (*pixel_data & framebuffer_info.red_mask) | (((uint32_t) r) << framebuffer_info.red_offset);
-    *pixel_data = (*pixel_data & framebuffer_info.green_mask) | (((uint32_t) g) << framebuffer_info.green_offset);
-    *pixel_data = (*pixel_data & framebuffer_info.blue_mask) | (((uint32_t) b) << framebuffer_info.blue_offset);
+    *pixel_data = color;
 
     return 0;
+}
+
+framebuffer_info_t* get_framebuffer(void)
+{
+    return &framebuffer_info;
 }
 
 uint32_t get_framebuffer_width(void)
@@ -99,4 +86,14 @@ uint64_t get_framebuffer_vaddr(void)
 uint64_t get_framebuffer_size(void)
 {
     return framebuffer_info.size;
+}
+
+uint32_t get_framebuffer_color(uint8_t r, uint8_t g, uint8_t b)
+{
+    uint32_t color;
+    color = 0;
+    color = (color & framebuffer_info.red_mask) | (((uint32_t) r) << framebuffer_info.red_offset);
+    color = (color & framebuffer_info.green_mask) | (((uint32_t) g) << framebuffer_info.green_offset);
+    color = (color & framebuffer_info.blue_mask) | (((uint32_t) b) << framebuffer_info.blue_offset);
+    return color;
 }

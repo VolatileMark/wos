@@ -3,12 +3,15 @@
 #include "../psf.h"
 #include "../log.h"
 #include "../../sys/drivers/video/framebuffer.h"
+#include "stdint.h"
 #include <stdarg.h>
 #include <string.h>
 
 static uint32_t cursor_x, cursor_y;
 static uint32_t max_x, max_y;
 static uint32_t offset_x, offset_y;
+static uint32_t fg_color, bg_color;
+static framebuffer_info_t* fb;
 extern volatile psf2_file_t _binary_font_psf_start;
 
 #define font_header _binary_font_psf_start.header
@@ -17,8 +20,9 @@ extern volatile psf2_file_t _binary_font_psf_start;
 static void putc(char c)
 {
     uint64_t glyph_offset;
-    uint8_t glyph_byte;
     uint64_t x, y, sx, sy;
+    uint32_t color;
+    uint8_t glyph_byte;
 
     switch (c)
     {
@@ -38,7 +42,10 @@ static void putc(char c)
             for (x = font_header.width; x > 0; x--)
             {
                 if (glyph_byte & 1)
-                    put_pixel(sx + (x - 1), sy + y, 255, 255, 255);
+                    color = fg_color;
+                else
+                    color = bg_color;
+                FB_PIXEL(fb, sx + (x - 1), sy + y) = color;
                 glyph_byte >>= 1;
             }
         }
@@ -110,8 +117,20 @@ void printf(const char* str, ...)
     va_end(ap);
 }
 
+void clear_screen(void)
+{
+    uint32_t* fb;
+    uint64_t i;
+
+    fb = (uint32_t*) get_framebuffer_vaddr();
+    for (i = 0; i < get_framebuffer_size(); i++)
+        fb[i] = bg_color;
+}
+
 int init_screen(void)
 {
+    fb = get_framebuffer();
+
     cursor_x = 0;
     cursor_y = 0;
 
@@ -124,16 +143,19 @@ int init_screen(void)
     )
         return -1;
     
-    max_x = get_framebuffer_width() / font_header.width;
-    max_y = get_framebuffer_height() / font_header.height;
+    max_x = fb->width / font_header.width;
+    max_y = fb->height / font_header.height;
     if (!(max_x && max_y))
         return -1;
 
     offset_x = 0;
     offset_y = 0;
 
-    info("Framebuffer found at %p, mapped at %p, has size %u bytes", get_multiboot_tag_framebuffer()->common.framebuffer_addr, get_framebuffer_vaddr(), get_framebuffer_size());
-    info("Screen utility initialized. Resolution is %ux%u pixels or %ux%u characters", get_framebuffer_width(), get_framebuffer_height(), max_x, max_y);
+    fg_color = get_framebuffer_color(255, 255, 255);
+    bg_color = get_framebuffer_color(0, 0, 0);
+
+    info("Framebuffer located at %p, mapped at %p, has size %u bytes", get_multiboot_tag_framebuffer()->common.framebuffer_addr, fb->addr, fb->size);
+    info("Screen utility initialized. Resolution is %ux%u pixels or %ux%u characters", fb->width, fb->height, max_x, max_y);
 
     return 0;
 }

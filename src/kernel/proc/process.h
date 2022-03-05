@@ -11,12 +11,6 @@
 #define PROC_DEFAULT_STACK_VADDR (VADDR_GET_TEMPORARY(0) - SIZE_4KB)
 #define PROC_DEFAULT_RFLAGS 0x202 /* Only interrupts enabled */
 
-typedef enum
-{
-    PROC_EXEC_ELF,
-    PROC_EXEC_BIN
-} PROC_EXEC_TYPE;
-
 typedef struct pages_list_entry
 {
     uint64_t paddr;

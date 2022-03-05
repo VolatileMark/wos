@@ -11,9 +11,9 @@
 
 typedef enum
 {
-    IDT_TRAP_GATE = 0x0,
-    IDT_INTERRUPT_GATE = 0x1,
-} IDT_GATE_TYPE;
+    IDT_TRAP_GATE,
+    IDT_INTERRUPT_GATE,
+} idt_gate_type_t;
 
 struct idt64_descriptor 
 {
@@ -48,7 +48,7 @@ static void set_idt_gate
     uint64_t offset, 
     uint16_t segment_selector, 
     uint8_t privilege_level, 
-    IDT_GATE_TYPE type,
+    idt_gate_type_t type,
     uint8_t present
 )
 {

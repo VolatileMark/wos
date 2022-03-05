@@ -117,9 +117,9 @@ typedef struct
 
 typedef enum
 {
-    PCI_HEADER_0x0 = 0x0,
-    PCI_HEADER_0x1 = 0x1,
-    PCI_HEADER_0x2 = 0x2
+    PCI_HEADER_0x0,
+    PCI_HEADER_0x1,
+    PCI_HEADER_0x2
 } pci_header_type_t;
 
 int scan_pci(void);

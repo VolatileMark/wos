@@ -1,8 +1,6 @@
 #ifndef __PAGING_H__
 #define __PAGING_H__
 
-enum PRIVILEGE_LEVEL_ENUM;
-
 #include <stdint.h>
 #include "../utils/constants.h"
 
@@ -44,7 +42,7 @@ typedef enum
     PAGE_FLAG_NO_WRITETHROUGH = 3,
     PAGE_FLAG_UNCACHABLE = 4,
     PAGE_FLAG_NO_EXECUTE = 63
-} PAGE_FLAG;
+} page_flag_t;
 
 #define PTE_CLEAR(pte) *((uint64_t*) pte) = 0
 #define VADDR_GET(pml4, pdp, pd, pt) ((((uint64_t) ((pml4 < 256) ? 0x0000 : 0xFFFF)) << 48) | ((((uint64_t) pml4) << 39) | (((uint64_t) pdp) << 30) | (((uint64_t) pd) << 21) | (((uint64_t) pt) << 12)))
@@ -92,16 +90,16 @@ void kernel_inject_pml4(page_table_t pml4);
 uint64_t get_kernel_pml4_paddr(void);
 page_table_t get_kernel_pml4(void);
 
-int kernel_set_pte_flag(uint64_t vaddr, PAGE_FLAG flag);
-int pml4_set_pte_flag(page_table_t pml4, uint64_t vaddr, PAGE_FLAG flag);
+int kernel_set_pte_flag(uint64_t vaddr, page_flag_t flag);
+int pml4_set_pte_flag(page_table_t pml4, uint64_t vaddr, page_flag_t flag);
 
-int kernel_reset_pte_flag(uint64_t vaddr, PAGE_FLAG flag);
-int pml4_reset_pte_flag(page_table_t pml4, uint64_t vaddr, PAGE_FLAG flag);
+int kernel_reset_pte_flag(uint64_t vaddr, page_flag_t flag);
+int pml4_reset_pte_flag(page_table_t pml4, uint64_t vaddr, page_flag_t flag);
 
-int kernel_flag_memory_area(uint64_t vaddr, uint64_t size, PAGE_FLAG flag);
-int pml4_flag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, PAGE_FLAG flag);
+int kernel_flag_memory_area(uint64_t vaddr, uint64_t size, page_flag_t flag);
+int pml4_flag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, page_flag_t flag);
 
-int kernel_unflag_memory_area(uint64_t vaddr, uint64_t size, PAGE_FLAG flag);
-int pml4_unflag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, PAGE_FLAG flag);
+int kernel_unflag_memory_area(uint64_t vaddr, uint64_t size, page_flag_t flag);
+int pml4_unflag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, page_flag_t flag);
 
 #endif

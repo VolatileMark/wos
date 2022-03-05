@@ -99,7 +99,7 @@ int init_acpi(void)
     info
     (
         "ACPI rev. %u.0 %cSDT located at %p, mapped at %p, has %u entries", 
-        (main_sdt.pointer_size == sizeof(uint32_t)) ? 1 : 2,
+        (main_sdt.pointer_size == sizeof(uint32_t)) ? 1 : rsdp->revision,
         (main_sdt.pointer_size == sizeof(uint32_t)) ? 'R' : 'X',
         main_sdt.header_paddr, 
         main_sdt.header, 

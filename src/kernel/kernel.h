@@ -19,6 +19,7 @@
 #include "sys/drivers/power/acpi.h"
 #include "sys/drivers/bus/pci.h"
 #include "sys/drivers/video/framebuffer.h"
+#include "sys/drivers/storage/disk-mgr.h"
 #include "sys/drivers/storage/ahci.h"
 #include "proc/process.h"
 #include "proc/scheduler.h"

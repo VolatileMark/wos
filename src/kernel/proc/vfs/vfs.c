@@ -1,8 +1,11 @@
 #include "vfs.h"
+#include "../../utils/log.h"
 #include "../../utils/helpers/alloc.h"
 #include <stddef.h>
 #include <string.h>
 #include <mem.h>
+
+#define trace_vfs(msg, ...) trace("VIFS", msg, ##__VA_ARGS__) 
 
 #define THIS_FOLDER_PREFIX "./"
 
@@ -33,7 +36,10 @@ int vfs_mount(const char* path, vfs_t* vfs)
 
     entry = calloc(1, sizeof(vfs_list_entry_t));
     if (entry == NULL)
+    {
+        trace_vfs("Could not allocate space for new entry");
         return -1;
+    }
     entry->vfs = vfs;
     
     if (vfs_list.tail == NULL)
@@ -93,7 +99,10 @@ int vfs_lookup(const char* path, vnode_t* out)
     path += path_length;
 
     if (mount_vfs->ops->root(mount_vfs, &node))
+    {
+        trace_vfs("Failed to retrieve root node for path: %s", path);
         return -1;
+    }
     
     prefix_length = strlen(THIS_FOLDER_PREFIX);
     path_length = strlen(path);
@@ -124,6 +133,9 @@ int vfs_lookup(const char* path, vnode_t* out)
     
     out->data = node.data;
     out->ops = node.ops;
+
+    if (exit_code != 0)
+        trace_vfs("Lookup error: %d", exit_code);
 
     return exit_code;
 }
