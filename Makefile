@@ -1,4 +1,4 @@
-export PATH := $(abspath tools/x86_64-elf-cross/bin):$(PATH)
+export PATH := $(abspath tools/x86_64-qemu/bin):$(abspath tools/x86_64-elf-cross/bin):$(PATH)
 
 OS_NAME = wos
 
@@ -6,12 +6,11 @@ BUILD_DIR = $(abspath build/)
 SOURCE_DIR = $(abspath src/)
 OVMF_DIR = $(abspath tools/ovmf-bins)
 
-#EMU = qemu-system-x86_64
-EMU = /home/vagrant/qemu/bin/qemu-system-x86_64
+EMU = qemu-system-x86_64
 DBG = gdb
 
-MKSTANDALONE = $(abspath tools/x86_64-grub2/bin/grub-mkstandalone)
-MKRESCUE = grub-mkrescue
+MKSTANDALONE = $(abspath tools/x86_64-grub2/efi/bin/grub-mkstandalone)
+MKRESCUE = $(abspath tools/x86_64-grub2/pc/bin/grub-mkrescue)
 
 EMU_FLAGS_LEGACY = -drive file=$(BUILD_DIR)/$(OS_NAME).iso,format=raw \
 				   -m 256M \
@@ -175,3 +174,7 @@ clean-all:
 grub-version:
 	@grub-mkrescue --version
 	@grub-mkstandalone --version
+
+.PHONY: qemu-version
+qemu-version:
+	@$(EMU) --version
