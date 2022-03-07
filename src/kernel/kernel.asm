@@ -8,7 +8,8 @@ _start:
     mov rsp, (kernel_stack_bottom - 8)
     mov rbp, rsp
 
-    jmp kernel_main
+    call kernel_main
+    jmp $
 
 
 [section .bss]

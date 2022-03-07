@@ -8,7 +8,7 @@
 
 static uint64_t struct_size;
 static struct multiboot_tag_mmap* mmap;
-static struct multiboot_tag_module* kernel_elf;
+static struct multiboot_tag_module* module;
 static struct multiboot_tag_framebuffer* framebuffer;
 static struct multiboot_tag_new_acpi* new_acpi;
 static struct multiboot_tag_old_acpi* old_acpi;
@@ -16,6 +16,9 @@ static struct multiboot_tag_old_acpi* old_acpi;
 int remap_struct(uint64_t struct_paddr)
 {
     uint64_t struct_vaddr;
+
+#define REMAP_TAG(tag) tag = (struct multiboot_tag_##tag*) (struct_vaddr + (((uint64_t) tag) - struct_paddr))
+
     kernel_unmap_memory(0, SIZE_nMB(16));
     if (kernel_get_next_vaddr(struct_size, &struct_vaddr) < struct_size)
         return -1;
@@ -25,13 +28,13 @@ int remap_struct(uint64_t struct_paddr)
         return -1;
     }
 
-    mmap = (struct multiboot_tag_mmap*) (struct_vaddr + (((uint64_t) mmap) - struct_paddr));
-    kernel_elf = (struct multiboot_tag_module*) (struct_vaddr + (((uint64_t) kernel_elf) - struct_paddr));
-    framebuffer = (struct multiboot_tag_framebuffer*) (struct_vaddr + (((uint64_t) framebuffer) - struct_paddr));
-    old_acpi = (struct multiboot_tag_old_acpi*) (struct_vaddr + (((uint64_t) old_acpi) - struct_paddr));
+    REMAP_TAG(mmap);
+    REMAP_TAG(module);
+    REMAP_TAG(framebuffer);
+    REMAP_TAG(old_acpi);
     if (new_acpi != NULL)
-        new_acpi = (struct multiboot_tag_new_acpi*) (struct_vaddr + (((uint64_t) new_acpi) - struct_paddr));
-    
+        REMAP_TAG(new_acpi);
+
     return 0;
 }
 
@@ -44,7 +47,7 @@ int parse_multiboot_struct(uint64_t addr)
         return -1;
 
     mmap = NULL;
-    kernel_elf = NULL;
+    module = NULL;
     framebuffer = NULL;
     old_acpi = NULL;
     new_acpi = NULL;
@@ -62,7 +65,7 @@ int parse_multiboot_struct(uint64_t addr)
             mmap = (struct multiboot_tag_mmap*) tag;
             break;
         case MULTIBOOT_TAG_TYPE_MODULE:
-            kernel_elf = (struct multiboot_tag_module*) tag;
+            module = (struct multiboot_tag_module*) tag;
             break;
         case MULTIBOOT_TAG_TYPE_FRAMEBUFFER:
             framebuffer = (struct multiboot_tag_framebuffer*) tag;
@@ -79,7 +82,7 @@ int parse_multiboot_struct(uint64_t addr)
     if 
     (
         mmap == NULL ||
-        kernel_elf == NULL ||
+        module == NULL ||
         framebuffer == NULL ||
         old_acpi == NULL
     )
@@ -97,9 +100,9 @@ struct multiboot_tag_mmap* get_multiboot_tag_mmap(void)
 {
     return mmap;
 }
-struct multiboot_tag_module* get_multiboot_tag_initrd(void)
+struct multiboot_tag_module* get_multiboot_tag_module(void)
 {
-    return kernel_elf;
+    return module;
 }
 
 struct multiboot_tag_framebuffer* get_multiboot_tag_framebuffer(void)

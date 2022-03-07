@@ -1,5 +1,6 @@
 #include "kernel.h"
 #include "sys/drivers/storage/disk-mgr.h"
+#include "utils/helpers/multiboot2-utils.h"
 
 static int init_kernel(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
@@ -51,8 +52,7 @@ void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
     {
         if (is_screen_initialized())
             error("Could not initialize kernel");
-        HALT();
+        return;
     }
     info("Kernel initialized (FREE: %u kB | USED: %u kB)", get_free_memory() >> 10, get_used_memory() >> 10);
-    HALT();
 }

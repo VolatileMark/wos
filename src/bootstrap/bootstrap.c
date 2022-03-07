@@ -106,9 +106,9 @@ static bitmap_t* free_useless_pages(uint64_t multiboot_struct_addr, uint64_t mul
     page_bitmap = get_page_bitmap();
 
     free_pages(alignd((uint64_t) &_start_addr, SIZE_4KB), ceil((double) (((uint64_t) &_end_addr) - ((uint64_t) &_start_addr)) / SIZE_4KB));
-    free_pages(alignd(multiboot_struct_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB));
     free_pages(alignd(kernel_elf->mod_start, SIZE_4KB), ceil((double) (kernel_elf->mod_end - kernel_elf->mod_start) / SIZE_4KB));
 
+    lock_pages(alignd(multiboot_struct_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB));
     lock_pages(alignd((uint64_t) page_bitmap->buffer, SIZE_4KB), ceil((double) page_bitmap->size / SIZE_4KB));
     lock_page(get_current_pml4_paddr());
 
@@ -228,7 +228,6 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
         )
     ) { return; }
 
-    //lock_pages(alignd(kernel_start_paddr, SIZE_4KB), ceil((double) (kernel_end_paddr - kernel_start_paddr) / SIZE_4KB));
     paging_unmap_memory(kernel_elf->mod_start, kernel_elf->mod_end - kernel_elf->mod_start);
 
     new_bitmap = free_useless_pages(multiboot_struct_addr, multiboot_struct_size, kernel_elf);
