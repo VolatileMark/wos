@@ -1,16 +1,25 @@
 #include "gpt.h"
+#include "mbr.h"
 #include "../../../utils/helpers/crc32.h"
+#include "../../../utils/helpers/alloc.h"
 #include <string.h>
 
-uint32_t check_gpt(disk_t* disk)
+int check_gpt(disk_t* disk)
 {
+    uint32_t header_crc32;
     gpt_t gpt;
-    disk->ops->read(disk, 1, sizeof(gpt_t), &gpt);
-    if 
+    mbr_t mbr;
+        
+    disk->ops->read(disk, 0, GPT_BLOCK_SIZE, &mbr);
+    disk->ops->read(disk, 1, GPT_BLOCK_SIZE, &gpt);
+
+    header_crc32 = gpt.header_crc32;
+    gpt.header_crc32 = 0x00000000;
+    return
     (
+        mbr.partition1.type == 0xEE &&
+        mbr.signature == MBR_BOOTSECTOR_SIG &&
         strncmp(gpt.signature, GPT_SIG, 8) == 0 &&
-        calculate_crc32(&gpt, sizeof(gpt_t)) == CRC32_VALID
-    )
-        return gpt.gpea_num_entries;
-    return 0;
+        calculate_crc32(&gpt, gpt.header_size) == header_crc32
+    );
 }

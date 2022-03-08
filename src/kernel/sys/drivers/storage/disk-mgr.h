@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-struct disk;
+struct disk_ops;
 
 typedef enum
 {
@@ -14,17 +14,16 @@ typedef enum
 
 typedef struct
 {
-    uint64_t (*read)(struct disk* drive, uint64_t lba, uint64_t bytes, void* buffer);
-} disk_ops_t;
-
-typedef struct disk
-{
     uint64_t id;
     void* control;
-    disk_ops_t* ops;
+    struct disk_ops* ops;
     partition_table_type_t partition_table_type;
-    uint64_t partition_table_lba;
 } disk_t;
+
+typedef struct disk_ops
+{
+    uint64_t (*read)(disk_t* drive, uint64_t lba, uint64_t bytes, void* buffer);
+} disk_ops_t;
 
 void init_disk_manager(void);
 int register_disk(void* control, disk_ops_t* ops);

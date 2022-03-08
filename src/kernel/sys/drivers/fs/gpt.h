@@ -40,6 +40,6 @@ struct gpt_entry
 } __attribute__((packed));
 typedef struct gpt_entry gpt_entry_t;
 
-uint32_t check_gpt(disk_t* disk);
+int check_gpt(disk_t* disk);
 
 #endif

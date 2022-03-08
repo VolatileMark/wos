@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #define MBR_BOOTSECTOR_SIG 0xAA55
+#define MBR_BLOCK_SIZE 512
 
 struct mbr_partition
 {
@@ -30,6 +31,6 @@ struct mbr
 } __attribute__((packed));
 typedef struct mbr mbr_t;
 
-uint32_t check_mbr(disk_t* disk);
+int check_mbr(disk_t* disk);
 
 #endif

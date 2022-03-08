@@ -343,6 +343,135 @@ static ahci_controllers_list_t ahci_controllers;
 static disk_ops_t ahci_ops;
 
 
+
+static int find_available_cmd_slot(hba_port_t* port)
+{
+    uint32_t slots;
+    int i;
+
+    slots = (port->sact | port->ci);
+    for (i = 0; i < 32; i++)
+    {
+        if (!(slots & 1))
+            return i;
+        slots >>= 1;
+    }
+
+    return -1;
+}
+
+static uint64_t ahci_read_bytes_capped(ahci_controller_port_descriptor_t* desc, uint64_t lba, uint64_t bytes, void* buffer)
+{
+    hba_cmd_header_t* cmd_header;
+    hba_cmd_tbl_t* cmd_tbl;
+    fis_reg_h2d_t* cmd_fis;
+    uint64_t spin, i, count, buffer_addr;
+    int slot;
+
+    if (bytes == 0 || desc == NULL)
+        return 0;
+    bytes = minu(bytes, SIZE_nMB(4) * HBA_PORT_PRDT_ENTRIES);
+    
+    desc->port->is = (uint32_t) -1;
+    slot = find_available_cmd_slot(desc->port);
+    if (slot == -1)
+    {
+        trace_ahci("No command slot available for port %u", desc->index);
+        return 0;
+    }
+    
+    cmd_header = (hba_cmd_header_t*) desc->clb_vaddr;
+    cmd_header += slot;
+    cmd_header->cmd_fis_length = (uint8_t) (sizeof(fis_reg_h2d_t) / sizeof(uint32_t));
+    cmd_header->write = 0;
+    cmd_header->prdt_length = (uint16_t) ceil((double) bytes / SIZE_nMB(4));
+    
+    cmd_tbl = (hba_cmd_tbl_t*) desc->ctb_vaddr;
+    cmd_tbl += slot;
+    memset(cmd_tbl, 0, sizeof(hba_cmd_tbl_t));
+
+    buffer_addr = (uint64_t) buffer;
+    count = bytes;
+    for (i = 0; i < cmd_header->prdt_length - 1; i++)
+    {
+        cmd_tbl->prdt_entry[i].data_base_address = kernel_get_paddr(buffer_addr);
+        cmd_tbl->prdt_entry[i].data_byte_count = SIZE_nMB(4) - 1;
+        cmd_tbl->prdt_entry[i].interrupt_completion = 1;
+        buffer_addr += SIZE_nMB(4);
+        count -= SIZE_nMB(4);
+    }
+    cmd_tbl->prdt_entry[i].data_base_address = kernel_get_paddr(buffer_addr);
+    cmd_tbl->prdt_entry[i].data_byte_count = count - 1;
+    cmd_tbl->prdt_entry[i].interrupt_completion = 1;
+
+    cmd_fis = (fis_reg_h2d_t*) &cmd_tbl->command_fis;
+    cmd_fis->fis_type = FIS_TYPE_REG_H2D;
+    cmd_fis->c_bit = 1;
+    cmd_fis->command = AHCI_ATA_CMD_READ_DMA_EX;
+    
+    cmd_fis->lba0 = (uint8_t) (lba >> 0x00);
+    cmd_fis->lba1 = (uint8_t) (lba >> 0x08);
+    cmd_fis->lba2 = (uint8_t) (lba >> 0x10);    
+    cmd_fis->lba3 = (uint8_t) (lba >> 0x18);
+    cmd_fis->lba4 = (uint8_t) (lba >> 0x20);
+    cmd_fis->lba5 = (uint8_t) (lba >> 0x28);
+
+    cmd_fis->device = AHCI_ATA_CMD_MODE_LBA;
+    cmd_fis->count = ceil((double) bytes / AHCI_SECTOR_SIZE);
+
+    for 
+    (
+        spin = 0; 
+        (desc->port->tfd & (AHCI_ATA_DEV_BUSY | AHCI_ATA_DEV_DRQ)) && (spin < TIMEOUT_SPIN); 
+        spin++
+    );
+    if (spin == TIMEOUT_SPIN)
+    {
+        trace_ahci("Port %u is hung", desc->index);
+        return 0;
+    }
+
+    desc->port->ci = 1 << slot;
+
+    while (1)
+    {
+        if (desc->port->is & HBA_PxIS_TFES)
+        {
+            trace_ahci("Disk read error (port %u)", desc->index);
+            return 0;
+        }
+        else if (!(desc->port->ci & (1 << slot)))
+            break;
+    }
+
+    return bytes;
+}
+
+static uint64_t ahci_read_bytes(disk_t* disk, uint64_t lba, uint64_t bytes, void* buffer)
+{
+    uint64_t bytes_read, bytes_read_now;
+    ahci_controller_port_descriptor_t* desc;
+
+    bytes_read = 0;
+    desc = disk->control;
+    while (bytes > 0)
+    {
+        bytes_read_now = ahci_read_bytes_capped(desc, lba, bytes, buffer);
+        if (bytes_read_now == 0)
+            return bytes_read;
+        bytes_read += bytes_read_now;
+        bytes -= bytes_read_now;
+        lba += (bytes_read_now / AHCI_SECTOR_SIZE);
+    }
+    return bytes_read;
+}
+
+static int test_ahci_disk_read(ahci_controller_port_descriptor_t* desc)
+{
+    uint8_t buff[AHCI_SECTOR_SIZE];
+    return (ahci_read_bytes_capped(desc, 0, AHCI_SECTOR_SIZE, buff) == AHCI_SECTOR_SIZE);
+}
+
 static pci_header_common_t* map_pci_header(uint64_t header_paddr)
 {
     uint64_t vaddr;
@@ -523,7 +652,8 @@ static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
                 );
                 break;
             }
-            register_disk(&entry->ports[ports], &ahci_ops);
+            if (test_ahci_disk_read(&entry->ports[ports]))
+                register_disk(&entry->ports[ports], &ahci_ops);
             ++ports;
         }
         pi >>= 1;
@@ -588,131 +718,6 @@ static uint64_t init_ahci_controller(pci_header_0x0_t* pci_header)
     ahci_controllers.tail = entry;
 
     return 1;
-}
-
-static int find_available_cmd_slot(hba_port_t* port)
-{
-    uint32_t slots;
-    int i;
-
-    slots = (port->sact | port->ci);
-    for (i = 0; i < 32; i++)
-    {
-        if (!(slots & 1))
-            return i;
-        slots >>= 1;
-    }
-
-    return -1;
-}
-
-static uint64_t ahci_read_bytes_capped(ahci_controller_port_descriptor_t* desc, uint64_t address, uint64_t bytes, void* buffer)
-{
-    hba_cmd_header_t* cmd_header;
-    hba_cmd_tbl_t* cmd_tbl;
-    fis_reg_h2d_t* cmd_fis;
-    uint64_t spin, i, count, buffer_addr;
-    int slot;
-
-    if (bytes == 0 || desc == NULL)
-        return 0;
-    bytes = minu(bytes, SIZE_nMB(4) * HBA_PORT_PRDT_ENTRIES);
-    
-    desc->port->is = (uint32_t) -1;
-    slot = find_available_cmd_slot(desc->port);
-    if (slot == -1)
-    {
-        trace_ahci("No command slot available for port %u", desc->index);
-        return 0;
-    }
-    
-    cmd_header = (hba_cmd_header_t*) desc->clb_vaddr;
-    cmd_header += slot;
-    cmd_header->cmd_fis_length = (uint8_t) (sizeof(fis_reg_h2d_t) / sizeof(uint32_t));
-    cmd_header->write = 0;
-    cmd_header->prdt_length = (uint16_t) ceil((double) bytes / SIZE_nMB(4));
-    
-    cmd_tbl = (hba_cmd_tbl_t*) desc->ctb_vaddr;
-    cmd_tbl += slot;
-    memset(cmd_tbl, 0, sizeof(hba_cmd_tbl_t));
-
-    buffer_addr = (uint64_t) buffer;
-    count = bytes;
-    for (i = 0; i < cmd_header->prdt_length - 1; i++)
-    {
-        cmd_tbl->prdt_entry[i].data_base_address = kernel_get_paddr(buffer_addr);
-        cmd_tbl->prdt_entry[i].data_byte_count = SIZE_nMB(4) - 1;
-        cmd_tbl->prdt_entry[i].interrupt_completion = 1;
-        buffer_addr += SIZE_nMB(4);
-        count -= SIZE_nMB(4);
-    }
-    cmd_tbl->prdt_entry[i].data_base_address = kernel_get_paddr(buffer_addr);
-    cmd_tbl->prdt_entry[i].data_byte_count = count - 1;
-    cmd_tbl->prdt_entry[i].interrupt_completion = 1;
-
-    cmd_fis = (fis_reg_h2d_t*) &cmd_tbl->command_fis;
-    cmd_fis->fis_type = FIS_TYPE_REG_H2D;
-    cmd_fis->c_bit = 1;
-    cmd_fis->command = AHCI_ATA_CMD_READ_DMA_EX;
-    
-    cmd_fis->lba0 = (uint8_t) (address >> 0x00);
-    cmd_fis->lba1 = (uint8_t) (address >> 0x08);
-    cmd_fis->lba2 = (uint8_t) (address >> 0x10);    
-    cmd_fis->lba3 = (uint8_t) (address >> 0x18);
-    cmd_fis->lba4 = (uint8_t) (address >> 0x20);
-    cmd_fis->lba5 = (uint8_t) (address >> 0x28);
-
-    cmd_fis->device = AHCI_ATA_CMD_MODE_LBA;
-    cmd_fis->count = ceil((double) bytes / 512);
-
-    for 
-    (
-        spin = 0; 
-        (desc->port->tfd & (AHCI_ATA_DEV_BUSY | AHCI_ATA_DEV_DRQ)) && (spin < TIMEOUT_SPIN); 
-        spin++
-    );
-    if (spin == TIMEOUT_SPIN)
-    {
-        trace_ahci("Port %u is hung", desc->index);
-        return 0;
-    }
-
-    desc->port->ci = 1 << slot;
-
-    while (1)
-    {
-        if (desc->port->is & HBA_PxIS_TFES)
-        {
-            trace_ahci("Disk read error (port %u)", desc->index);
-            return 0;
-        }
-        else if (!(desc->port->ci & (1 << slot)))
-            break;
-    }
-
-    return bytes;
-}
-
-static uint64_t ahci_read_bytes(disk_t* disk, uint64_t lba, uint64_t bytes, void* buffer)
-{
-    uint64_t bytes_read, bytes_read_now;
-    ahci_controller_port_descriptor_t* desc;
-
-    bytes_read = 0;
-    desc = disk->control;
-    while (bytes > 0)
-    {
-        bytes_read_now = ahci_read_bytes_capped(desc, lba, bytes, buffer);
-        if (bytes_read_now == 0)
-        {
-            trace_ahci("Failed to read %u bytes from disk %u", bytes, disk->id);
-            return bytes_read;
-        }
-        bytes_read += bytes_read_now;
-        bytes -= bytes_read_now;
-        lba += bytes_read_now;
-    }
-    return bytes_read;
 }
 
 int init_ahci_driver(void)

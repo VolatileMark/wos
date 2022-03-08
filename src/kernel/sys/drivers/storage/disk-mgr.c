@@ -29,15 +29,14 @@ static uint64_t get_next_disk_id(void)
     return (disk_list.tail->disk.id + 1);
 }
 
-static uint64_t get_partition_table(disk_t* disk)
+static partition_table_type_t get_partition_table_type(disk_t* disk)
 {
-
-    uint32_t partitions;
-    if ((partitions = check_gpt(disk)));
-    else if ((partitions = check_mbr(disk)));
-    else 
-        partitions = 1;
-    return partitions;
+    if (check_gpt(disk))
+        return DISKTABLE_GPT;
+    else if (check_mbr(disk))
+        return DISKTABLE_MBR;
+    else
+        return DISKTABLE_NONE;
 }
 
 void init_disk_manager(void)
@@ -49,19 +48,21 @@ void init_disk_manager(void)
 int register_disk(void* control, disk_ops_t* ops)
 {
     disk_list_entry_t* entry;
-    uint64_t num_partitions;
+    disk_t disk;
+
+    disk.id = get_next_disk_id();
+    disk.ops = ops;
+    disk.control = control;
+    disk.partition_table_type = get_partition_table_type(&disk);
 
     entry = malloc(sizeof(disk_list_entry_t));
     if (entry == NULL)
     {
-        trace_disk("Could not allocate space for new drive list entry");
+        trace_disk("Could not allocate space for new disk list entry");
         return -1;
     }
 
-    entry->disk.id = get_next_disk_id();
-    entry->disk.ops = ops;
-    entry->disk.control = control;
-    num_partitions = get_partition_table(&entry->disk);
+    entry->disk = disk;
     entry->next = NULL;
 
     if (disk_list.tail == NULL)
@@ -70,7 +71,7 @@ int register_disk(void* control, disk_ops_t* ops)
         disk_list.tail->next = entry;
     disk_list.tail = entry;
 
-    info("Registered new disk with id %u, it has %u partitions", entry->disk.id, num_partitions);
+    info("Registered new disk with ID %u, it has %s partition table", disk.id, (disk.partition_table_type == DISKTABLE_GPT) ? "GPT" : (disk.partition_table_type == DISKTABLE_MBR) ? "MBR" : "no");
 
     return 0;
 }
