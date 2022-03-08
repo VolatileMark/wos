@@ -162,7 +162,6 @@ clean:
 	find $(BUILD_DIR) -name '*.a' -delete
 	find $(BUILD_DIR) -name '*.cfg' -delete
 	find $(BUILD_DIR) -name '*.EFI' -delete
-	rm -f $(BUILD_DIR)/initrd/initrd
 
 .PHONY: clean-all
 clean-all:

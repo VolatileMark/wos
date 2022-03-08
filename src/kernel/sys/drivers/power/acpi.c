@@ -3,7 +3,6 @@
 #include "../../../utils/log.h"
 #include "../../../utils/helpers/multiboot2-utils.h"
 #include "../../../utils/helpers/checksum.h"
-#include "stdint.h"
 #include <stddef.h>
 #include <string.h>
 

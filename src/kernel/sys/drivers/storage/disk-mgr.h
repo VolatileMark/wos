@@ -5,6 +5,13 @@
 
 struct disk;
 
+typedef enum
+{
+    DISKTABLE_MBR,
+    DISKTABLE_GPT,
+    DISKTABLE_NONE
+} partition_table_type_t;
+
 typedef struct
 {
     uint64_t (*read)(struct disk* drive, uint64_t lba, uint64_t bytes, void* buffer);
@@ -15,6 +22,8 @@ typedef struct disk
     uint64_t id;
     void* control;
     disk_ops_t* ops;
+    partition_table_type_t partition_table_type;
+    uint64_t partition_table_lba;
 } disk_t;
 
 void init_disk_manager(void);

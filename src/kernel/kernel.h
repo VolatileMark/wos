@@ -10,6 +10,7 @@
 #include "utils/helpers/screen.h"
 #include "utils/helpers/bitmap.h"
 #include "utils/helpers/multiboot2-utils.h"
+#include "utils/helpers/crc32.h"
 #include "sys/cpu/gdt.h"
 #include "sys/cpu/idt.h"
 #include "sys/cpu/isr.h"

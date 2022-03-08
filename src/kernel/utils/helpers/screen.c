@@ -3,7 +3,6 @@
 #include "../psf.h"
 #include "../log.h"
 #include "../../sys/drivers/video/framebuffer.h"
-#include "stdint.h"
 #include <stdarg.h>
 #include <string.h>
 

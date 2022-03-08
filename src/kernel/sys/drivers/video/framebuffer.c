@@ -2,7 +2,6 @@
 #include "../../../mem/paging.h"
 #include "../../../utils/helpers/checksum.h"
 #include "../../../utils/helpers/multiboot2-utils.h"
-#include "stdint.h"
 
 #define FRAMEBUFFER_DIRECT_COLOR 1
 

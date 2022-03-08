@@ -1,6 +1,4 @@
 #include "kernel.h"
-#include "sys/drivers/storage/disk-mgr.h"
-#include "utils/helpers/multiboot2-utils.h"
 
 static int init_kernel(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
@@ -17,6 +15,8 @@ static int init_kernel(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
     init_gdt();
     init_idt();
     init_isr();
+    
+    fill_crc32_lookup_table();
 
     if 
     (

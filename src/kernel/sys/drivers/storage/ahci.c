@@ -499,12 +499,11 @@ static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
             entry->ports[ports].index = i;
             entry->ports[ports].port = port;
             
-            ++ports;
-
             switch (type)
             {
             case AHCI_DEV_NULL:
                 pi >>= 1;
+                ++ports;
                 continue;
             case AHCI_DEV_SEMB:
                 break;
@@ -524,7 +523,8 @@ static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
                 );
                 break;
             }
-            register_disk(entry, &ahci_ops);
+            register_disk(&entry->ports[ports], &ahci_ops);
+            ++ports;
         }
         pi >>= 1;
     }
