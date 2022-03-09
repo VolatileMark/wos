@@ -1,13 +1,13 @@
 [section .text]
 [bits 64]
 
-[extern run_scheduler]
+[extern scheduler_run]
 [extern alignu]
-[extern get_tss]
+[extern tss_get]
 
 [global switch_pml4_and_stack]
 switch_pml4_and_stack:
-    call get_tss
+    call tss_get
     pop rcx
     pop rdx
     pop rdx
@@ -146,5 +146,5 @@ snapshot_and_schedule:
     call alignu
     fxsave [rax]
 
-    call run_scheduler
+    call scheduler_run
     jmp $

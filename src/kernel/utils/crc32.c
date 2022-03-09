@@ -4,7 +4,7 @@
 
 static uint32_t crc32_lookup_table[256];
 
-void fill_crc32_lookup_table(void)
+void crc32_fill_lookup_table(void)
 {
     uint8_t index, z;
 
@@ -16,7 +16,7 @@ void fill_crc32_lookup_table(void)
     } while (++index);
 }
 
-uint32_t calculate_crc32(void* p, uint64_t len)
+uint32_t crc32_calculate(void* p, uint64_t len)
 {
     uint32_t crc;
     uint8_t* data;

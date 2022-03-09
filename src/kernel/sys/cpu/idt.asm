@@ -2,8 +2,8 @@
 
 [section .text]
 
-[global load_idt]
-load_idt:
+[global idt_load]
+idt_load:
     ; RDI contains the pointer to the IDT descriptor struct.
     lidt [rdi]
     ret

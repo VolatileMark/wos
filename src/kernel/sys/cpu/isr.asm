@@ -139,7 +139,7 @@ int_frame:
 
 
 
-[extern get_kernel_ds]
+[extern gdt_get_kernel_ds]
 [extern isr_handler]
 
 common_stub:
@@ -147,7 +147,7 @@ common_stub:
     PUSHALL
     mov ax, ds
     push rax
-    call get_kernel_ds
+    call gdt_get_kernel_ds
     mov ds, ax
     mov es, ax
     mov fs, ax

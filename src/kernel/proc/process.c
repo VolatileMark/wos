@@ -9,16 +9,14 @@
 #include "../utils/elf.h"
 #include "../utils/constants.h"
 #include "../utils/macros.h"
-#include "../utils/helpers/alloc.h"
+#include "../utils/alloc.h"
 #include "../sys/cpu/gdt.h"
 #include <stddef.h>
 #include <mem.h>
 #include <math.h>
 #include <string.h>
 
-extern void switch_pml4(uint64_t pml4_paddr);
-
-static void init_process(process_t* ps, uint64_t pid)
+static void process_init(process_t* ps, uint64_t pid)
 {
     ps->pid = pid;
     ps->parent_pid = 0;
@@ -53,15 +51,15 @@ static void init_process(process_t* ps, uint64_t pid)
     memset(&ps->current, 0, sizeof(cpu_state_t));
 
     ps->user_mode.stack.rflags = PROC_DEFAULT_RFLAGS;
-    ps->user_mode.stack.cs = get_user_cs() | PL3;
-    ps->user_mode.stack.ss = get_user_ds() | PL3;
+    ps->user_mode.stack.cs = gdt_get_user_cs() | PL3;
+    ps->user_mode.stack.ss = gdt_get_user_ds() | PL3;
 }
 
-static int init_process_pml4(process_t* ps)
+static int process_init_pml4(process_t* ps)
 {
     uint64_t paddr, vaddr;
 
-    paddr = request_page();
+    paddr = pfa_request_page();
     if 
     (
         paddr == 0 || 
@@ -77,7 +75,7 @@ static int init_process_pml4(process_t* ps)
     return 0;
 }
 
-static int load_process_code(process_t* ps, const char* path)
+static int process_load_code(process_t* ps, const char* path)
 {
     uint64_t phdrs_offset, phdrs_total_size;
     uint64_t copy_tmp_vaddr;
@@ -132,7 +130,7 @@ static int load_process_code(process_t* ps, const char* path)
         {
         case PT_LOAD:            
             alloc_pages = ceil((double) phdr->p_memsz / SIZE_4KB);
-            alloc_paddr = request_pages(alloc_pages);
+            alloc_paddr = pfa_request_pages(alloc_pages);
             
             if (kernel_get_next_vaddr(phdr->p_memsz, &copy_tmp_vaddr) < phdr->p_memsz)
             {
@@ -189,13 +187,13 @@ static int load_process_code(process_t* ps, const char* path)
     return 0;
 }
 
-static int init_process_stack(process_t* ps)
+static int process_init_stack(process_t* ps)
 {
     uint64_t paddr, bytes, pages, size;
     pages_list_entry_t* stack_pages;
 
     pages = ceil((double) PROC_INITIAL_STACK_SIZE / SIZE_4KB);
-    paddr = request_pages(PROC_INITIAL_STACK_SIZE);
+    paddr = pfa_request_pages(PROC_INITIAL_STACK_SIZE);
     if (paddr == 0)
         return -1;
     
@@ -203,14 +201,14 @@ static int init_process_stack(process_t* ps)
     size = pml4_map_memory(ps->pml4, paddr, PROC_DEFAULT_STACK_VADDR, bytes, PAGE_ACCESS_RW, PL3);
     if (size < bytes)
     {
-        free_pages(paddr, pages);
+        pfa_free_pages(paddr, pages);
         return -1;
     }
 
     stack_pages = malloc(sizeof(pages_list_entry_t));
     if (stack_pages == NULL)
     {
-        free_pages(paddr, pages);
+        pfa_free_pages(paddr, pages);
         return -1;
     }
     
@@ -226,7 +224,7 @@ static int init_process_stack(process_t* ps)
     return 0;
 }
 
-static int init_process_kernel_stack(process_t* ps)
+static int process_init_kernel_stack(process_t* ps)
 {
     uint64_t pages, bytes, vaddr, paddr, size;
     pages_list_entry_t* kernel_stack_pages;
@@ -237,21 +235,21 @@ static int init_process_kernel_stack(process_t* ps)
         return -1;
 
     pages = ceil((double) PROC_INITIAL_STACK_SIZE / SIZE_4KB);
-    paddr = request_pages(pages);
+    paddr = pfa_request_pages(pages);
     if (paddr == 0)
         return -1;
     
     size = pml4_map_memory(ps->pml4, paddr, vaddr, bytes, PAGE_ACCESS_RW, PL0);
     if (size < bytes)
     {
-        free_pages(paddr, pages);
+        pfa_free_pages(paddr, pages);
         return -1;
     }
     
     kernel_stack_pages = malloc(sizeof(pages_list_entry_t));
     if (kernel_stack_pages == NULL)
     {
-        free_pages(paddr, pages);
+        pfa_free_pages(paddr, pages);
         return -1;
     }
     
@@ -266,7 +264,7 @@ static int init_process_kernel_stack(process_t* ps)
     return 0;
 }
 
-static char** parse_args(char* c, uint64_t* argc, uint64_t* bytes)
+static char** process_parse_args(char* c, uint64_t* argc, uint64_t* bytes)
 {
     char** argv;
     uint64_t i;
@@ -324,7 +322,7 @@ static char** parse_args(char* c, uint64_t* argc, uint64_t* bytes)
     return argv;
 }
 
-static int load_process_args(process_t* ps, const char* cmdline)
+static int process_load_args(process_t* ps, const char* cmdline)
 {
     pages_list_entry_t* args_pages;
     uint64_t argc;
@@ -335,7 +333,7 @@ static int load_process_args(process_t* ps, const char* cmdline)
     if (cmdline == NULL)
         return 0;
     
-    argv = parse_args((char*) cmdline, &argc, &cmdline_bytes);
+    argv = process_parse_args((char*) cmdline, &argc, &cmdline_bytes);
     argv_bytes = argc * sizeof(char*);
 
     if (cmdline_bytes > SIZE_4KB)
@@ -353,7 +351,7 @@ static int load_process_args(process_t* ps, const char* cmdline)
     }
     
     pages = ceil((double) total_bytes / SIZE_4KB);
-    paddr = request_pages(pages);
+    paddr = pfa_request_pages(pages);
     if (paddr == 0)
     {
         free(argv);
@@ -373,14 +371,14 @@ static int load_process_args(process_t* ps, const char* cmdline)
     size = pml4_map_memory(ps->pml4, paddr, vaddr, total_bytes, PAGE_ACCESS_RW, PL3);
     if (size < total_bytes)
     {
-        free_pages(paddr, pages);
+        pfa_free_pages(paddr, pages);
         return -1;
     }
 
     args_pages = malloc(sizeof(pages_list_entry_t));
     if (args_pages == NULL)
     {
-        free_pages(paddr, pages);
+        pfa_free_pages(paddr, pages);
         return -1;
     }
 
@@ -398,7 +396,7 @@ static int load_process_args(process_t* ps, const char* cmdline)
     return 0;
 }
 
-static uint64_t delete_pages_list(pages_list_t* list)
+static uint64_t process_delete_pages_list(pages_list_t* list)
 {
     pages_list_entry_t* current;
     pages_list_entry_t* tmp;
@@ -410,7 +408,7 @@ static uint64_t delete_pages_list(pages_list_t* list)
     {
         pages += current->pages;
         tmp = current->next;
-        free_pages(current->paddr, current->pages);
+        pfa_free_pages(current->paddr, current->pages);
         free(current);
         current = tmp;
     }
@@ -418,25 +416,25 @@ static uint64_t delete_pages_list(pages_list_t* list)
     return pages * SIZE_4KB;
 }
 
-void delete_process_resources(process_t* ps)
+void process_delete_resources(process_t* ps)
 {
     uint64_t i;
 
     if (ps->pml4 != 0)
     {
-        if (delete_pml4(ps->pml4, ps->pml4_paddr) > KERNEL_HEAP_START_ADDR)
+        if (pml4_delete(ps->pml4, ps->pml4_paddr) > KERNEL_HEAP_START_ADDR)
             return;
         kernel_unmap_memory((uint64_t) ps->pml4, SIZE_4KB);
     }
     
     if (ps->kernel_stack_start_vaddr != 0)
-        delete_pages_list(&ps->kernel_stack_pages);
+        process_delete_pages_list(&ps->kernel_stack_pages);
     if (ps->args_start_vaddr != 0)
-        delete_pages_list(&ps->args_pages);
+        process_delete_pages_list(&ps->args_pages);
 
-    delete_pages_list(&ps->code_pages);
-    delete_pages_list(&ps->stack_pages);
-    delete_pages_list(&ps->mapped_pages);
+    process_delete_pages_list(&ps->code_pages);
+    process_delete_pages_list(&ps->stack_pages);
+    process_delete_pages_list(&ps->mapped_pages);
 
     for (i = 0; i < PROC_MAX_FDS; i++)
     {
@@ -447,13 +445,13 @@ void delete_process_resources(process_t* ps)
     }
 }
 
-void delete_and_free_process(process_t* ps)
+void process_delete_and_free(process_t* ps)
 {
-    delete_process_resources(ps);
+    process_delete_resources(ps);
     free(ps);
 }
 
-process_t* create_process(const char* path, uint64_t pid)
+process_t* process_create(const char* path, uint64_t pid)
 {
     process_t* ps;
     
@@ -461,18 +459,18 @@ process_t* create_process(const char* path, uint64_t pid)
     if (ps == NULL)
         return NULL;
 
-    init_process(ps, pid);
+    process_init(ps, pid);
 
     if 
     (
-        init_process_pml4(ps) ||
-        load_process_code(ps, path) || 
-        init_process_stack(ps) || 
-        init_process_kernel_stack(ps) ||
-        load_process_args(ps, NULL) /* TODO: Add back CMDLINE support */
+        process_init_pml4(ps) ||
+        process_load_code(ps, path) || 
+        process_init_stack(ps) || 
+        process_init_kernel_stack(ps) ||
+        process_load_args(ps, NULL) /* TODO: Add back CMDLINE support */
     )
     {
-        delete_and_free_process(ps);
+        process_delete_and_free(ps);
         return NULL;
     }
 
@@ -494,18 +492,18 @@ static int copy_file_descriptors(file_descriptor_t* from, file_descriptor_t* to)
     return 0;
 }
 
-process_t* create_replacement_process(const char* path, process_t* parent)
+process_t* process_create_replacement(const char* path, process_t* parent)
 {
     process_t* child;
     
-    child = create_process(path, parent->pid);
+    child = process_create(path, parent->pid);
     if (child == NULL)
         return NULL;
     
     child->parent_pid = parent->parent_pid;
     if (copy_file_descriptors(parent->fds, child->fds))
     {
-        delete_and_free_process(child);
+        process_delete_and_free(child);
         return NULL;
     }
     
@@ -521,7 +519,7 @@ static int copy_segments_list(page_table_t pml4, uint64_t vaddr, pages_list_t* f
     ptr = from->head;
     while (ptr != NULL)
     {
-        paddr = request_pages(ptr->pages);
+        paddr = pfa_request_pages(ptr->pages);
         if (paddr == 0)
             return -1;
         
@@ -530,7 +528,7 @@ static int copy_segments_list(page_table_t pml4, uint64_t vaddr, pages_list_t* f
         size = kernel_get_next_vaddr(bytes, &kernel_vaddr);
         if (size < bytes)
         {
-            free_pages(paddr, ptr->pages);
+            pfa_free_pages(paddr, ptr->pages);
             return -1;
         }
         
@@ -538,7 +536,7 @@ static int copy_segments_list(page_table_t pml4, uint64_t vaddr, pages_list_t* f
         if (size < bytes)
         {
             kernel_unmap_memory(kernel_vaddr, bytes);
-            free_pages(paddr, ptr->pages);
+            pfa_free_pages(paddr, ptr->pages);
             return -1;
         }
         
@@ -548,7 +546,7 @@ static int copy_segments_list(page_table_t pml4, uint64_t vaddr, pages_list_t* f
         segment = malloc(sizeof(pages_list_entry_t));
         if (segment == NULL)
         {
-            free_pages(paddr, ptr->pages);
+            pfa_free_pages(paddr, ptr->pages);
             return -1;
         }
 
@@ -566,7 +564,7 @@ static int copy_segments_list(page_table_t pml4, uint64_t vaddr, pages_list_t* f
         if (size < bytes)
         {
             free(segment);
-            free_pages(paddr, ptr->pages);
+            pfa_free_pages(paddr, ptr->pages);
             return -1;
         }
 
@@ -577,7 +575,7 @@ static int copy_segments_list(page_table_t pml4, uint64_t vaddr, pages_list_t* f
     return 0;
 }
 
-process_t* clone_process(process_t* parent, uint64_t id)
+process_t* process_clone(process_t* parent, uint64_t id)
 {
     process_t* child;
     
@@ -585,7 +583,7 @@ process_t* clone_process(process_t* parent, uint64_t id)
     if (child == NULL)
         return NULL;
     
-    init_process(child, id);
+    process_init(child, id);
 
     child->parent_pid = parent->pid;
     child->user_mode = parent->user_mode;
@@ -597,16 +595,16 @@ process_t* clone_process(process_t* parent, uint64_t id)
 
     if 
     (
-        init_process_pml4(child) ||
+        process_init_pml4(child) ||
         copy_segments_list(child->pml4, parent->code_start_vaddr, &parent->code_pages, &child->code_pages) ||
         copy_segments_list(child->pml4, parent->stack_start_vaddr, &parent->stack_pages, &child->stack_pages) ||
         copy_segments_list(child->pml4, parent->mapping_start_vaddr, &parent->mapped_pages, &child->mapped_pages) ||
         copy_segments_list(child->pml4, parent->args_start_vaddr, &parent->args_pages, &child->args_pages) ||
-        init_process_kernel_stack(child) || 
+        process_init_kernel_stack(child) || 
         copy_file_descriptors(parent->fds, child->fds)
     )
     {
-        delete_and_free_process(child);
+        process_delete_and_free(child);
         return NULL;
     }
 

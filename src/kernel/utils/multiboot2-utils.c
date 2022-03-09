@@ -1,6 +1,6 @@
 #include "multiboot2-utils.h"
-#include "../../mem/paging.h"
-#include "../macros.h"
+#include "macros.h"
+#include "../mem/paging.h"
 #include <mem.h>
 #include <stddef.h>
 
@@ -13,7 +13,7 @@ static struct multiboot_tag_framebuffer* framebuffer;
 static struct multiboot_tag_new_acpi* new_acpi;
 static struct multiboot_tag_old_acpi* old_acpi;
 
-int remap_struct(uint64_t struct_paddr)
+int multiboot_remap_struct(uint64_t struct_paddr)
 {
     uint64_t struct_vaddr;
 
@@ -38,7 +38,7 @@ int remap_struct(uint64_t struct_paddr)
     return 0;
 }
 
-int parse_multiboot_struct(uint64_t addr)
+int multiboot_parse_struct(uint64_t addr)
 {
     struct multiboot_tag* tag;
 
@@ -96,26 +96,26 @@ uint64_t get_multiboot_struct_size(void)
     return struct_size;
 }
 
-struct multiboot_tag_mmap* get_multiboot_tag_mmap(void)
+struct multiboot_tag_mmap* multiboot_get_tag_mmap(void)
 {
     return mmap;
 }
-struct multiboot_tag_module* get_multiboot_tag_module(void)
+struct multiboot_tag_module* multiboot_get_tag_module(void)
 {
     return module;
 }
 
-struct multiboot_tag_framebuffer* get_multiboot_tag_framebuffer(void)
+struct multiboot_tag_framebuffer* multiboot_get_tag_framebuffer(void)
 {
     return framebuffer;
 }
 
-struct multiboot_tag_new_acpi* get_multiboot_tag_new_acpi(void)
+struct multiboot_tag_new_acpi* multiboot_get_tag_new_acpi(void)
 {
     return new_acpi;
 }
 
-struct multiboot_tag_old_acpi* get_multiboot_tag_old_acpi(void)
+struct multiboot_tag_old_acpi* multiboot_get_tag_old_acpi(void)
 {
     return old_acpi;
 }

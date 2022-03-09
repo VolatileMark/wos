@@ -1,6 +1,6 @@
 #include "alloc.h"
 #include "checksum.h"
-#include "../../mem/heap.h"
+#include "../mem/heap.h"
 #include <stddef.h>
 #include <mem.h>
 
@@ -16,7 +16,7 @@ typedef struct align_header align_header_t;
 
 void* malloc(uint64_t size)
 {
-    return ((void*) allocate_kernel_heap_memory(size)->data);
+    return ((void*) heap_allocate_memory(size)->data);
 }
 
 void* aligned_alloc(uint64_t align, uint64_t size)
@@ -24,7 +24,7 @@ void* aligned_alloc(uint64_t align, uint64_t size)
     heap_segment_header_t* seg;
     align_header_t* alignhd;
     size = alignu(size + sizeof(align_header_t), align);
-    seg = allocate_kernel_heap_memory(size);
+    seg = heap_allocate_memory(size);
     seg->data = alignu(seg->data, align);
     alignhd = (align_header_t*)(seg->data - sizeof(align_header_t));
     alignhd->offset = (uint16_t)(seg->data - ((uint64_t) seg));
@@ -66,5 +66,5 @@ void free(void* ptr)
         seg = (heap_segment_header_t*) (((uint64_t) ptr) - alignhd->offset);
     else
         seg = ((heap_segment_header_t*) ptr) - 1;
-    free_kernel_heap_memory(seg);
+    heap_free_memory(seg);
 }

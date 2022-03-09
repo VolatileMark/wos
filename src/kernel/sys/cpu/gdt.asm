@@ -1,8 +1,8 @@
 [section .text]
 [bits 64]
 
-[global load_gdt]
-load_gdt:
+[global gdt_load]
+gdt_load:
     lgdt [rdi]
     mov ax, dx
     mov ds, ax

@@ -2,44 +2,43 @@
 
 static int init_kernel(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
-    disable_interrupts();
+    interrupts_disable();
 
-    init_paging();
-    restore_pfa(current_bitmap);
-    if (parse_multiboot_struct(multiboot_struct_addr))
+    paging_init();
+    pfa_restore(current_bitmap);
+    if (multiboot_parse_struct(multiboot_struct_addr))
         return -1;
     
-    init_mmap(get_multiboot_tag_mmap());
-    init_pfa();
-    init_tss();
-    init_gdt();
+    mmap_init(multiboot_get_tag_mmap());
+    pfa_init();
+    tss_init();
+    gdt_init();
     init_idt();
-    init_isr();
+    isr_init();
     
-    fill_crc32_lookup_table();
+    crc32_fill_lookup_table();
 
     if 
     (
-        remap_struct(multiboot_struct_addr) ||
-        init_framebuffer_driver() ||
-        init_screen()
+        multiboot_remap_struct(multiboot_struct_addr) ||
+        framebuffer_init() ||
+        screen_init()
     )
         return -1;
 
-    if (init_kernel_heap(KERNEL_HEAP_START_ADDR, KERNEL_HEAP_CEIL_ADDR, SIZE_4KB))
+    if (heap_init(KERNEL_HEAP_START_ADDR, KERNEL_HEAP_CEIL_ADDR, SIZE_4KB))
         return -1;
     
-    init_syscalls();
-    init_disk_manager();
-    init_vfs();
-    init_pit();
+    syscall_init();
+    vfs_init();
+    pit_init();
 
     if 
     (
-        init_scheduler() || 
-        init_acpi() || 
-        scan_pci() || 
-        init_ahci_driver()
+        scheduler_init() || 
+        acpi_init() || 
+        pci_init() || 
+        ahci_init()
     )
         return -1;
     
@@ -54,5 +53,5 @@ void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
             error("Could not initialize kernel");
         return;
     }
-    info("Kernel initialized (FREE: %u kB | USED: %u kB)", get_free_memory() >> 10, get_used_memory() >> 10);
+    info("Kernel initialized (FREE: %u kB | USED: %u kB)", pfa_get_free_memory() >> 10, pfa_get_used_memory() >> 10);
 }

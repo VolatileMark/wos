@@ -1,6 +1,6 @@
 #include "vfs.h"
 #include "../../utils/log.h"
-#include "../../utils/helpers/alloc.h"
+#include "../../utils/alloc.h"
 #include <stddef.h>
 #include <string.h>
 #include <mem.h>
@@ -23,7 +23,7 @@ typedef struct
 
 static vfs_list_t vfs_list;
 
-void init_vfs(void)
+void vfs_init(void)
 {
     vfs_list.head = NULL;    
     vfs_list.tail = NULL;    

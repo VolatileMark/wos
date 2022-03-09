@@ -1,13 +1,13 @@
 [section .text]
 [bits 64]
 
-[global get_current_pml4_paddr]
-get_current_pml4_paddr:
+[global pml4_get_current_paddr]
+pml4_get_current_paddr:
     mov rax, cr3
     and rax, 0x00000000FFFFF000
     ret
 
-[global invalidate_pte]
-invalidate_pte:
+[global pte_invalidate]
+pte_invalidate:
     invlpg [rdi]
     ret

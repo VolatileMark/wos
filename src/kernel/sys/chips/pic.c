@@ -88,43 +88,43 @@
 
 
 
-void init_pic(void)
+void pic_init(void)
 {
     /* Send input control word no. 1 */
-    wait_for_ports();
-    write_to_port(PIC1_COMM, PIC_ICW1);
-    wait_for_ports();
-    write_to_port(PIC2_COMM, PIC_ICW1);
+    port_wait();
+    port_out(PIC1_COMM, PIC_ICW1);
+    port_wait();
+    port_out(PIC2_COMM, PIC_ICW1);
     
     /* Send input control word no. 2 */
-    wait_for_ports();
-    write_to_port(PIC1_DATA, PIC1_ICW2);
-    wait_for_ports();
-    write_to_port(PIC2_DATA, PIC2_ICW2);
+    port_wait();
+    port_out(PIC1_DATA, PIC1_ICW2);
+    port_wait();
+    port_out(PIC2_DATA, PIC2_ICW2);
 
     /* Send input control word no. 3 */
-    wait_for_ports();
-    write_to_port(PIC1_DATA, PIC1_ICW3);
-    wait_for_ports();
-    write_to_port(PIC2_DATA, PIC2_ICW3);
+    port_wait();
+    port_out(PIC1_DATA, PIC1_ICW3);
+    port_wait();
+    port_out(PIC2_DATA, PIC2_ICW3);
 
     /* Send input control word no. 4 */
-    wait_for_ports();
-    write_to_port(PIC1_DATA, PIC_ICW4);
-    wait_for_ports();
-    write_to_port(PIC2_DATA, PIC_ICW4);
+    port_wait();
+    port_out(PIC1_DATA, PIC_ICW4);
+    port_wait();
+    port_out(PIC2_DATA, PIC_ICW4);
 
     /* Null out the data registers */
-    wait_for_ports();
-    write_to_port(PIC1_DATA, 0);
-    wait_for_ports();
-    write_to_port(PIC2_DATA, 0);
+    port_wait();
+    port_out(PIC1_DATA, 0);
+    port_wait();
+    port_out(PIC2_DATA, 0);
 
     /* Disable ALL IRQs (Do not set bit 2 as it's the one that enables PIC2) */
-    wait_for_ports();
-    write_to_port(PIC1_DATA, 0b11111011);
-    wait_for_ports();
-    write_to_port(PIC2_DATA, 0b11111111);
+    port_wait();
+    port_out(PIC1_DATA, 0b11111011);
+    port_wait();
+    port_out(PIC2_DATA, 0b11111111);
 }
 
 void pic_mask_irq(uint8_t index)
@@ -147,10 +147,10 @@ void pic_mask_irq(uint8_t index)
     }
 
     bit_mask = 1 << index;
-    pic_mask = read_from_port(pic_port);
+    pic_mask = port_in(pic_port);
     pic_mask |= bit_mask;
-    wait_for_ports();
-    write_to_port(pic_port, pic_mask);
+    port_wait();
+    port_out(pic_port, pic_mask);
 }
 
 void pic_unmask_irq(uint8_t index)
@@ -172,10 +172,10 @@ void pic_unmask_irq(uint8_t index)
         index -= IRQ_COUNT / 2;
     }
     bit_mask = 1 << index;
-    pic_mask = read_from_port(pic_port);
+    pic_mask = port_in(pic_port);
     pic_mask &= ~bit_mask;
-    wait_for_ports();
-    write_to_port(pic_port, pic_mask);
+    port_wait();
+    port_out(pic_port, pic_mask);
 }
 
 void pic_toggle_irq(uint8_t index)
@@ -198,10 +198,10 @@ void pic_toggle_irq(uint8_t index)
     }
 
     bit_mask = 1 << index;
-    pic_mask = read_from_port(pic_port);
+    pic_mask = port_in(pic_port);
     pic_mask ^= bit_mask;
-    wait_for_ports();
-    write_to_port(pic_port, pic_mask);
+    port_wait();
+    port_out(pic_port, pic_mask);
 }
 
 void pic_acknowledge(uint8_t interrupt_number)
@@ -209,6 +209,6 @@ void pic_acknowledge(uint8_t interrupt_number)
     if (interrupt_number < IRQ(0) || interrupt_number >= IRQ(IRQ_COUNT))
         return;
     if (interrupt_number >= IRQ(IRQ_COUNT / 2))
-        write_to_port(PIC2_COMM, PIC_EOI);
-    write_to_port(PIC1_COMM, PIC_EOI);
+        port_out(PIC2_COMM, PIC_EOI);
+    port_out(PIC1_COMM, PIC_EOI);
 }

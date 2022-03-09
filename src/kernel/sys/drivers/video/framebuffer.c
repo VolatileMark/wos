@@ -1,7 +1,7 @@
 #include "framebuffer.h"
 #include "../../../mem/paging.h"
-#include "../../../utils/helpers/checksum.h"
-#include "../../../utils/helpers/multiboot2-utils.h"
+#include "../../../utils/checksum.h"
+#include "../../../utils/multiboot2-utils.h"
 
 #define FRAMEBUFFER_DIRECT_COLOR 1
 
@@ -19,11 +19,11 @@ static uint32_t get_mask(uint8_t size, uint8_t offset, uint32_t* out_offset)
     return ~(mask << offset);
 }
 
-int init_framebuffer_driver(void)
+int framebuffer_init(void)
 {
     struct multiboot_tag_framebuffer* framebuffer_tag;
 
-    framebuffer_tag = get_multiboot_tag_framebuffer();
+    framebuffer_tag = multiboot_get_tag_framebuffer();
     if (framebuffer_tag->common.framebuffer_type != FRAMEBUFFER_DIRECT_COLOR)
         return -1;
     
@@ -62,32 +62,32 @@ inline int put_pixel(uint32_t x, uint32_t y, uint32_t color)
     return 0;
 }
 
-framebuffer_info_t* get_framebuffer(void)
+framebuffer_info_t* framebuffer_get(void)
 {
     return &framebuffer_info;
 }
 
-uint32_t get_framebuffer_width(void)
+uint32_t framebuffer_width(void)
 {
     return framebuffer_info.width;
 }
 
-uint32_t get_framebuffer_height(void)
+uint32_t framebuffer_height(void)
 {
     return framebuffer_info.height;
 }
 
-uint64_t get_framebuffer_vaddr(void)
+uint64_t framebuffer_vaddr(void)
 {
     return framebuffer_info.addr;
 }
 
-uint64_t get_framebuffer_size(void)
+uint64_t framebuffer_size(void)
 {
     return framebuffer_info.size;
 }
 
-uint32_t get_framebuffer_color(uint8_t r, uint8_t g, uint8_t b)
+uint32_t framebuffer_color(uint8_t r, uint8_t g, uint8_t b)
 {
     uint32_t color;
     color = 0;

@@ -2,7 +2,7 @@
 #include "pfa.h"
 #include "paging.h"
 #include "../utils/constants.h"
-#include "../utils/helpers/alloc.h"
+#include "../utils/alloc.h"
 #include "../utils/log.h"
 #include <stddef.h>
 #include <math.h>
@@ -23,7 +23,7 @@ typedef struct heap
 
 static heap_t kernel_heap;
 
-static uint64_t expand_kernel_heap(uint64_t size)
+static uint64_t heap_expand(uint64_t size)
 {
     uint64_t pages_paddr, pages_count, mapped_size, new_size;
     heap_segment_header_t* new;
@@ -35,14 +35,14 @@ static uint64_t expand_kernel_heap(uint64_t size)
         return 0;
     
     pages_count = ceil((double) new_size / SIZE_4KB);
-    pages_paddr = request_pages(pages_count);
+    pages_paddr = pfa_request_pages(pages_count);
     if (pages_paddr == 0)
         return 0;
     
     mapped_size = kernel_map_memory(pages_paddr, kernel_heap.end_vaddr, new_size, PAGE_ACCESS_WX, PL0);
     if (mapped_size < new_size)
     {
-        free_pages(pages_paddr, pages_count);
+        pfa_free_pages(pages_paddr, pages_count);
         return 0;
     }
 
@@ -63,7 +63,7 @@ static uint64_t expand_kernel_heap(uint64_t size)
     return mapped_size;
 }
 
-static heap_segment_header_t* next_free_kernel_heap_segment(uint64_t size)
+static heap_segment_header_t* heap_next_free_segment(uint64_t size)
 {
     heap_segment_header_t* current;
     
@@ -75,13 +75,13 @@ static heap_segment_header_t* next_free_kernel_heap_segment(uint64_t size)
         current = current->next;
     }
     
-    if (expand_kernel_heap(size) < size)
+    if (heap_expand(size) < size)
         return NULL;
     
-    return next_free_kernel_heap_segment(size);
+    return heap_next_free_segment(size);
 }
 
-static void combine_kernel_heap_forward(heap_segment_header_t* seg)
+static void heap_combine_forward(heap_segment_header_t* seg)
 {
     if (seg->next == NULL || !seg->next->free)
         return;
@@ -91,13 +91,13 @@ static void combine_kernel_heap_forward(heap_segment_header_t* seg)
     seg->next = seg->next->next;
 }
 
-static void combine_kernel_heap_backward(heap_segment_header_t* seg)
+static void heap_combine_backward(heap_segment_header_t* seg)
 {
     if (seg->prev != NULL && seg->prev->free)
-        combine_kernel_heap_forward(seg->prev);
+        heap_combine_forward(seg->prev);
 }
 
-int init_kernel_heap(uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t initial_size)
+int heap_init(uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t initial_size)
 {
     if (initial_size > ceil_vaddr - start_vaddr || initial_size < sizeof(heap_segment_header_t))
     {
@@ -109,7 +109,7 @@ int init_kernel_heap(uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t initial
     kernel_heap.start_vaddr = start_vaddr;
     kernel_heap.end_vaddr = start_vaddr;
     kernel_heap.tail = NULL;
-    if (expand_kernel_heap(initial_size) < initial_size)
+    if (heap_expand(initial_size) < initial_size)
     {
         trace_heap("Failed to allocate initial memory");
         return -1;
@@ -121,7 +121,7 @@ int init_kernel_heap(uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t initial
     return 0;
 }
 
-heap_segment_header_t* allocate_kernel_heap_memory(uint64_t size)
+heap_segment_header_t* heap_allocate_memory(uint64_t size)
 {
     heap_segment_header_t* seg;
     heap_segment_header_t* new;
@@ -129,7 +129,7 @@ heap_segment_header_t* allocate_kernel_heap_memory(uint64_t size)
     size = ((size < MIN_ALLOC_SIZE) ? MIN_ALLOC_SIZE : size);
 
     do {
-        seg = next_free_kernel_heap_segment(size + sizeof(heap_segment_header_t));
+        seg = heap_next_free_segment(size + sizeof(heap_segment_header_t));
         if (seg == NULL)
             return 0;
     } while (seg->size < size);
@@ -152,9 +152,9 @@ heap_segment_header_t* allocate_kernel_heap_memory(uint64_t size)
     return seg;
 }
 
-void free_kernel_heap_memory(heap_segment_header_t* seg)
+void heap_free_memory(heap_segment_header_t* seg)
 {
     seg->free = 1;
-    combine_kernel_heap_forward(seg);
-    combine_kernel_heap_backward(seg);
+    heap_combine_forward(seg);
+    heap_combine_backward(seg);
 }

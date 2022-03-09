@@ -122,8 +122,8 @@ typedef enum
     PCI_HEADER_0x2
 } pci_header_type_t;
 
-int scan_pci(void);
-pci_devices_list_t* find_pci_devices(int class, int subclass, int program_interface);
-void delete_devices_list(pci_devices_list_t* list);
+int pci_init(void);
+pci_devices_list_t* pci_find_devices(int class, int subclass, int program_interface);
+void pci_delete_devices_list(pci_devices_list_t* list);
 
 #endif

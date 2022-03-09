@@ -4,14 +4,14 @@
 
 
 
-[global enable_interrupts]
-enable_interrupts:
+[global interrupts_enable]
+interrupts_enable:
     sti
     ret
 
 
 
-[global disable_interrupts]
-disable_interrupts:
+[global interrupts_disable]
+interrupts_disable:
     cli
     ret

@@ -52,13 +52,13 @@ typedef enum
 #define PML4_ENTRY_SIZE (PDP_ENTRY_SIZE * MAX_PAGE_TABLE_ENTRIES)
 #define PML4_VADDR VADDR_GET_TEMPORARY(0)
 
-extern uint64_t get_current_pml4_paddr(void);
-extern void invalidate_pte(uint64_t vaddr);
+extern uint64_t pml4_get_current_paddr(void);
+extern void pte_invalidate(uint64_t vaddr);
 
-void set_pte_address(page_table_entry_t* entry, uint64_t addr);
-uint64_t get_pte_address(page_table_entry_t* entry);
+void pte_set_address(page_table_entry_t* entry, uint64_t addr);
+uint64_t pte_get_address(page_table_entry_t* entry);
 
-void init_paging(void);
+void paging_init(void);
 
 uint64_t pml4_map_memory(page_table_t pml4, uint64_t paddr, uint64_t vaddr, uint64_t size, page_access_type_t access, privilege_level_t privilege_level);
 uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, page_access_type_t access, privilege_level_t privilege_level);
@@ -70,10 +70,5 @@ void paging_unmap_temporary_page(uint64_t vaddr);
 
 uint64_t paging_get_next_vaddr(uint64_t size, uint64_t* vaddr_out);
 uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t size, uint64_t* vaddr_out);
-
-uint64_t paging_get_paddr(uint64_t vaddr);
-uint64_t pml4_get_paddr(page_table_t pml4, uint64_t vaddr);
-
-void delete_pml4(page_table_t pml4);
 
 #endif

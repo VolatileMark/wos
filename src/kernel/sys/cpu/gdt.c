@@ -49,9 +49,9 @@ static uint16_t kernel_cs, kernel_ds;
 static uint16_t user_cs, user_ds;
 static uint16_t tss_ss;
 
-extern void load_gdt(uint64_t gdt_descriptor_addr, uint16_t kernel_cs, uint16_t kernel_ds);
+extern void gdt_load(uint64_t gdt_descriptor_addr, uint16_t kernel_cs, uint16_t kernel_ds);
 
-static uint16_t create_gdt_entry
+static uint16_t gdt_create_entry
 (
     uint16_t index, 
     uint32_t base, 
@@ -126,47 +126,47 @@ static uint16_t create_tss_entry(uint16_t index, uint64_t addr)
     return (index * sizeof(gdt_entry_t));
 }
 
-void init_gdt(void)
+void gdt_init(void)
 {
     uint64_t tss_addr;
     
-    tss_addr = (uint64_t) get_tss();
+    tss_addr = (uint64_t) tss_get();
 
-    create_gdt_entry(0, 0x00000000, 0x00000000, PL0, GDT_SEG_NULL);
-    kernel_cs = create_gdt_entry(1, 0x00000000, 0xFFFFFFFF, PL0, GDT_SEG_CODE);
-    kernel_ds = create_gdt_entry(2, 0x00000000, 0xFFFFFFFF, PL0, GDT_SEG_DATA);
-    user_cs = create_gdt_entry(4, 0x00000000, 0xFFFFFFFF, PL3, GDT_SEG_CODE);
-    user_ds = create_gdt_entry(3, 0x00000000, 0xFFFFFFFF, PL3, GDT_SEG_DATA);
+    gdt_create_entry(0, 0x00000000, 0x00000000, PL0, GDT_SEG_NULL);
+    kernel_cs = gdt_create_entry(1, 0x00000000, 0xFFFFFFFF, PL0, GDT_SEG_CODE);
+    kernel_ds = gdt_create_entry(2, 0x00000000, 0xFFFFFFFF, PL0, GDT_SEG_DATA);
+    user_cs = gdt_create_entry(4, 0x00000000, 0xFFFFFFFF, PL3, GDT_SEG_CODE);
+    user_ds = gdt_create_entry(3, 0x00000000, 0xFFFFFFFF, PL3, GDT_SEG_DATA);
     tss_ss = create_tss_entry(5, tss_addr);
 
     gdt_descriptor.size = (GDT_NUM_ENTRIES * sizeof(gdt_entry_t)) - 1;
     gdt_descriptor.addr = (uint64_t) &gdt;
 
-    load_gdt((uint64_t) &gdt_descriptor, kernel_cs, kernel_ds);
-    load_tss(tss_ss);
+    gdt_load((uint64_t) &gdt_descriptor, kernel_cs, kernel_ds);
+    tss_load(tss_ss);
 }
 
-uint16_t get_kernel_cs(void)
+uint16_t gdt_get_kernel_cs(void)
 {
     return kernel_cs;
 }
 
-uint16_t get_kernel_ds(void)
+uint16_t gdt_get_kernel_ds(void)
 {
     return kernel_ds;
 }
 
-uint16_t get_user_cs(void)
+uint16_t gdt_get_user_cs(void)
 {
     return user_cs;
 }
 
-uint16_t get_user_ds(void)
+uint16_t gdt_get_user_ds(void)
 {
     return user_ds;
 }
 
-uint16_t get_tss_ss(void)
+uint16_t gdt_get_tss_ss(void)
 {
     return tss_ss;
 }

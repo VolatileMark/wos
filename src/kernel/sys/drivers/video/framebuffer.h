@@ -21,13 +21,13 @@ typedef struct
     uint32_t blue_offset;
 } framebuffer_info_t;
 
-int init_framebuffer_driver(void);
+int framebuffer_init(void);
 int put_pixel(uint32_t x, uint32_t y, uint32_t color);
-framebuffer_info_t* get_framebuffer(void);
-uint32_t get_framebuffer_width(void);
-uint32_t get_framebuffer_height(void);
-uint64_t get_framebuffer_vaddr(void);
-uint64_t get_framebuffer_size(void);
-uint32_t get_framebuffer_color(uint8_t r, uint8_t g, uint8_t b);
+framebuffer_info_t* framebuffer_get(void);
+uint32_t framebuffer_width(void);
+uint32_t framebuffer_height(void);
+uint64_t framebuffer_vaddr(void);
+uint64_t framebuffer_size(void);
+uint32_t framebuffer_color(uint8_t r, uint8_t g, uint8_t b);
 
 #endif

@@ -5,9 +5,9 @@
 #include "../../proc/scheduler.h"
 #include "../../utils/constants.h"
 
-#define SET_ISR(index) set_idt_gate(index, (uint64_t) &isr##index, get_kernel_cs(), PL0, IDT_INTERRUPT_GATE, 1)
-#define SET_IRQ(index) set_idt_gate(IRQ(index), (uint64_t) &irq##index, get_kernel_cs(), PL0, IDT_INTERRUPT_GATE, 0)
-#define SET_SFT(index) set_idt_gate(index, (uint64_t) &sft##index, get_kernel_cs(), PL3, IDT_INTERRUPT_GATE, 0)
+#define SET_ISR(index) idt_set_gate(index, (uint64_t) &isr##index, gdt_get_kernel_cs(), PL0, IDT_INTERRUPT_GATE, 1)
+#define SET_IRQ(index) idt_set_gate(IRQ(index), (uint64_t) &irq##index, gdt_get_kernel_cs(), PL0, IDT_INTERRUPT_GATE, 0)
+#define SET_SFT(index) idt_set_gate(index, (uint64_t) &sft##index, gdt_get_kernel_cs(), PL3, IDT_INTERRUPT_GATE, 0)
 
 typedef enum
 {
@@ -40,9 +40,9 @@ typedef struct idt64_entry idt64_entry_t;
 static idt64_entry_t idt[IDT_NUM_ENTRIES];
 static idt64_descriptor_t idt_descriptor;
 
-extern void load_idt(uint64_t idt); /* ASM call */
+extern void idt_load(uint64_t idt); /* ASM call */
 
-static void set_idt_gate
+static void idt_set_gate
 (
     uint8_t interrupt_number, 
     uint64_t offset, 
@@ -66,7 +66,7 @@ static void set_idt_gate
     entry->zero = 0;
 }
 
-void set_idt_interrupt_present(uint8_t interrupt_number, uint8_t value)
+void idt_set_interrupt_present(uint8_t interrupt_number, uint8_t value)
 {
     idt[interrupt_number].present = value;
 }
@@ -110,7 +110,7 @@ void init_idt(void)
     SET_ISR(31);
 
     /* Remap PIC */
-    init_pic();
+    pic_init();
 
     SET_IRQ(0);
     SET_IRQ(1);
@@ -131,5 +131,5 @@ void init_idt(void)
 
     SET_SFT(128); /* Yield (probably useless, but just for fun) */
 
-    load_idt((uint64_t) &idt_descriptor);
+    idt_load((uint64_t) &idt_descriptor);
 }

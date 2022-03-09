@@ -1,7 +1,6 @@
 #ifndef __MBR_H__
 #define __MBR_H__
 
-#include "../storage/disk-mgr.h"
 #include <stdint.h>
 
 #define MBR_BOOTSECTOR_SIG 0xAA55
@@ -31,6 +30,6 @@ struct mbr
 } __attribute__((packed));
 typedef struct mbr mbr_t;
 
-int check_mbr(disk_t* disk);
+int mbr_check(void* disk);
 
 #endif

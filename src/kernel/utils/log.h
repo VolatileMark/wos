@@ -1,7 +1,7 @@
 #ifndef __LOG_H__
 #define __LOG_H__
 
-#include "helpers/screen.h"
+#include "screen.h"
 
 #define log(lvl, msg, ...) printf("[" lvl "] " msg "\n", ##__VA_ARGS__)
 

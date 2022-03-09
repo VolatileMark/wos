@@ -14,8 +14,8 @@ struct heap_segment_header
 } __attribute__((packed));
 typedef struct heap_segment_header heap_segment_header_t;
 
-int init_kernel_heap(uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t inital_size);
-heap_segment_header_t* allocate_kernel_heap_memory(uint64_t size);
-void free_kernel_heap_memory(heap_segment_header_t* seg);
+int heap_init(uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t inital_size);
+heap_segment_header_t* heap_allocate_memory(uint64_t size);
+void heap_free_memory(heap_segment_header_t* seg);
 
 #endif

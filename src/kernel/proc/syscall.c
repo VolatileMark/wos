@@ -5,7 +5,7 @@
 #include "../mem/pfa.h"
 #include "../utils/constants.h"
 #include "../utils/macros.h"
-#include "../utils/helpers/alloc.h"
+#include "../utils/alloc.h"
 #include "../abi/vm-flags.h"
 #include <stdint.h>
 #include <stddef.h>
@@ -36,9 +36,9 @@ static void pfree(void* addr)
 DEFINE_SYSCALL(exit)
 {
     UNUSED(stack);
-    switch_to_kernel(&(get_current_scheduled_process()->user_mode), 0);
-    terminate_process(get_current_scheduled_process());
-    run_scheduler();
+    switch_to_kernel(&(scheduler_get_current_scheduled_process()->user_mode), 0);
+    scheduler_terminate_process(scheduler_get_current_scheduled_process());
+    scheduler_run();
     return -1;
 }
 
@@ -49,15 +49,15 @@ DEFINE_SYSCALL(execve)
     process_t* old;
 
     path = POP_STACK(const char*);
-    old = get_current_scheduled_process();
-    new = create_replacement_process(path, old);
+    old = scheduler_get_current_scheduled_process();
+    new = process_create_replacement(path, old);
     if (new == NULL)
         return -1;
 
-    switch_to_kernel(&(get_current_scheduled_process()->user_mode), 3);
+    switch_to_kernel(&(scheduler_get_current_scheduled_process()->user_mode), 3);
 
-    replace_process(old, new);
-    run_scheduler();
+    scheduler_replace_process(old, new);
+    scheduler_run();
     
     return 0;
 }
@@ -79,7 +79,7 @@ DEFINE_SYSCALL(vm_map)
     fd = POP_STACK(int);
     offset = POP_STACK(long);
     window = POP_STACK(uint64_t*);
-    ps = get_current_scheduled_process();
+    ps = scheduler_get_current_scheduled_process();
 
     *window = (uint64_t) -1;
 
@@ -92,7 +92,7 @@ DEFINE_SYSCALL(vm_map)
         return EINVAL;
 
     if ((flags & MAP_ANONYMOUS) && fd == -1 && offset == 0)
-        paddr = request_pages(ceil((double) size / SIZE_4KB));
+        paddr = pfa_request_pages(ceil((double) size / SIZE_4KB));
     else
     {
         /* TODO: Implement mapping fd */
@@ -140,7 +140,7 @@ DEFINE_SYSCALL(vm_unmap)
 
     vaddr = POP_STACK(uint64_t);
     size = POP_STACK(uint64_t);
-    ps = get_current_scheduled_process();
+    ps = scheduler_get_current_scheduled_process();
 
     if (pml4_unmap_memory(ps->pml4, vaddr, size) < size)
         return -1;

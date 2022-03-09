@@ -8,7 +8,7 @@
 #include "utils/multiboot2.h"
 #include "utils/constants.h"
 #include "utils/elf.h"
-#include "utils/helpers/bitmap.h"
+#include "utils/bitmap.h"
 #include "sys/acpi.h"
 
 static int parse_multiboot_struct(uint64_t addr, uint64_t* out_size, struct multiboot_tag_old_acpi** out_rsdp, struct multiboot_tag_module** out_module)
@@ -32,7 +32,7 @@ static int parse_multiboot_struct(uint64_t addr, uint64_t* out_size, struct mult
         switch (tag->type)
         {
         case MULTIBOOT_TAG_TYPE_MMAP:
-            if (init_mmap((struct multiboot_tag_mmap*) tag)) { return -1; }
+            if (mmap_init((struct multiboot_tag_mmap*) tag)) { return -1; }
             break;
         case MULTIBOOT_TAG_TYPE_MODULE:
             *out_module = (struct multiboot_tag_module*) tag;
@@ -84,7 +84,7 @@ static int load_elf(uint64_t start_addr, uint64_t size, uint64_t* entry_address)
         switch (phdr->p_type)
         {
         case PT_LOAD:
-            paddr = request_pages(ceil((double) phdr->p_memsz / SIZE_4KB));
+            paddr = pfa_request_pages(ceil((double) phdr->p_memsz / SIZE_4KB));
             paging_map_memory(paddr, phdr->p_vaddr, phdr->p_memsz, PAGE_ACCESS_RW, PL0);
             memcpy((void*) phdr->p_vaddr, (void*) (((uint64_t) ehdr) + phdr->p_offset), phdr->p_filesz);
             break;
@@ -103,14 +103,14 @@ static bitmap_t* free_useless_pages(uint64_t multiboot_struct_addr, uint64_t mul
     uint64_t pml4_idx, pdp_idx, pd_idx;
     bitmap_t* page_bitmap;
 
-    page_bitmap = get_page_bitmap();
+    page_bitmap = pfa_get_page_bitmap();
 
-    free_pages(alignd((uint64_t) &_start_addr, SIZE_4KB), ceil((double) (((uint64_t) &_end_addr) - ((uint64_t) &_start_addr)) / SIZE_4KB));
-    free_pages(alignd(kernel_elf->mod_start, SIZE_4KB), ceil((double) (kernel_elf->mod_end - kernel_elf->mod_start) / SIZE_4KB));
+    pfa_free_pages(alignd((uint64_t) &_start_addr, SIZE_4KB), ceil((double) (((uint64_t) &_end_addr) - ((uint64_t) &_start_addr)) / SIZE_4KB));
+    pfa_free_pages(alignd(kernel_elf->mod_start, SIZE_4KB), ceil((double) (kernel_elf->mod_end - kernel_elf->mod_start) / SIZE_4KB));
 
-    lock_pages(alignd(multiboot_struct_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB));
-    lock_pages(alignd((uint64_t) page_bitmap->buffer, SIZE_4KB), ceil((double) page_bitmap->size / SIZE_4KB));
-    lock_page(get_current_pml4_paddr());
+    pfa_lock_pages(alignd(multiboot_struct_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB));
+    pfa_lock_pages(alignd((uint64_t) page_bitmap->buffer, SIZE_4KB), ceil((double) page_bitmap->size / SIZE_4KB));
+    pfa_lock_page(pml4_get_current_paddr());
 
     pml4 = (page_table_t) PML4_VADDR;
     for (pml4_idx = 0; pml4_idx < MAX_PAGE_TABLE_ENTRIES; pml4_idx++)
@@ -118,21 +118,21 @@ static bitmap_t* free_useless_pages(uint64_t multiboot_struct_addr, uint64_t mul
         entry = pml4[pml4_idx];
         if (entry.present)
         {
-            paddr = get_pte_address(&entry);
-            lock_page(paddr);
+            paddr = pte_get_address(&entry);
+            pfa_lock_page(paddr);
             pdp = (page_table_t) paging_map_temporary_page(paddr, PAGE_ACCESS_RO, PL0);
             for (pdp_idx = 0; pdp_idx < MAX_PAGE_TABLE_ENTRIES; pdp_idx++)
             {
                 entry = pdp[pdp_idx];
                 if (entry.present)
                 {
-                    paddr = get_pte_address(&entry);
-                    lock_page(paddr);
+                    paddr = pte_get_address(&entry);
+                    pfa_lock_page(paddr);
                     pd = (page_table_t) paging_map_temporary_page(paddr, PAGE_ACCESS_RO, PL0);
                     for (pd_idx = 0; pd_idx < MAX_PAGE_TABLE_ENTRIES; pd_idx++)
                     {
                         entry = pd[pd_idx];
-                        if (entry.present) { lock_page(get_pte_address(&entry)); }
+                        if (entry.present) { pfa_lock_page(pte_get_address(&entry)); }
                     }
                     paging_unmap_temporary_page((uint64_t) pd);
                 }
@@ -156,8 +156,8 @@ uint64_t align_multiboot_struct
     uint64_t new_addr, tmp_size;
     uint8_t* src;
     uint8_t* dst;
-    
-    new_addr = alignu(current_addr, boundary);
+
+    new_addr = alignu(maxu(current_addr, (*kernel_elf)->mod_end), boundary);
     src = (uint8_t*) (current_addr + (size - 1));
     dst = (uint8_t*) (new_addr + (size - 1));
     tmp_size = size;
@@ -196,15 +196,15 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
     ) { return; }
 
     /* Initialize the page frame allocator */
-    init_pfa();
+    pfa_init();
 
     /* Initialize paging helper */
-    init_paging();
+    paging_init();
 
-    lock_pages(alignd((uint64_t) &_start_addr, SIZE_4KB), ceil((double) (((uint64_t) &_end_addr) - ((uint64_t) &_start_addr)) / SIZE_4KB));
-    lock_pages(alignd(kernel_elf->mod_start, SIZE_4KB), ceil((double) (kernel_elf->mod_end - kernel_elf->mod_start) / SIZE_4KB));
+    pfa_lock_pages(alignd((uint64_t) &_start_addr, SIZE_4KB), ceil((double) (((uint64_t) &_end_addr) - ((uint64_t) &_start_addr)) / SIZE_4KB));
+    pfa_lock_pages(alignd(kernel_elf->mod_start, SIZE_4KB), ceil((double) (kernel_elf->mod_end - kernel_elf->mod_start) / SIZE_4KB));
 
-    if (lock_acpi_sdt_pages((uint64_t) rsdp_tag->rsdp, &rsdp_size)) { return; }
+    if (acpi_lock_sdt_pages((uint64_t) rsdp_tag->rsdp, &rsdp_size)) { return; }
     
     multiboot_struct_new_addr = align_multiboot_struct
     (
@@ -214,7 +214,7 @@ void bootstrap_main(uint64_t multiboot2_magic, uint64_t multiboot_struct_addr)
         &rsdp_tag,
         &kernel_elf
     );
-    lock_pages(alignd(multiboot_struct_new_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB));
+    pfa_lock_pages(alignd(multiboot_struct_new_addr, SIZE_4KB), ceil((double) multiboot_struct_size / SIZE_4KB));
     paging_unmap_memory(multiboot_struct_addr, multiboot_struct_new_addr - multiboot_struct_addr);
     paging_map_memory(kernel_elf->mod_start, kernel_elf->mod_start, kernel_elf->mod_end - kernel_elf->mod_start, PAGE_ACCESS_RW, PL0);
 

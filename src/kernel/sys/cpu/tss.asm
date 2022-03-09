@@ -4,8 +4,8 @@
 
 
 
-[global load_tss]
-load_tss:
+[global tss_load]
+tss_load:
     mov rax, rdi
     ltr ax
     ret

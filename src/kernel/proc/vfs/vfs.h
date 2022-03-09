@@ -18,7 +18,7 @@ typedef struct vfs_ops
     int (*root)(vfs_t* vfs, vnode_t* root);
 } vfs_ops_t;
 
-void init_vfs(void);
+void vfs_init(void);
 
 int vfs_mount(const char* path, vfs_t* vfs);
 int vfs_lookup(const char* path, vnode_t* out);

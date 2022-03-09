@@ -1,8 +1,8 @@
 #include "screen.h"
 #include "multiboot2-utils.h"
-#include "../psf.h"
-#include "../log.h"
-#include "../../sys/drivers/video/framebuffer.h"
+#include "psf.h"
+#include "log.h"
+#include "../sys/drivers/video/framebuffer.h"
 #include <stdarg.h>
 #include <string.h>
 
@@ -118,17 +118,17 @@ void printf(const char* str, ...)
 
 void clear_screen(void)
 {
-    uint32_t* fb;
+    uint32_t* fb_ptr;
     uint64_t i;
 
-    fb = (uint32_t*) get_framebuffer_vaddr();
-    for (i = 0; i < get_framebuffer_size(); i++)
-        fb[i] = bg_color;
+    fb_ptr = (uint32_t*) fb->addr;
+    for (i = 0; i < fb->size; i++)
+        fb_ptr[i] = bg_color;
 }
 
-int init_screen(void)
+int screen_init(void)
 {
-    fb = get_framebuffer();
+    fb = framebuffer_get();
 
     cursor_x = 0;
     cursor_y = 0;
@@ -150,28 +150,28 @@ int init_screen(void)
     offset_x = 0;
     offset_y = 0;
 
-    fg_color = get_framebuffer_color(255, 255, 255);
-    bg_color = get_framebuffer_color(0, 0, 0);
+    fg_color = framebuffer_color(255, 255, 255);
+    bg_color = framebuffer_color(0, 0, 0);
 
-    info("Framebuffer located at %p, mapped at %p, has size %u bytes", get_multiboot_tag_framebuffer()->common.framebuffer_addr, fb->addr, fb->size);
+    info("Framebuffer located at %p, mapped at %p, has size %u bytes", multiboot_get_tag_framebuffer()->common.framebuffer_addr, fb->addr, fb->size);
     info("Screen utility initialized. Resolution is %ux%u pixels or %ux%u characters", fb->width, fb->height, max_x, max_y);
 
     return 0;
 }
 
-void resize_screen_viewport(uint32_t width, uint32_t height)
+void screen_resize_viewport(uint32_t width, uint32_t height)
 {
     max_x = width / font_header.width;
     max_y = height / font_header.height;
 }
 
-void offset_screen_viewport(uint32_t x, uint32_t y)
+void screen_offset_viewport(uint32_t x, uint32_t y)
 {
     offset_x = x / font_header.width;
     offset_y = y / font_header.height;
 }
 
-void set_cursor_pos(uint32_t cx, uint32_t cy)
+void screen_set_cursor_pos(uint32_t cx, uint32_t cy)
 {
     cursor_x = cx;
     cursor_y = cy;

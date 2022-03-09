@@ -1,19 +1,19 @@
 [section .text]
 [bits 64]
 
-[extern get_kernel_cs]
-[extern get_kernel_ds]
+[extern gdt_get_kernel_cs]
+[extern gdt_get_kernel_ds]
 
 [extern syscall_handler]
-[extern get_tss]
+[extern tss_get]
 
 [extern alignu]
-[extern get_kernel_pml4_paddr]
+[extern paging_get_kernel_pml4_paddr]
 [extern kernel_stack_bottom]
 
 
-[global init_syscalls]
-init_syscalls:
+[global syscall_init]
+syscall_init:
     ; Set LSTAR register to syscall kernel entry point
     mov rdx, syscall_hook
     shr rdx, 32
@@ -30,11 +30,11 @@ init_syscalls:
     rdmsr
     ; Set the correct segment selectors
     mov edx, 0x00000000
-    call get_kernel_ds
+    call gdt_get_kernel_ds
     or ax, 0x03
     mov dx, ax
     shl edx, 16
-    call get_kernel_cs
+    call gdt_get_kernel_cs
     mov dx, ax
     wrmsr
 
@@ -61,7 +61,7 @@ load_kernel_stack:
     mov [user_rsp], rsp
     mov [user_rbp], rbp
     push rax
-    call get_tss
+    call tss_get
     mov rbx, rax
     pop rax
     mov rsp, [rbx + 4]
@@ -115,7 +115,7 @@ switch_to_kernel:
     pop rdi
 
     ; Load correct data registers
-    call get_kernel_ds
+    call gdt_get_kernel_ds
     mov ds, ax
     mov es, ax
     mov fs, ax
@@ -149,9 +149,9 @@ switch_to_kernel:
     ; Load default kernel stack and pml4
     pop rcx
     mov [rdi + 8*15], rcx ; Save return RIP
-    call get_tss
+    call tss_get
     mov rdi, rax
-    call get_kernel_pml4_paddr
+    call paging_get_kernel_pml4_paddr
     mov qword [rdi + 4], (kernel_stack_bottom - 8)
     mov rsp, [rdi + 4]
     mov rbp, rsp

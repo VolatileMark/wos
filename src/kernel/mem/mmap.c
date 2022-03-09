@@ -4,7 +4,7 @@
 static uint64_t memory_segment_sizes[5];
 static struct multiboot_mmap_entry* largest_segments[5];
 
-void init_mmap(struct multiboot_tag_mmap* tag)
+void mmap_init(struct multiboot_tag_mmap* tag)
 {
     uint32_t entries, i;
     struct multiboot_mmap_entry* entry;
@@ -36,12 +36,12 @@ void init_mmap(struct multiboot_tag_mmap* tag)
     }
 }
 
-struct multiboot_mmap_entry* get_largest_mmap_entry_of_type(uint64_t type)
+struct multiboot_mmap_entry* mmap_get_largest_entry_of_type(uint64_t type)
 {
     return largest_segments[type - 1];
 }
 
-uint64_t get_total_memory_of_type(uint64_t type)
+uint64_t mmap_get_total_memory_of_type(uint64_t type)
 {
     return memory_segment_sizes[type - 1];
 }

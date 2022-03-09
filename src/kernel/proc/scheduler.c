@@ -7,7 +7,7 @@
 #include "../sys/chips/pic.h"
 #include "../sys/chips/pit.h"
 #include "../utils/macros.h"
-#include "../utils/helpers/alloc.h"
+#include "../utils/alloc.h"
 #include "../utils/log.h"
 #include "../utils/elf.h"
 #include <stddef.h>
@@ -54,7 +54,7 @@ static uint64_t max_id_in_process_list(process_list_t* pss)
     return max;
 }
 
-uint64_t get_next_pid(void)
+uint64_t scheduler_get_next_pid(void)
 {
     uint64_t pid_runnable, pid_zombie;
     pid_runnable = max_id_in_process_list(&runnable_pss);
@@ -96,20 +96,20 @@ static void update_kernel_registers(process_t* ps, const registers_state_t* regs
 {
     copy_common_registers(&ps->current, regs, stack);
     ps->current.stack.rsp = stack->rsp + (3 * sizeof(uint64_t));
-    ps->current.stack.ss = get_kernel_ds();
+    ps->current.stack.ss = gdt_get_kernel_ds();
 }
 
-static void schedule_on_interrupt(const registers_state_t* regs, const stack_state_t* stack, uint8_t interrupt_number)
+static void scheduler_schedule_on_interrupt(const registers_state_t* regs, const stack_state_t* stack, uint8_t interrupt_number)
 {
     process_t* ps;
-    disable_interrupts();
-    ps = get_current_scheduled_process();
-    if (stack->cs == (get_user_cs() | PL3))
+    interrupts_disable();
+    ps = scheduler_get_current_scheduled_process();
+    if (stack->cs == (gdt_get_user_cs() | PL3))
         update_user_registers(ps, regs, stack);
     else
         update_kernel_registers(ps, regs, stack);
     pic_acknowledge(interrupt_number);
-    run_scheduler();
+    scheduler_run();
 }
 
 static void scheduler_pit_handler(const interrupt_frame_t* int_frame)
@@ -118,34 +118,34 @@ static void scheduler_pit_handler(const interrupt_frame_t* int_frame)
     if (ms >= SCHEDULER_TIME_SLICE)
     {
         ms = 0;
-        schedule_on_interrupt(&int_frame->registers_state, &int_frame->stack_state, (uint8_t) int_frame->interrupt_info.interrupt_number);
+        scheduler_schedule_on_interrupt(&int_frame->registers_state, &int_frame->stack_state, (uint8_t) int_frame->interrupt_info.interrupt_number);
     }
     else
         pic_acknowledge((uint8_t) int_frame->interrupt_info.interrupt_number);
 }
 
-static void yield_interrupt_handler(const interrupt_frame_t* int_frame)
+static void scheduler_yield_handler(const interrupt_frame_t* int_frame)
 {
     ms = 0;
-    schedule_on_interrupt(&int_frame->registers_state, &int_frame->stack_state, (uint8_t) int_frame->interrupt_info.interrupt_number);
+    scheduler_schedule_on_interrupt(&int_frame->registers_state, &int_frame->stack_state, (uint8_t) int_frame->interrupt_info.interrupt_number);
 }
 
-int init_scheduler(void)
+int scheduler_init(void)
 {
     ms = 0;
     memset(&runnable_pss, 0, sizeof(process_list_t));
     memset(&zombie_pss, 0, sizeof(process_list_t));
     set_pit_interval(SCHEDULER_PIT_INTERVAL);
-    register_isr_handler(128, &yield_interrupt_handler);
+    isr_register_handler(128, &scheduler_yield_handler);
     return register_pit_callback(&scheduler_pit_handler);
 }
 
-process_t* get_current_scheduled_process(void)
+process_t* scheduler_get_current_scheduled_process(void)
 {
     return (runnable_pss.head == NULL) ? NULL : runnable_pss.head->ps;
 }
 
-static int schedule_process(process_list_t* pss, process_t* ps)
+static int scheduler_schedule_process(process_list_t* pss, process_t* ps)
 {
     process_list_entry_t* entry;
     
@@ -168,12 +168,12 @@ static int schedule_process(process_list_t* pss, process_t* ps)
     return 0;
 }
 
-int schedule_runnable_process(process_t* ps)
+int scheduler_schedule_runnable_process(process_t* ps)
 {
-    return schedule_process(&runnable_pss, ps);
+    return scheduler_schedule_process(&runnable_pss, ps);
 }
 
-static int remove_process(process_list_t* pss, uint64_t pid, uint8_t should_delete)
+static int scheduler_remove_process(process_list_t* pss, uint64_t pid, uint8_t should_delete)
 {
     process_list_entry_t* current;
     process_list_entry_t* prev;
@@ -196,7 +196,7 @@ static int remove_process(process_list_t* pss, uint64_t pid, uint8_t should_dele
             }
 
             if (should_delete)
-                delete_and_free_process(current->ps);
+                process_delete_and_free(current->ps);
             
             free(current);
             
@@ -212,14 +212,14 @@ static int remove_process(process_list_t* pss, uint64_t pid, uint8_t should_dele
     return -1;
 }
 
-void terminate_process(process_t* ps)
+void scheduler_terminate_process(process_t* ps)
 {
-    delete_process_resources(ps);
-    remove_process(&runnable_pss, ps->pid, 0);
-    schedule_process(&zombie_pss, ps);
+    process_delete_resources(ps);
+    scheduler_remove_process(&runnable_pss, ps->pid, 0);
+    scheduler_schedule_process(&zombie_pss, ps);
 }
 
-int has_any_child_process_terminated(process_t* parent)
+int scheduler_has_any_child_process_terminated(process_t* parent)
 {
     process_list_entry_t* entry;
     
@@ -250,7 +250,7 @@ static int count_num_children_of_process_in_list(process_list_t* pss, uint64_t p
     return num;
 }
 
-int num_children_of_process(uint64_t parent_pid)
+int scheduler_get_num_children_of_process(uint64_t parent_pid)
 {
     int num_running, num_zombies;
     num_running = count_num_children_of_process_in_list(&runnable_pss, parent_pid);
@@ -258,14 +258,14 @@ int num_children_of_process(uint64_t parent_pid)
     return (num_zombies + num_running);
 }
 
-int replace_process(process_t* old, process_t* new)
+int scheduler_replace_process(process_t* old, process_t* new)
 {
-    if (remove_process(&runnable_pss, old->pid, 1))
+    if (scheduler_remove_process(&runnable_pss, old->pid, 1))
     {
         trace_scheduler("Failed to replace process %u", old->pid);
         return -1;
     }
-    return schedule_runnable_process(new);
+    return scheduler_schedule_runnable_process(new);
 }
 
 static process_t* get_next_runnable_process(void)
@@ -287,7 +287,7 @@ static process_t* get_next_runnable_process(void)
     return runnable_pss.head->ps;
 }
 
-void delete_zombie_processes(void)
+void scheduler_delete_zombie_processes(void)
 {
     /* Delete all zombie processes */
     process_list_entry_t* tmp;
@@ -310,7 +310,7 @@ void delete_zombie_processes(void)
     zombie_pss.tail = zombie_pss.head;
 }
 
-void run_scheduler(void)
+void scheduler_run(void)
 {
     process_t* ps;
     
@@ -325,7 +325,7 @@ void run_scheduler(void)
     kernel_inject_pml4(ps->pml4);
     switch_pml4_and_stack(ps->pml4_paddr);
 
-    if (ps->current.stack.cs == get_kernel_cs())
+    if (ps->current.stack.cs == gdt_get_kernel_cs())
         run_process_in_kernel_mode(&ps->current);
     else
         run_process_in_user_mode(&ps->current);

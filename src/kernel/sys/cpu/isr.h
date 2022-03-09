@@ -115,7 +115,7 @@ typedef struct interrupt_frame interrupt_frame_t;
 
 typedef void (*isr_handler_t)(const interrupt_frame_t* info); 
 
-void init_isr(void);
-uint8_t register_isr_handler(uint8_t interrupt_number, isr_handler_t handler);
+void isr_init(void);
+uint8_t isr_register_handler(uint8_t interrupt_number, isr_handler_t handler);
 
 #endif

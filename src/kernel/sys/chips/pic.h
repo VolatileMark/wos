@@ -8,7 +8,7 @@
 /**
  * Initialize the PIC
  */
-void init_pic(void);
+void pic_init(void);
 
 /**
  * Acknowledge interrupt

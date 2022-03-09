@@ -62,10 +62,10 @@ typedef struct
     cpu_state_t user_mode;
 } process_t;
 
-process_t* create_process(const char* path, uint64_t pid);
-process_t* create_replacement_process(const char* path, process_t* parent);
-process_t* clone_process(process_t* parent, uint64_t id);
-void delete_and_free_process(process_t* ps);
-void delete_process_resources(process_t* ps);
+process_t* process_create(const char* path, uint64_t pid);
+process_t* process_create_replacement(const char* path, process_t* parent);
+process_t* process_clone(process_t* parent, uint64_t id);
+void process_delete_and_free(process_t* ps);
+void process_delete_resources(process_t* ps);
 
 #endif

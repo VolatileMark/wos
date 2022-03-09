@@ -13,7 +13,7 @@ static bitmap_t page_bitmap;
 static uint64_t last_page_index;
 static uint64_t free_memory, used_memory;
 
-uint64_t request_page(void)
+uint64_t pfa_request_page(void)
 {
     uint64_t address;
     for (; last_page_index < page_bitmap.size * 8; last_page_index++)
@@ -21,14 +21,14 @@ uint64_t request_page(void)
         if (!bitmap_get(&page_bitmap, last_page_index))
         {
             address = (last_page_index * SIZE_4KB);
-            lock_page(address);
+            pfa_lock_page(address);
             return address;
         }
     }
     return 0;
 }
 
-uint64_t request_pages(uint64_t num)
+uint64_t pfa_request_pages(uint64_t num)
 {
     uint64_t found;
     uint64_t address;
@@ -49,12 +49,12 @@ uint64_t request_pages(uint64_t num)
     }
 
     if (found == num)
-        lock_pages(address, num);
+        pfa_lock_pages(address, num);
     
     return address;
 }
 
-void lock_page(uint64_t page_addr)
+void pfa_lock_page(uint64_t page_addr)
 {
     uint64_t index;
     index = PFA_GET_PAGE_IDX(page_addr);
@@ -66,7 +66,7 @@ void lock_page(uint64_t page_addr)
     }
 }
 
-void free_page(uint64_t page_addr)
+void pfa_free_page(uint64_t page_addr)
 {
     uint64_t index;
     index = PFA_GET_PAGE_IDX(page_addr);
@@ -80,34 +80,34 @@ void free_page(uint64_t page_addr)
         last_page_index = index;
 }
 
-void lock_pages(uint64_t page_addr, uint64_t num)
+void pfa_lock_pages(uint64_t page_addr, uint64_t num)
 {
     for (; num > 0; num--, page_addr += SIZE_4KB)
-        lock_page(page_addr);
+        pfa_lock_page(page_addr);
 }
 
-void free_pages(uint64_t page_addr, uint64_t num)
+void pfa_free_pages(uint64_t page_addr, uint64_t num)
 {
     for (; num > 0; num--, page_addr += SIZE_4KB)
-        free_page(page_addr);
+        pfa_free_page(page_addr);
 }
 
-void init_pfa(void)
+void pfa_init(void)
 {
     uint64_t total_memory, bitmap_size, bitmap_paddr, bitmap_vaddr;
 
-    total_memory = get_total_memory_of_type(MULTIBOOT_MEMORY_AVAILABLE);
+    total_memory = mmap_get_total_memory_of_type(MULTIBOOT_MEMORY_AVAILABLE);
     free_memory = total_memory - used_memory;
 
     /* Initialize new bitmap */
     bitmap_size = ceil(((double) total_memory) / SIZE_4KB / 8.0);
-    bitmap_paddr = request_pages(ceil((double) bitmap_size / SIZE_4KB));
+    bitmap_paddr = pfa_request_pages(ceil((double) bitmap_size / SIZE_4KB));
     kernel_get_next_vaddr(bitmap_size, &bitmap_vaddr);
     kernel_map_memory(bitmap_paddr, bitmap_vaddr, bitmap_size, PAGE_ACCESS_WX, PL0);
     memset((void*) bitmap_vaddr, 0, bitmap_size);
 
     /* Copy the old bitmap over */
-    free_pages(alignd((uint64_t) page_bitmap.buffer, SIZE_4KB), ceil((double) page_bitmap.size / SIZE_4KB));
+    pfa_free_pages(alignd((uint64_t) page_bitmap.buffer, SIZE_4KB), ceil((double) page_bitmap.size / SIZE_4KB));
     memcpy((void*) bitmap_vaddr, page_bitmap.buffer, page_bitmap.size);
 
     /* Set new bitmap */
@@ -115,7 +115,7 @@ void init_pfa(void)
     page_bitmap.size = bitmap_size;
 }
 
-void restore_pfa(bitmap_t* current_bitmap)
+void pfa_restore(bitmap_t* current_bitmap)
 {
     uint64_t i;
 
@@ -131,17 +131,17 @@ void restore_pfa(bitmap_t* current_bitmap)
     }
 }
 
-bitmap_t* get_page_bitmap(void)
+bitmap_t* pfa_get_page_bitmap(void)
 {
     return &page_bitmap;
 }
 
-uint64_t get_free_memory(void)
+uint64_t pfa_get_free_memory(void)
 {
     return free_memory;
 }
 
-uint64_t get_used_memory(void)
+uint64_t pfa_get_used_memory(void)
 {
     return used_memory;
 }

@@ -1,8 +1,8 @@
 #include "acpi.h"
 #include "../../../mem/paging.h"
 #include "../../../utils/log.h"
-#include "../../../utils/helpers/multiboot2-utils.h"
-#include "../../../utils/helpers/checksum.h"
+#include "../../../utils/multiboot2-utils.h"
+#include "../../../utils/checksum.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -45,11 +45,11 @@ static sdt_t main_sdt;
 static rsdp_descriptor_v1_t* get_rsdp(void)
 {
     struct multiboot_tag_new_acpi* new;
-    new = get_multiboot_tag_new_acpi();
-    return (rsdp_descriptor_v1_t*) ((new == NULL) ? get_multiboot_tag_old_acpi()->rsdp : new->rsdp);
+    new = multiboot_get_tag_new_acpi();
+    return (rsdp_descriptor_v1_t*) ((new == NULL) ? multiboot_get_tag_old_acpi()->rsdp : new->rsdp);
 }
 
-int init_acpi(void)
+int acpi_init(void)
 {
     uint64_t sdt_vaddr, sdt_size, sdt_addr_offset;
     sdt_header_t* mapped_sdt_header;
@@ -108,7 +108,7 @@ int init_acpi(void)
     return 0;
 }
 
-static uint64_t get_next_entry_pointer(sdt_t* sdt, uint64_t index)
+static uint64_t sdt_get_next_entry_pointer(sdt_t* sdt, uint64_t index)
 {
     uint64_t entries_array, entry_offset;
     uint64_t entry_pointer, byte_offset, byte;
@@ -129,13 +129,13 @@ static uint64_t get_next_entry_pointer(sdt_t* sdt, uint64_t index)
     return entry_pointer;
 }
 
-sdt_header_t* find_acpi_table(const char* signature)
+sdt_header_t* acpi_find_table(const char* signature)
 {
     sdt_header_t* header;
     uint64_t entry_paddr, entry_vaddr, entry_size, entry;
     for (entry = 0; entry < main_sdt.entries; entry++)
     {
-        entry_paddr = get_next_entry_pointer(&main_sdt, entry);
+        entry_paddr = sdt_get_next_entry_pointer(&main_sdt, entry);
         header = (sdt_header_t*) (kernel_map_temporary_page(entry_paddr, PAGE_ACCESS_RX, PL0) + GET_ADDR_OFFSET(entry_paddr));
         if (!strncmp(header->signature, signature, 4))
         {

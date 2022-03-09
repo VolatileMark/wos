@@ -1,8 +1,7 @@
 #ifndef __GPT_H__
 #define __GPT_H__
 
-#include "../storage/disk-mgr.h"
-#include "../../../utils/helpers/guid.h"
+#include "../../../../utils/guid.h"
 #include "mbr.h"
 #include <stdint.h>
 
@@ -40,6 +39,6 @@ struct gpt_entry
 } __attribute__((packed));
 typedef struct gpt_entry gpt_entry_t;
 
-int check_gpt(disk_t* disk);
+int gpt_check(void* disk);
 
 #endif

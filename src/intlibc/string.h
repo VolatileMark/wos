@@ -4,6 +4,7 @@
 #include "stdint.h"
 
 uint64_t strlen(const char* str);
+char* strcpy(char* dest, const char* src);
 char strcmp(const char* str1, const char* str2);
 char strncmp(const char* str1, const char* str2, uint64_t bytes);
 uint64_t strcspn(const char* str1, const char* str2);

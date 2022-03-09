@@ -1,7 +1,7 @@
 #include "pit.h"
 #include "../cpu/io.h"
 #include "../cpu/interrupts.h"
-#include "../../utils/helpers/alloc.h"
+#include "../../utils/alloc.h"
 #include "../../utils/log.h"
 #include <stddef.h>
 #include <mem.h>
@@ -77,16 +77,16 @@ void set_pit_interval(uint64_t interval)
     
     frequency = 1000 / interval;
     divider = (uint16_t) (PIT_BASE_FREQUENCY / frequency);
-    write_to_port(PIT_CH0, (uint8_t) divider);
-    wait_for_ports();
-    write_to_port(PIT_CH0, (uint8_t) (divider >> 8));
-    wait_for_ports();
+    port_out(PIT_CH0, (uint8_t) divider);
+    port_wait();
+    port_out(PIT_CH0, (uint8_t) (divider >> 8));
+    port_wait();
 }
 
-void init_pit(void)
+void pit_init(void)
 {
     memset(&callbacks, 0, sizeof(pit_callback_list_t));   
-    write_to_port(PIT_COMM, PIT_CONFIG);
-    wait_for_ports();
-    register_isr_handler(IRQ(0), pit_handler);
+    port_out(PIT_COMM, PIT_CONFIG);
+    port_wait();
+    isr_register_handler(IRQ(0), pit_handler);
 }

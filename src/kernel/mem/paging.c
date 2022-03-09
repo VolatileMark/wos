@@ -11,17 +11,17 @@ static page_table_t kernel_tmp_pt;
 static uint64_t kernel_tmp_index;
 static uint64_t kernel_pml4_paddr;
 
-uint64_t get_kernel_pml4_paddr(void)
+uint64_t paging_get_kernel_pml4_paddr(void)
 {
     return kernel_pml4_paddr;
 }
 
-page_table_t get_kernel_pml4(void)
+page_table_t paging_get_kernel_pml4(void)
 {
     return kernel_pml4;
 }
 
-void set_pte_address(page_table_entry_t* entry, uint64_t addr)
+void pte_set_address(page_table_entry_t* entry, uint64_t addr)
 {
     addr >>= 12;
     entry->addr_lo = addr & 0x000000000000000F;
@@ -31,7 +31,7 @@ void set_pte_address(page_table_entry_t* entry, uint64_t addr)
     entry->addr_hi = addr & 0x000000000000000F;
 }
 
-uint64_t get_pte_address(page_table_entry_t* entry)
+uint64_t pte_get_address(page_table_entry_t* entry)
 {
     uint64_t addr;
     addr = entry->addr_hi;
@@ -43,7 +43,7 @@ uint64_t get_pte_address(page_table_entry_t* entry)
     return addr;
 }
 
-static uint64_t get_next_tmp_index(void)
+static uint64_t paging_get_next_tmp_index(void)
 {
     if (kernel_tmp_index >= MAX_PAGE_TABLE_ENTRIES)
         return 0;
@@ -57,12 +57,12 @@ static uint64_t get_next_tmp_index(void)
     return index;
 }
 
-static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, page_access_type_t access, privilege_level_t privilege_level)
+static void pte_create(page_table_t table, uint64_t index, uint64_t paddr, page_access_type_t access, privilege_level_t privilege_level)
 {
     page_table_entry_t* entry;
     entry = &table[index];
     PTE_CLEAR(entry);
-    set_pte_address(entry, paddr);
+    pte_set_address(entry, paddr);
     entry->present = (((uint64_t) access) & 0b0100) >> 2;
     entry->allow_writes = (((uint64_t) access) & 0b0001);
     entry->allow_user_access = (privilege_level == PL3);
@@ -72,8 +72,8 @@ static void create_pte(page_table_t table, uint64_t index, uint64_t paddr, page_
 uint64_t kernel_map_temporary_page(uint64_t paddr, page_access_type_t access, privilege_level_t privilege_level)
 {
     uint64_t index;
-    index = get_next_tmp_index();
-    create_pte(kernel_tmp_pt, index, paddr, access, privilege_level);
+    index = paging_get_next_tmp_index();
+    pte_create(kernel_tmp_pt, index, paddr, access, privilege_level);
     return VADDR_GET_TEMPORARY(index);
 }
 
@@ -86,10 +86,10 @@ void kernel_unmap_temporary_page(uint64_t vaddr)
     if (kernel_tmp_index > index)
         kernel_tmp_index = index;
     PTE_CLEAR(&kernel_tmp_pt[index]);
-    invalidate_pte(vaddr);
+    pte_invalidate(vaddr);
 }
 
-void init_paging(void)
+void paging_init(void)
 {
     kernel_pml4 = (page_table_t) KERNEL_PML4_VADDR;
     kernel_tmp_pt = (page_table_t) VADDR_GET_TEMPORARY(1);
@@ -125,7 +125,7 @@ static uint64_t pt_unmap_memory
         if (pt[pt_idx].present)
         {
             PTE_CLEAR(&pt[pt_idx]);
-            invalidate_pte(vaddr);
+            pte_invalidate(vaddr);
         }
 
         vaddr += PT_ENTRY_SIZE;
@@ -166,7 +166,7 @@ static uint64_t pd_unmap_memory
             continue;
         }
 
-        pt_paddr = get_pte_address(&entry);
+        pt_paddr = pte_get_address(&entry);
         pt_vaddr = kernel_map_temporary_page(pt_paddr, PAGE_ACCESS_RW, PL0);
 
         pt = (page_table_t) pt_vaddr;
@@ -178,7 +178,7 @@ static uint64_t pd_unmap_memory
 
         if (i == MAX_PAGE_TABLE_ENTRIES)
         {
-            free_page(pt_paddr);
+            pfa_free_page(pt_paddr);
             PTE_CLEAR(&pd[pd_idx]);
         }
 
@@ -220,7 +220,7 @@ static uint64_t pdp_unmap_memory
             continue;
         }
 
-        pd_paddr = get_pte_address(&entry);
+        pd_paddr = pte_get_address(&entry);
         pd_vaddr = kernel_map_temporary_page(pd_paddr, PAGE_ACCESS_RW, PL0);
 
         pd = (page_table_t) pd_vaddr;
@@ -232,7 +232,7 @@ static uint64_t pdp_unmap_memory
 
         if (i == MAX_PAGE_TABLE_ENTRIES)
         {
-            free_page(pd_paddr);
+            pfa_free_page(pd_paddr);
             PTE_CLEAR(&pdp[pdp_idx]);
         }
 
@@ -275,7 +275,7 @@ uint64_t pml4_unmap_memory
             continue;
         }
 
-        pdp_paddr = get_pte_address(&entry);
+        pdp_paddr = pte_get_address(&entry);
         pdp_vaddr = kernel_map_temporary_page(pdp_paddr, PAGE_ACCESS_RW, PL0);
 
         pdp = (page_table_t) pdp_vaddr;
@@ -287,7 +287,7 @@ uint64_t pml4_unmap_memory
 
         if (i == MAX_PAGE_TABLE_ENTRIES)
         {
-            free_page(pdp_paddr);
+            pfa_free_page(pdp_paddr);
             PTE_CLEAR(&pml4[pml4_idx]);
         }
 
@@ -319,7 +319,7 @@ static uint64_t pt_map_memory
     {
         if (pt[pt_idx].present)
             return 0;
-        create_pte(pt, pt_idx, paddr, access, privilege_level);
+        pte_create(pt, pt_idx, paddr, access, privilege_level);
 
         paddr += PT_ENTRY_SIZE;
         mapped_size += PT_ENTRY_SIZE;
@@ -355,16 +355,16 @@ static uint64_t pd_map_memory
 
         if (!entry.present)
         {
-            pt_paddr = request_page();
+            pt_paddr = pfa_request_page();
             if (pt_paddr == 0)
                 return 0;
             pt_vaddr = kernel_map_temporary_page(pt_paddr, PAGE_ACCESS_WX, privilege_level);
             memset((void*) pt_vaddr, 0, SIZE_4KB);
-            create_pte(pd, pd_idx, pt_paddr, PAGE_ACCESS_WX, privilege_level);
+            pte_create(pd, pd_idx, pt_paddr, PAGE_ACCESS_WX, privilege_level);
         }
         else
         {
-            pt_paddr = get_pte_address(&entry);
+            pt_paddr = pte_get_address(&entry);
             pt_vaddr = kernel_map_temporary_page(pt_paddr, PAGE_ACCESS_WX, privilege_level);
         }
 
@@ -411,16 +411,16 @@ static uint64_t pdp_map_memory
 
         if (!entry.present)
         {
-            pd_paddr = request_page();
+            pd_paddr = pfa_request_page();
             if (pd_paddr == 0)
                 return 0;
             pd_vaddr = kernel_map_temporary_page(pd_paddr, PAGE_ACCESS_WX, privilege_level);
             memset((void*) pd_vaddr, 0, SIZE_4KB);
-            create_pte(pdp, pdp_idx, pd_paddr, PAGE_ACCESS_WX, privilege_level);
+            pte_create(pdp, pdp_idx, pd_paddr, PAGE_ACCESS_WX, privilege_level);
         }
         else
         {
-            pd_paddr = get_pte_address(&entry);
+            pd_paddr = pte_get_address(&entry);
             pd_vaddr = kernel_map_temporary_page(pd_paddr, PAGE_ACCESS_WX, privilege_level);
         }
 
@@ -468,16 +468,16 @@ uint64_t pml4_map_memory
 
         if (!entry.present)
         {
-            pdp_paddr = request_page();
+            pdp_paddr = pfa_request_page();
             if (pdp_paddr == 0)
                 return 0;
             pdp_vaddr = kernel_map_temporary_page(pdp_paddr, PAGE_ACCESS_WX, privilege_level);
             memset((void*) pdp_vaddr, 0, SIZE_4KB);
-            create_pte(pml4, pml4_idx, pdp_paddr, PAGE_ACCESS_WX, privilege_level);
+            pte_create(pml4, pml4_idx, pdp_paddr, PAGE_ACCESS_WX, privilege_level);
         }
         else
         {
-            pdp_paddr = get_pte_address(&entry);
+            pdp_paddr = pte_get_address(&entry);
             pdp_vaddr = kernel_map_temporary_page(pdp_paddr, PAGE_ACCESS_WX, privilege_level);
         }
 
@@ -528,7 +528,7 @@ uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t s
         entry = pml4[pml4_idx];
         if (entry.present)
         {
-            pdp = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RX, PL0);
+            pdp = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RX, PL0);
             for
             (
                 ;
@@ -539,7 +539,7 @@ uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t s
                 entry = pdp[pdp_idx];
                 if (entry.present)
                 {
-                    pd = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RX, PL0);
+                    pd = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RX, PL0);
                     for
                     (
                         ;
@@ -550,7 +550,7 @@ uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t s
                         entry = pd[pd_idx];
                         if (entry.present)
                         {
-                            pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RX, PL0);
+                            pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RX, PL0);
                             for
                             (
                                 ;
@@ -617,27 +617,27 @@ uint64_t pml4_get_paddr(page_table_t pml4, uint64_t vaddr)
         return 0;
     
     pdp_idx = VADDR_TO_PDP_IDX(vaddr);
-    pdp = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RX, PL0);
+    pdp = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RX, PL0);
     entry = pdp[pdp_idx];
     kernel_unmap_temporary_page((uint64_t) pdp);
     if (!entry.present)
         return 0;
     
     pd_idx = VADDR_TO_PD_IDX(vaddr);
-    pd = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RX, PL0);
+    pd = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RX, PL0);
     entry = pd[pd_idx];
     kernel_unmap_temporary_page((uint64_t) pd);
     if (!entry.present)
         return 0;
     
     pt_idx = VADDR_TO_PT_IDX(vaddr);
-    pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RX, PL0);
+    pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RX, PL0);
     entry = pt[pt_idx];
     kernel_unmap_temporary_page((uint64_t) pt);
     if (!entry.present)
         return 0;
     
-    return (get_pte_address(&entry) + GET_ADDR_OFFSET(vaddr));
+    return (pte_get_address(&entry) + GET_ADDR_OFFSET(vaddr));
 }
 
 static void delete_pd(page_table_t pd, uint64_t pd_paddr, uint64_t pdp_idx, uint64_t pml4_idx)
@@ -654,9 +654,9 @@ static void delete_pd(page_table_t pd, uint64_t pd_paddr, uint64_t pdp_idx, uint
     {
         entry = pd[pd_idx];
         if (entry.present)
-            free_page(get_pte_address(&entry));
+            pfa_free_page(pte_get_address(&entry));
     }
-    free_page(pd_paddr);
+    pfa_free_page(pd_paddr);
 }
 
 static void delete_pdp(page_table_t pdp, uint64_t pdp_paddr, uint64_t pml4_idx)
@@ -675,16 +675,16 @@ static void delete_pdp(page_table_t pdp, uint64_t pdp_paddr, uint64_t pml4_idx)
         entry = pdp[pdp_idx];
         if (entry.present)
         {
-            pd_paddr = get_pte_address(&entry);
+            pd_paddr = pte_get_address(&entry);
             pd = (page_table_t) kernel_map_temporary_page(pd_paddr, PAGE_ACCESS_RX, PL0);
             delete_pd(pd, pd_paddr, pdp_idx, pml4_idx);
             kernel_unmap_temporary_page((uint64_t) pd);
         }
     }
-    free_page(pdp_paddr);
+    pfa_free_page(pdp_paddr);
 }
 
-uint64_t delete_pml4(page_table_t pml4, uint64_t pml4_paddr)
+uint64_t pml4_delete(page_table_t pml4, uint64_t pml4_paddr)
 {
     uint64_t pml4_idx, pdp_paddr, vaddr;
     page_table_entry_t entry;
@@ -700,13 +700,13 @@ uint64_t delete_pml4(page_table_t pml4, uint64_t pml4_paddr)
         entry = pml4[pml4_idx];
         if (entry.present)
         {
-            pdp_paddr = get_pte_address(&entry);
+            pdp_paddr = pte_get_address(&entry);
             pdp = (page_table_t) kernel_map_temporary_page(pdp_paddr, PAGE_ACCESS_RX, PL0);
             delete_pdp(pdp, pdp_paddr, pml4_idx);
             kernel_unmap_temporary_page((uint64_t) pdp);
         }
     }
-    free_page(pml4_paddr);
+    pfa_free_page(pml4_paddr);
 
     return vaddr;
 }
@@ -745,8 +745,8 @@ static void merge_pd_with_pd(page_table_t src, page_table_t dest, uint64_t vaddr
             dest_entry = dest[idx];
             if (dest_entry.present)
             {
-                src_pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&src_entry), PAGE_ACCESS_RX, PL0);
-                dest_pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&dest_entry), PAGE_ACCESS_WX, PL0);
+                src_pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&src_entry), PAGE_ACCESS_RX, PL0);
+                dest_pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&dest_entry), PAGE_ACCESS_WX, PL0);
                 merge_pt_with_pt(src_pt, dest_pt, vaddr);
                 kernel_unmap_temporary_page((uint64_t) src_pt);
                 kernel_unmap_temporary_page((uint64_t) dest_pt);
@@ -775,8 +775,8 @@ static void merge_pdp_with_pdp(page_table_t src, page_table_t dest, uint64_t vad
             dest_entry = dest[idx];
             if (dest_entry.present)
             {
-                src_pd = (page_table_t) kernel_map_temporary_page(get_pte_address(&src_entry), PAGE_ACCESS_RX, PL0);
-                dest_pd = (page_table_t) kernel_map_temporary_page(get_pte_address(&dest_entry), PAGE_ACCESS_WX, PL0);
+                src_pd = (page_table_t) kernel_map_temporary_page(pte_get_address(&src_entry), PAGE_ACCESS_RX, PL0);
+                dest_pd = (page_table_t) kernel_map_temporary_page(pte_get_address(&dest_entry), PAGE_ACCESS_WX, PL0);
                 merge_pd_with_pd(src_pd, dest_pd, vaddr);
                 kernel_unmap_temporary_page((uint64_t) src_pd);
                 kernel_unmap_temporary_page((uint64_t) dest_pd);
@@ -805,8 +805,8 @@ static void merge_pml4_with_pml4(page_table_t src, page_table_t dest, uint64_t v
             dest_entry = dest[idx];
             if (dest_entry.present)
             {
-                src_pdp = (page_table_t) kernel_map_temporary_page(get_pte_address(&src_entry), PAGE_ACCESS_RX, PL0);
-                dest_pdp = (page_table_t) kernel_map_temporary_page(get_pte_address(&dest_entry), PAGE_ACCESS_WX, PL0);
+                src_pdp = (page_table_t) kernel_map_temporary_page(pte_get_address(&src_entry), PAGE_ACCESS_RX, PL0);
+                dest_pdp = (page_table_t) kernel_map_temporary_page(pte_get_address(&dest_entry), PAGE_ACCESS_WX, PL0);
                 merge_pdp_with_pdp(src_pdp, dest_pdp, vaddr);
                 kernel_unmap_temporary_page((uint64_t) src_pdp);
                 kernel_unmap_temporary_page((uint64_t) dest_pdp);
@@ -841,21 +841,21 @@ int pml4_set_pte_flag(page_table_t pml4, uint64_t vaddr, page_flag_t flag)
     entry = pml4[pt_idx];
     if (!entry.present)
         return -1;
-    pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RW, PL0);
+    pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
 
     pt_idx = VADDR_TO_PDP_IDX(vaddr);
     entry = pt[pt_idx];
     kernel_unmap_temporary_page((uint64_t) pt);
     if (!entry.present)
         return -1;
-    pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RW, PL0);
+    pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
 
     pt_idx = VADDR_TO_PD_IDX(vaddr);
     entry = pt[pt_idx];
     kernel_unmap_temporary_page((uint64_t) pt);
     if (!entry.present)
         return -1;
-    pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RW, PL0);
+    pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
 
     pt_idx = VADDR_TO_PT_IDX(vaddr);
     entry = pt[pt_idx];
@@ -885,21 +885,21 @@ int pml4_reset_pte_flag(page_table_t pml4, uint64_t vaddr, page_flag_t flag)
     entry = pml4[pt_idx];
     if (!entry.present)
         return -1;
-    pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RW, PL0);
+    pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
 
     pt_idx = VADDR_TO_PDP_IDX(vaddr);
     entry = pt[pt_idx];
     kernel_unmap_temporary_page((uint64_t) pt);
     if (!entry.present)
         return -1;
-    pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RW, PL0);
+    pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
 
     pt_idx = VADDR_TO_PD_IDX(vaddr);
     entry = pt[pt_idx];
     kernel_unmap_temporary_page((uint64_t) pt);
     if (!entry.present)
         return -1;
-    pt = (page_table_t) kernel_map_temporary_page(get_pte_address(&entry), PAGE_ACCESS_RW, PL0);
+    pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
 
     pt_idx = VADDR_TO_PT_IDX(vaddr);
     entry = pt[pt_idx];

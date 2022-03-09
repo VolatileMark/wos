@@ -39,7 +39,7 @@ typedef struct mcfg mcfg_t;
 #define RSDT_SIG "RSDT"
 #define XSDT_SIG "XSDT"
 
-int init_acpi(void);
-sdt_header_t* find_acpi_table(const char* signature);
+int acpi_init(void);
+sdt_header_t* acpi_find_table(const char* signature);
 
 #endif

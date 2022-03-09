@@ -152,3 +152,9 @@ char* utoan(uint64_t val, char* str, int base, int n)
     strrev(str);
     return str;
 }
+
+char* strcpy(char* dest, const char* src)
+{
+    memcpy((void*) dest, (void*) src, strlen(src) + 1);
+    return dest;
+}
