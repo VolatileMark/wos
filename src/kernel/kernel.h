@@ -7,7 +7,7 @@
 #include "mem/heap.h"
 #include "utils/macros.h"
 #include "utils/log.h"
-#include "utils/screen.h"
+#include "utils/tty.h"
 #include "utils/bitmap.h"
 #include "utils/multiboot2-utils.h"
 #include "utils/crc32.h"

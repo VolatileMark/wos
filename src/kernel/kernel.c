@@ -22,7 +22,7 @@ static int init_kernel(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
     (
         multiboot_remap_struct(multiboot_struct_addr) ||
         framebuffer_init() ||
-        screen_init()
+        tty_init()
     )
         return -1;
 
@@ -49,7 +49,7 @@ void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
     if (init_kernel(multiboot_struct_addr, current_bitmap))
     {
-        if (is_screen_initialized())
+        if (tty_is_initialized())
             error("Could not initialize kernel");
         return;
     }

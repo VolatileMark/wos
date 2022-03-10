@@ -1,4 +1,4 @@
-#include "screen.h"
+#include "tty.h"
 #include "multiboot2-utils.h"
 #include "psf.h"
 #include "log.h"
@@ -126,7 +126,7 @@ void clear_screen(void)
         fb_ptr[i] = bg_color;
 }
 
-int screen_init(void)
+int tty_init(void)
 {
     fb = framebuffer_get();
 
@@ -154,30 +154,30 @@ int screen_init(void)
     bg_color = framebuffer_color(0, 0, 0);
 
     info("Framebuffer located at %p, mapped at %p, has size %u bytes", multiboot_get_tag_framebuffer()->common.framebuffer_addr, fb->addr, fb->size);
-    info("Screen utility initialized. Resolution is %ux%u pixels or %ux%u characters", fb->width, fb->height, max_x, max_y);
+    info("TTY initialized. Resolution is %ux%u pixels or %ux%u characters", fb->width, fb->height, max_x, max_y);
 
     return 0;
 }
 
-void screen_resize_viewport(uint32_t width, uint32_t height)
+void tty_resize_viewport(uint32_t width, uint32_t height)
 {
     max_x = width / font_header.width;
     max_y = height / font_header.height;
 }
 
-void screen_offset_viewport(uint32_t x, uint32_t y)
+void tty_offset_viewport(uint32_t x, uint32_t y)
 {
     offset_x = x / font_header.width;
     offset_y = y / font_header.height;
 }
 
-void screen_set_cursor_pos(uint32_t cx, uint32_t cy)
+void tty_set_cursor_pos(uint32_t cx, uint32_t cy)
 {
     cursor_x = cx;
     cursor_y = cy;
 }
 
-int is_screen_initialized(void)
+int tty_is_initialized(void)
 {
     return
     (

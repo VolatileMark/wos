@@ -149,10 +149,10 @@ DEFINE_SYSCALL(vm_unmap)
 }
 
 static syscall_handler_t handlers[] = {
-    SYSCALL(exit),
-    SYSCALL(execve),
-    SYSCALL(vm_map),
-    SYSCALL(vm_unmap)
+    &SYSCALL(exit),
+    &SYSCALL(execve),
+    &SYSCALL(vm_map),
+    &SYSCALL(vm_unmap)
 };
 
 #define NUM_SYSCALLS (sizeof(handlers) / sizeof(uint64_t))

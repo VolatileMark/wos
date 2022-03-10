@@ -88,5 +88,5 @@ void pit_init(void)
     memset(&callbacks, 0, sizeof(pit_callback_list_t));   
     port_out(PIT_COMM, PIT_CONFIG);
     port_wait();
-    isr_register_handler(IRQ(0), pit_handler);
+    isr_register_handler(IRQ(0), &pit_handler);
 }
