@@ -1,4 +1,5 @@
 #include "string.h"
+#include "math.h"
 #include "mem.h"
 
 uint64_t strlen(const char* str)
@@ -9,20 +10,14 @@ uint64_t strlen(const char* str)
     (
         ptr = str, len = 0; 
         *ptr != '\0'; 
-        ptr ++, len ++
+        ptr++, len++
     );
     return len;
 }
 
 char strcmp(const char* str1, const char* str2)
 {
-    while
-    (
-        *str1 != '\0' &&
-        *str2 != '\0' &&
-        *str1 ++ == *str2 ++
-    );
-    return (*str1 - *str2);
+    return strncmp(str1, str2, minu(strlen(str1), strlen(str2)));
 }
 
 char strncmp(const char* str1, const char* str2, uint64_t bytes)
@@ -30,18 +25,18 @@ char strncmp(const char* str1, const char* str2, uint64_t bytes)
     for 
     (
         ; 
-        bytes > 0 && *str1 == *str2 && *str1 != '\0' && *str2 != '\0'; 
-        bytes --
+        bytes > 0 && *str1++ == *str2++ && *str1 != '\0' && *str2 != '\0'; 
+        bytes--
     );
-    return (*str1 - *str2);
+    return (*(str1 - 1) - *(str2 - 1));
 }
 
 uint64_t strcspn(const char* str1, const char* str2)
 {
     uint64_t i, j;
-    for (i = 0; i < strlen(str1); i ++)
+    for (i = 0; i < strlen(str1); i++)
     {
-        for (j = 0; j < strlen(str2); j ++)
+        for (j = 0; j < strlen(str2); j++)
         {
             if (str1[i] == str2[j])
                 return i;
@@ -55,7 +50,7 @@ char* strrev(char* str)
     char tmp;
     uint64_t i, j;
     uint64_t str_length = strlen(str) - 1;
-    for (i = 0, j = str_length; i < j; i ++, j --)
+    for (i = 0, j = str_length; i < j; i++, j--)
     {
         tmp = str[i];
         str[i] = str[j];

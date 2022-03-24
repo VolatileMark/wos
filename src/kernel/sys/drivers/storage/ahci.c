@@ -1,5 +1,6 @@
 #include "ahci.h"
 #include "../bus/pci.h"
+#include "../fs/drivefs.h"
 #include "../../../mem/pfa.h"
 #include "../../../mem/paging.h"
 #include "../../../utils/constants.h"
@@ -225,6 +226,7 @@ struct hba_cmd_tbl
 typedef struct hba_cmd_tbl hba_cmd_tbl_t;
 
 static ahci_controllers_list_t ahci_controllers;
+static drive_ops_t ahci_ops;
 
 
 
@@ -330,7 +332,7 @@ static uint64_t ahci_read_bytes_capped(ahci_controller_port_descriptor_t* desc, 
     return bytes;
 }
 
-uint64_t ahci_read_bytes(ahci_controller_port_descriptor_t* desc, uint64_t lba, uint64_t bytes, void* buffer)
+static uint64_t ahci_read_bytes(void* desc, uint64_t lba, uint64_t bytes, void* buffer)
 {
     uint64_t bytes_read, bytes_read_now, buffer_addr;
 
@@ -338,7 +340,7 @@ uint64_t ahci_read_bytes(ahci_controller_port_descriptor_t* desc, uint64_t lba, 
     buffer_addr = (uint64_t) buffer;
     while (bytes > 0)
     {
-        bytes_read_now = ahci_read_bytes_capped(desc, lba, bytes, buffer_addr);
+        bytes_read_now = ahci_read_bytes_capped((ahci_controller_port_descriptor_t*) desc, lba, bytes, buffer_addr);
         if (bytes_read_now == 0)
             return bytes_read;
         buffer_addr += bytes_read_now;
@@ -546,6 +548,7 @@ static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
             }
             if (!test_ahci_disk_read(&entry->ports[port_index]))
                 trace_ahci("Port %u failed the read test", port_index);
+            drivefs_register_drive(&entry->ports[port_index], &ahci_ops);
             ++port_index;
         }
         pi >>= 1;
@@ -620,6 +623,7 @@ int ahci_init(void)
     uint64_t controllers_online;
 
     memset(&ahci_controllers, 0, sizeof(ahci_controllers_list_t));
+    ahci_ops.read = &ahci_read_bytes;
 
     controllers = pci_find_devices(0x1, 0x6, -1);
     controller = controllers->head;
@@ -643,9 +647,4 @@ int ahci_init(void)
     ahci_controllers.num_of_controllers = controllers_online;
 
     return !(controllers_online > 0);
-}
-
-ahci_controllers_list_t* ahci_get_controller_list(void)
-{
-    return &ahci_controllers;
 }

@@ -109,7 +109,7 @@ int devfs_add_device(const char* path, vnode_t* node)
     }
 
     path_len = strlen(path) + 1;
-    inode = malloc(path_len);
+    inode = malloc(sizeof(devfs_inode_t));
     if (inode == NULL)
     {
         trace_devfs("Could not allocate space for new inode (%s)", path);

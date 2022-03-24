@@ -1,6 +1,29 @@
 #include "kernel.h"
 
-static int init_kernel(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
+static int kernel_init_fs(void)
+{
+    vfs_t* devfs;
+
+    vfs_init();
+
+    devfs = malloc(sizeof(vfs_t));
+    if (devfs == NULL)
+    {
+        error("Failed to allocate memory for devfs");
+        return -1;
+    }
+    if (devfs_init(devfs))
+    {
+        free(devfs);
+        error("Could not initialize devfs");
+        return -1;
+    }
+    vfs_mount("/dev", devfs);
+
+    return 0;
+}
+
+static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
     interrupts_disable();
 
@@ -29,12 +52,12 @@ static int init_kernel(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
     if (heap_init(KERNEL_HEAP_START_ADDR, KERNEL_HEAP_CEIL_ADDR, SIZE_4KB))
         return -1;
     
-    syscall_init();
-    vfs_init();
     pit_init();
+    syscall_init();
 
     if 
     (
+        kernel_init_fs() ||
         scheduler_init() || 
         acpi_init() || 
         pci_init() || 
@@ -47,7 +70,7 @@ static int init_kernel(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 
 void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
-    if (init_kernel(multiboot_struct_addr, current_bitmap))
+    if (kernel_init(multiboot_struct_addr, current_bitmap))
     {
         if (tty_is_initialized())
             error("Could not initialize kernel");

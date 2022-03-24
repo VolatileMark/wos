@@ -121,7 +121,5 @@ typedef struct
 } ahci_controllers_list_t;
 
 int ahci_init(void);
-uint64_t ahci_read_bytes(ahci_controller_port_descriptor_t* desc, uint64_t lba, uint64_t bytes, void* buffer);
-ahci_controllers_list_t* ahci_get_controller_list(void);
 
 #endif
