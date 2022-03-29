@@ -35,9 +35,11 @@
 #define AHCI_ATA_CMD_READ_DMA_EX 0x25
 #define AHCI_ATA_CMD_WRITE_DMA 0xCA
 #define AHCI_ATA_CMD_WRITE_DMA_EX 0x35
-#define AHCI_ATA_CMD_MODE_LBA (1 << 6)
+#define AHCI_ATA_CMD_IDENTIFY_EX 0xEC
 
-#define CONTROLLER_MEM(max_ports, max_cmd_slots) (((sizeof(hba_cmd_header_t) * max_cmd_slots) + sizeof(hba_fis_t) + (sizeof(hba_cmd_tbl_t) * max_cmd_slots)) * max_ports)
+#define AHCI_ATA_DEV_MODE_LBA (1 << 6)
+
+#define AHCI_CONTROLLER_MEM(max_ports, max_cmd_slots) (((sizeof(hba_cmd_header_t) * max_cmd_slots) + sizeof(hba_fis_t) + (sizeof(hba_cmd_tbl_t) * max_cmd_slots)) * max_ports)
 
 typedef enum
 {
@@ -233,7 +235,7 @@ typedef struct ahci_controllers_list_entry
     uint64_t base_vaddr;
     uint64_t pages;
     uint64_t max_ports;
-    ahci_controller_port_descriptor_t* ports;
+    ahci_port_descriptor_t* ports;
 } ahci_controllers_list_entry_t;
 
 typedef struct
@@ -248,7 +250,7 @@ static drive_ops_t ahci_ops;
 
 
 
-static int find_available_cmd_slot(hba_port_t* port)
+static int ahci_find_available_cmd_slot(hba_port_t* port)
 {
     uint32_t slots;
     int i;
@@ -264,7 +266,7 @@ static int find_available_cmd_slot(hba_port_t* port)
     return -1;
 }
 
-static uint64_t ahci_read_bytes_capped(ahci_controller_port_descriptor_t* desc, uint64_t lba, uint64_t bytes, uint64_t buffer)
+static uint64_t ahci_read_bytes_capped(ahci_port_descriptor_t* desc, uint64_t lba, uint64_t bytes, uint64_t buffer)
 {
     hba_cmd_header_t* cmd_header;
     hba_cmd_tbl_t* cmd_tbl;
@@ -277,7 +279,7 @@ static uint64_t ahci_read_bytes_capped(ahci_controller_port_descriptor_t* desc, 
     bytes = minu(bytes, SIZE_nMB(4) * AHCI_HBA_PORT_PRDT_ENTRIES);
     
     desc->port->is = (uint32_t) -1;
-    slot = find_available_cmd_slot(desc->port);
+    slot = ahci_find_available_cmd_slot(desc->port);
     if (slot == -1)
     {
         trace_ahci("No command slot available for port %u", desc->index);
@@ -319,8 +321,8 @@ static uint64_t ahci_read_bytes_capped(ahci_controller_port_descriptor_t* desc, 
     cmd_fis->lba4 = (uint8_t) (lba >> 0x20);
     cmd_fis->lba5 = (uint8_t) (lba >> 0x28);
 
-    cmd_fis->device = AHCI_ATA_CMD_MODE_LBA;
-    cmd_fis->count = ceil((double) bytes / AHCI_SECTOR_SIZE);
+    cmd_fis->device = AHCI_ATA_DEV_MODE_LBA;
+    cmd_fis->count = ceil((double) bytes / desc->sector_size);
 
     for 
     (
@@ -358,7 +360,7 @@ static uint64_t ahci_read_bytes(void* desc, uint64_t lba, uint64_t bytes, void* 
     buffer_addr = (uint64_t) buffer;
     while (bytes > 0)
     {
-        bytes_read_now = ahci_read_bytes_capped((ahci_controller_port_descriptor_t*) desc, lba, bytes, buffer_addr);
+        bytes_read_now = ahci_read_bytes_capped((ahci_port_descriptor_t*) desc, lba, bytes, buffer_addr);
         if (bytes_read_now == 0)
             return bytes_read;
         buffer_addr += bytes_read_now;
@@ -370,7 +372,78 @@ static uint64_t ahci_read_bytes(void* desc, uint64_t lba, uint64_t bytes, void* 
     return bytes_read;
 }
 
-static int test_ahci_disk_read(ahci_controller_port_descriptor_t* desc)
+static uint64_t ahci_identify_port(ahci_port_descriptor_t* desc)
+{
+    hba_cmd_header_t* cmd_header;
+    hba_cmd_tbl_t* cmd_tbl;
+    fis_reg_h2d_t* cmd_fis;
+    uint64_t spin;
+    int slot;
+    
+    desc->port->is = (uint32_t) -1;
+    slot = ahci_find_available_cmd_slot(desc->port);
+    if (slot == -1)
+    {
+        trace_ahci("No command slot available for port %u", desc->index);
+        return 0;
+    }
+    
+    cmd_header = (hba_cmd_header_t*) desc->clb_vaddr;
+    cmd_header += slot;
+    cmd_header->cmd_fis_length = (uint8_t) (sizeof(fis_reg_h2d_t) / sizeof(uint32_t));
+    cmd_header->write = 0;
+    cmd_header->prdt_length = 0;
+    
+    cmd_tbl = (hba_cmd_tbl_t*) desc->ctb_vaddr;
+    cmd_tbl += slot;
+    memset(cmd_tbl, 0, sizeof(hba_cmd_tbl_t));
+
+    cmd_fis = (fis_reg_h2d_t*) &cmd_tbl->command_fis;
+    cmd_fis->fis_type = FIS_TYPE_REG_H2D;
+    cmd_fis->c_bit = 1;
+    cmd_fis->command = AHCI_ATA_CMD_IDENTIFY_EX;
+    
+    cmd_fis->lba0 = 0;
+    cmd_fis->lba1 = 0;
+    cmd_fis->lba2 = 0;    
+    cmd_fis->lba3 = 0;
+    cmd_fis->lba4 = 0;
+    cmd_fis->lba5 = 0;
+
+    cmd_fis->device = AHCI_ATA_DEV_MODE_LBA;
+    cmd_fis->count = 0;
+
+    for 
+    (
+        spin = 0; 
+        (desc->port->tfd & (AHCI_ATA_DEV_BUSY | AHCI_ATA_DEV_DRQ)) && (spin < AHCI_TIMEOUT_SPIN); 
+        spin++
+    );
+    if (spin == AHCI_TIMEOUT_SPIN)
+    {
+        trace_ahci("Port %u is hung", desc->index);
+        return 0;
+    }
+
+    desc->port->ci = 1 << slot;
+
+    while (1)
+    {
+        if (desc->port->is & AHCI_HBA_PxIS_TFES)
+        {
+            trace_ahci("Disk IDENTIFY error (port %u)", desc->index);
+            return 0;
+        }
+        else if (!(desc->port->ci & (1 << slot)))
+            break;
+    }
+
+    desc->sector_size = ((hba_fis_t*) desc->fb_vaddr)->pio_setup_fis.transfer_count;
+
+    return 1;
+}
+
+static int ahci_test_disk_read(ahci_port_descriptor_t* desc)
 {
     /* Hey future me, if you're having problems with the stack in the future, check this */
     uint8_t buff[AHCI_SECTOR_SIZE];
@@ -384,7 +457,7 @@ static int test_ahci_disk_read(ahci_controller_port_descriptor_t* desc)
     return (i == AHCI_TEST_READS);
 }
 
-static pci_header_common_t* map_pci_header(uint64_t header_paddr)
+static pci_header_common_t* ahci_map_pci_header(uint64_t header_paddr)
 {
     uint64_t vaddr;
     vaddr = kernel_map_temporary_page(header_paddr, PAGE_ACCESS_RO, PL0);
@@ -392,14 +465,14 @@ static pci_header_common_t* map_pci_header(uint64_t header_paddr)
     return (pci_header_common_t*)(vaddr + GET_ADDR_OFFSET(header_paddr));
 }
 
-static void unmap_pci_header(uint64_t header_vaddr)
+static void ahci_unmap_pci_header(uint64_t header_vaddr)
 {
     header_vaddr = alignd(header_vaddr, SIZE_4KB);
     kernel_unmap_temporary_page(header_vaddr);
     kernel_unmap_temporary_page(header_vaddr + SIZE_4KB);
 }
 
-static ahci_device_type_t get_port_type(hba_port_t* port)
+static ahci_device_type_t ahci_get_port_type(hba_port_t* port)
 {
     uint8_t ipm, det;
 
@@ -426,7 +499,7 @@ static ahci_device_type_t get_port_type(hba_port_t* port)
     }
 }
 
-static hba_mem_t* map_abar(uint64_t abar_paddr)
+static hba_mem_t* ahci_map_abar(uint64_t abar_paddr)
 {
     uint64_t abar_vaddr;
 
@@ -445,19 +518,19 @@ static hba_mem_t* map_abar(uint64_t abar_paddr)
     return (hba_mem_t*) abar_vaddr;
 }
 
-static void start_command_engine(hba_port_t* port)
+static void ahci_start_command_engine(hba_port_t* port)
 {
     while (port->cmd & AHCI_HBA_PxCMD_CR);
     port->cmd |= AHCI_HBA_PxCMD_FRE | AHCI_HBA_PxCMD_ST;
 }
 
-static void stop_command_engine(hba_port_t* port)
+static void ahci_stop_command_engine(hba_port_t* port)
 {
     port->cmd &= ~(AHCI_HBA_PxCMD_FRE | AHCI_HBA_PxCMD_ST);
     while (port->cmd & (AHCI_HBA_PxCMD_CR | AHCI_HBA_PxCMD_FR));
 }
 
-static void init_ahci_controller_sata_port
+static void ahci_init_sata_port
 (
     uint64_t controller_base_paddr, 
     uint64_t controller_base_vaddr,
@@ -465,7 +538,7 @@ static void init_ahci_controller_sata_port
     uint64_t port_num, 
     uint8_t max_ports, 
     uint8_t max_cmd_slots,
-    ahci_controller_port_descriptor_t* desc
+    ahci_port_descriptor_t* desc
 )
 {
     hba_cmd_header_t* cmd_header;
@@ -473,7 +546,7 @@ static void init_ahci_controller_sata_port
     uint64_t cmd_headers_total_size;
     uint64_t clb_offset, fb_offset, ctb_offset;
 
-    stop_command_engine(port);
+    ahci_stop_command_engine(port);
 
     cmd_headers_total_size = sizeof(hba_cmd_header_t) * max_cmd_slots;
     clb_offset = (port_num * cmd_headers_total_size);
@@ -496,23 +569,24 @@ static void init_ahci_controller_sata_port
         memset((void*) (desc->ctb_vaddr + (sizeof(hba_cmd_tbl_t) * i)), 0, sizeof(hba_cmd_tbl_t));
     }
 
-    start_command_engine(port);
+    ahci_start_command_engine(port);
 }
 
-static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_header, ahci_controllers_list_entry_t* entry)
+static void ahci_init_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_header, ahci_controllers_list_entry_t* entry)
 {
     hba_port_t* port;
     uint64_t controller_mem_size;
     uint32_t pi, i;
     uint8_t max_ports, port_index, max_cmd_slots;
     ahci_device_type_t type;
+    ahci_port_descriptor_t* desc;
     
     pi = abar->pi;
     max_ports = abar->cap.np + 1;
     max_cmd_slots = abar->cap.ncs + 1;
     port_index = 0;
 
-    controller_mem_size = CONTROLLER_MEM(max_ports, max_cmd_slots);
+    controller_mem_size = AHCI_CONTROLLER_MEM(max_ports, max_cmd_slots);
     if (kernel_get_next_vaddr(controller_mem_size, &entry->base_vaddr) < controller_mem_size)
         return;
 
@@ -527,18 +601,19 @@ static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
         return;
     }
 
-    entry->ports = calloc(max_ports, sizeof(ahci_controller_port_descriptor_t));
+    entry->ports = calloc(max_ports, sizeof(ahci_port_descriptor_t));
 
     for (i = 0; i < 32 && port_index < max_ports; i++)
     {
         if (pi & 1)
         {
             port = &abar->ports[i];
-            type = get_port_type(port);
+            type = ahci_get_port_type(port);
+            desc = &entry->ports[port_index];
             
-            entry->ports[port_index].type = type;
-            entry->ports[port_index].index = i;
-            entry->ports[port_index].port = port;
+            desc->type = type;
+            desc->index = i;
+            desc->port = port;
             
             switch (type)
             {
@@ -552,7 +627,7 @@ static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
                 break;
             case AHCI_DEV_SATAPI:
             case AHCI_DEV_SATA:
-                init_ahci_controller_sata_port
+                ahci_init_sata_port
                 (
                     entry->base_paddr, 
                     entry->base_vaddr, 
@@ -560,14 +635,15 @@ static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
                     port_index, 
                     max_ports, 
                     max_cmd_slots, 
-                    &entry->ports[port_index]
+                    desc
                 );
                 break;
             }
-            if (!test_ahci_disk_read(&entry->ports[port_index]))
+            ahci_identify_port(desc);
+            if (!ahci_test_disk_read(desc))
                 trace_ahci("Port %u failed the read test", port_index);
             else
-                drivefs_register_drive(&entry->ports[port_index], &ahci_ops, AHCI_SECTOR_SIZE);
+                drivefs_register_drive(desc, &ahci_ops, desc->sector_size);
             ++port_index;
         }
         pi >>= 1;
@@ -576,12 +652,12 @@ static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
     entry->max_ports = max_ports;
 }
 
-static uint64_t init_ahci_controller(pci_header_0x0_t* pci_header)
+static uint64_t ahci_init_controller(pci_header_0x0_t* pci_header)
 {
     hba_mem_t* abar;
     ahci_controllers_list_entry_t* entry;
 
-    abar = map_abar(pci_header->bar5);
+    abar = ahci_map_abar(pci_header->bar5);
     if (abar == NULL)
     {
         trace_ahci("Could not map ABAR");
@@ -620,7 +696,7 @@ static uint64_t init_ahci_controller(pci_header_0x0_t* pci_header)
         return 0;
     }
 
-    init_ahci_controller_ports(abar, pci_header, entry);
+    ahci_init_controller_ports(abar, pci_header, entry);
 
     entry->next = NULL;
     entry->abar = abar;
@@ -649,17 +725,17 @@ int ahci_init(void)
     controllers_online = 0;
     while (controller != NULL)
     {
-        pci_header = map_pci_header(controller->header_paddr);
+        pci_header = ahci_map_pci_header(controller->header_paddr);
         if 
         (
             pci_header->header_type == PCI_HEADER_0x0 && 
-            init_ahci_controller((pci_header_0x0_t*) pci_header)
+            ahci_init_controller((pci_header_0x0_t*) pci_header)
         )
         {
             info("AHCI controller %x:%x initialized. New controller ID is %u", pci_header->vendor_id, pci_header->device_id, controllers_online);
             ++controllers_online;
         }
-        unmap_pci_header((uint64_t) pci_header);
+        ahci_unmap_pci_header((uint64_t) pci_header);
         controller = controller->next;
     }
 

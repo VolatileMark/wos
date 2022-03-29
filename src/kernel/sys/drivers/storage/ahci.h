@@ -96,11 +96,12 @@ typedef struct
 {
     ahci_device_type_t type;
     uint32_t index;
+    uint32_t sector_size;
     uint64_t clb_vaddr;
     uint64_t fb_vaddr;
     uint64_t ctb_vaddr;
     hba_port_t* port;
-} ahci_controller_port_descriptor_t;
+} ahci_port_descriptor_t;
 
 int ahci_init(void);
 
