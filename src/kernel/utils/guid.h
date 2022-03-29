@@ -8,7 +8,8 @@ struct guid
     uint32_t d1;
     uint16_t d2;
     uint16_t d3;
-    uint8_t d4[8];
+    uint64_t d4 : 16;
+    uint64_t d5 : 48;
 } __attribute__((packed));
 typedef struct guid guid_t;
 

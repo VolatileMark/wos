@@ -13,6 +13,7 @@ MKSTANDALONE = $(abspath tools/x86_64-grub2/efi/bin/grub-mkstandalone)
 MKRESCUE = $(abspath tools/x86_64-grub2/pc/bin/grub-mkrescue)
 
 EMU_FLAGS_LEGACY = -drive file=$(BUILD_DIR)/$(OS_NAME).iso,format=raw \
+				   -drive file=gpt-test.img,format=raw \
 				   -m 256M \
 				   -cpu qemu64 \
 				   -vga std \

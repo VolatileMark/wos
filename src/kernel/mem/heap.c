@@ -49,7 +49,7 @@ static uint64_t heap_expand(uint64_t size)
     kernel_heap.end_vaddr += mapped_size;
 
     new->free = 1;
-    new->size = new_size;
+    new->size = new_size - sizeof(heap_segment_header_t);
     new->data = (uint64_t)(new + 1);
     new->prev = kernel_heap.tail;
     new->next = NULL;

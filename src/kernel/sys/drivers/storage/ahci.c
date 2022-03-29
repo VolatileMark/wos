@@ -225,6 +225,24 @@ struct hba_cmd_tbl
 } __attribute__((packed));
 typedef struct hba_cmd_tbl hba_cmd_tbl_t;
 
+typedef struct ahci_controllers_list_entry
+{
+    struct ahci_controllers_list_entry* next;
+    hba_mem_t* abar;
+    uint64_t base_paddr;
+    uint64_t base_vaddr;
+    uint64_t pages;
+    uint64_t max_ports;
+    ahci_controller_port_descriptor_t* ports;
+} ahci_controllers_list_entry_t;
+
+typedef struct
+{
+    uint64_t num_of_controllers;
+    ahci_controllers_list_entry_t* head;
+    ahci_controllers_list_entry_t* tail;
+} ahci_controllers_list_t;
+
 static ahci_controllers_list_t ahci_controllers;
 static drive_ops_t ahci_ops;
 
@@ -548,7 +566,8 @@ static void init_ahci_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
             }
             if (!test_ahci_disk_read(&entry->ports[port_index]))
                 trace_ahci("Port %u failed the read test", port_index);
-            drivefs_register_drive(&entry->ports[port_index], &ahci_ops);
+            else
+                drivefs_register_drive(&entry->ports[port_index], &ahci_ops, AHCI_SECTOR_SIZE);
             ++port_index;
         }
         pi >>= 1;

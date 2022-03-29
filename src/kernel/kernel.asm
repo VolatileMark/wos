@@ -14,7 +14,7 @@ _start:
 
 [section .bss]
 
-%define KERNEL_STACK_SIZE 4096
+%define KERNEL_STACK_SIZE 16384
 
 [global kernel_stack_top]
 [global kernel_stack_bottom]

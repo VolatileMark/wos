@@ -1,9 +1,14 @@
 #ifndef __GPT_H__
 #define __GPT_H__
 
+#include "../../fs/drivefs.h"
 #include "../../../../utils/guid.h"
 #include "mbr.h"
 #include <stdint.h>
+
+#define GPT_GUID(da1, da2, da3, da4, da5) ((guid_t) { .d1 = da1, .d2 = da2, .d3 = da3, .d4 = da4, .d5 = da5 })
+
+#define GPT_ENTRY_NULL GPT_GUID(0, 0, 0, 0, 0)
 
 #define GPT_SIG "EFI PART"
 #define GPT_BLOCK_SIZE 512
@@ -35,10 +40,12 @@ struct gpt_entry
     uint64_t start_lba;
     uint64_t end_lba;
     uint64_t attributes;
-    char patition_name[72];
+    char partition_name[];
 } __attribute__((packed));
 typedef struct gpt_entry gpt_entry_t;
 
-int gpt_check(void* disk);
+void gpt_load(drive_t* drive, gpt_t* gpt);
+int gpt_check(drive_t* drive);
+int gpt_find_partitions(drive_t* drive, gpt_t* gpt);
 
 #endif

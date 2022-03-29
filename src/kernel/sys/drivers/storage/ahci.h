@@ -102,24 +102,6 @@ typedef struct
     hba_port_t* port;
 } ahci_controller_port_descriptor_t;
 
-typedef struct ahci_controllers_list_entry
-{
-    struct ahci_controllers_list_entry* next;
-    hba_mem_t* abar;
-    uint64_t base_paddr;
-    uint64_t base_vaddr;
-    uint64_t pages;
-    uint64_t max_ports;
-    ahci_controller_port_descriptor_t* ports;
-} ahci_controllers_list_entry_t;
-
-typedef struct
-{
-    uint64_t num_of_controllers;
-    ahci_controllers_list_entry_t* head;
-    ahci_controllers_list_entry_t* tail;
-} ahci_controllers_list_t;
-
 int ahci_init(void);
 
 #endif
