@@ -372,20 +372,23 @@ static uint64_t ahci_read_bytes(void* desc, uint64_t lba, uint64_t bytes, void* 
     return bytes_read;
 }
 
-static uint64_t ahci_identify_port(ahci_port_descriptor_t* desc)
+static int ahci_identify_port(void* desc_ptr)
 {
+    ahci_port_descriptor_t* desc;
     hba_cmd_header_t* cmd_header;
     hba_cmd_tbl_t* cmd_tbl;
     fis_reg_h2d_t* cmd_fis;
     uint64_t spin;
     int slot;
     
+    desc = desc_ptr;
+
     desc->port->is = (uint32_t) -1;
     slot = ahci_find_available_cmd_slot(desc->port);
     if (slot == -1)
     {
         trace_ahci("No command slot available for port %u", desc->index);
-        return 0;
+        return -1;
     }
     
     cmd_header = (hba_cmd_header_t*) desc->clb_vaddr;
@@ -422,7 +425,7 @@ static uint64_t ahci_identify_port(ahci_port_descriptor_t* desc)
     if (spin == AHCI_TIMEOUT_SPIN)
     {
         trace_ahci("Port %u is hung", desc->index);
-        return 0;
+        return -1;
     }
 
     desc->port->ci = 1 << slot;
@@ -432,15 +435,13 @@ static uint64_t ahci_identify_port(ahci_port_descriptor_t* desc)
         if (desc->port->is & AHCI_HBA_PxIS_TFES)
         {
             trace_ahci("Disk IDENTIFY error (port %u)", desc->index);
-            return 0;
+            return -1;
         }
         else if (!(desc->port->ci & (1 << slot)))
             break;
     }
 
-    desc->sector_size = ((hba_fis_t*) desc->fb_vaddr)->pio_setup_fis.transfer_count;
-
-    return 1;
+    return 0;
 }
 
 static int ahci_test_disk_read(ahci_port_descriptor_t* desc)
@@ -639,7 +640,6 @@ static void ahci_init_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
                 );
                 break;
             }
-            ahci_identify_port(desc);
             if (!ahci_test_disk_read(desc))
                 trace_ahci("Port %u failed the read test", port_index);
             else
@@ -710,6 +710,20 @@ static uint64_t ahci_init_controller(pci_header_0x0_t* pci_header)
     return 1;
 }
 
+static uint64_t ahci_get_port_property(void* desc_ptr, drive_property_t prop)
+{
+    hba_fis_t* fis;
+
+    fis = ((hba_fis_t*)((ahci_port_descriptor_t*) desc_ptr)->fb_vaddr);
+    switch (prop)
+    {
+    case DRIVE_PROPERTY_SECSIZE:
+        return fis->pio_setup_fis.transfer_count;
+    }
+
+    return 0;
+}
+
 int ahci_init(void)
 {
     pci_devices_list_t* controllers;
@@ -718,6 +732,8 @@ int ahci_init(void)
     uint64_t controllers_online;
 
     memset(&ahci_controllers, 0, sizeof(ahci_controllers_list_t));
+    ahci_ops.identify = &ahci_identify_port;
+    ahci_ops.property = &ahci_get_port_property;
     ahci_ops.read = &ahci_read_bytes;
 
     controllers = pci_find_devices(0x1, 0x6, -1);

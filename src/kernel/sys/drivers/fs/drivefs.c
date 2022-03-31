@@ -1,5 +1,6 @@
 #include "drivefs.h"
-#include "../fs/devfs.h"
+#include "devfs.h"
+#include "isofs.h"
 #include "../storage/partition-tables/mbr.h"
 #include "../storage/partition-tables/gpt.h"
 #include "../../../proc/vfs/vnode.h"
@@ -10,8 +11,13 @@
 
 #define trace_drive_manager(msg, ...) trace("STOR", msg, ##__VA_ARGS__)
 
+typedef drive_partition_fs_t (*fs_check_t)(drive_t* drive);
+
 static uint64_t drive_index;
 static vnode_ops_t drive_manager_vnode_ops;
+static fs_check_t fss[] = {
+    &isofs_check
+};
 
 static int drivefs_open_stub(vnode_t* node)
 {
@@ -75,7 +81,10 @@ static int drivefs_detect_partitions(drive_t* drive)
 
 static drive_partition_fs_t drivefs_detect_partition_fs(drive_t* drive, uint64_t index)
 {
-    return DRIVE_FS_UNKNOWN;
+    drive_partition_fs_t fs;
+    uint64_t i;
+    for (i = 0; i < (sizeof(fss) / sizeof(uint64_t)) && (fs = fss[i](drive)) == DRIVE_FS_UNKNOWN; i++);
+    return fs;
 }
 
 int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_bytes)
@@ -83,7 +92,7 @@ int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_by
     uint64_t i;
     drive_t* drive;
     vnode_t* vnode;
-    char path[4] = "sda";
+    char path[] = "sda";
 
     if (drive_index > 'z' - 'a')
     {
@@ -97,10 +106,17 @@ int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_by
         trace_drive_manager("Failed to allocate memory for drive descriptor");
         return -1;
     }
+
     drive->interface = interface;
     drive->ops = ops;
-    drive->sector_bytes = sector_bytes;
 
+    if (drive->ops->identify(drive->interface))
+    {
+        free(drive);
+        trace_drive_manager("Failed to IDENTIFY drive");
+    }
+    drive->sector_bytes = drive->ops->property(drive->interface, DRIVE_PROPERTY_SECSIZE);
+    
     vnode = malloc(sizeof(vnode_t));
     if (vnode == NULL)
     {
@@ -122,12 +138,15 @@ int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_by
     }
 
     drive->num_partitions = drivefs_detect_partitions(drive);
+    info("Added drive %u as /dev/%s. Found %d partition%c", drive_index, path, drive->num_partitions, (drive->num_partitions == 1) ? ' ' : 's');
     if (drive->num_partitions > 0)
     {
         for (i = 0; i < drive->num_partitions; i++)
+        {
             drive->partitions[i].fs = drivefs_detect_partition_fs(drive, i);
+            info("Detected partition of type %u saved as /dev/%s%u", drive->partitions[i].fs, path, i + 1);
+        }
     }
-    info("Added drive %u as /dev/%s. Found %d partition%c", drive_index, path, drive->num_partitions, (drive->num_partitions == 1) ? ' ' : 's');
 
     drive_index++;
 

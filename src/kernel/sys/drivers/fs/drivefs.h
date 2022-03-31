@@ -8,8 +8,14 @@ struct drive_ops;
 typedef enum
 {
     DRIVE_FS_UNKNOWN,
-    DRIVE_FS_FAT
+    DRIVE_FS_FAT,
+    DRIVE_FS_ISO9660
 } drive_partition_fs_t;
+
+typedef enum
+{
+    DRIVE_PROPERTY_SECSIZE
+} drive_property_t;
 
 typedef struct
 {
@@ -32,6 +38,8 @@ typedef struct
 
 typedef struct drive_ops
 {
+    int (*identify)(void* inteface);
+    uint64_t (*property)(void* interface, drive_property_t property);
     uint64_t (*read)(void* interface, uint64_t lba, uint64_t size, void* buffer);
 } drive_ops_t;
 

@@ -4,7 +4,8 @@
 #include "../../../proc/vfs/vfs.h"
 #include "../../../proc/vfs/vnode.h"
 
-int devfs_init(vfs_t* vfs);
+void devfs_init(void);
+int devfs_create(vfs_t* vfs);
 int devfs_add_device(const char* path, vnode_t* node);
 
 #endif

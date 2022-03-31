@@ -9,6 +9,7 @@ struct vfs_ops;
 
 typedef struct vfs
 {
+    uint64_t index;
     struct vfs_ops* ops;
     const char* mount_path;
 } vfs_t;

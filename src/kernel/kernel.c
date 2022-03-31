@@ -1,30 +1,9 @@
 #include "kernel.h"
 
-static int kernel_init_fs(void)
+static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
     vfs_t* devfs;
 
-    vfs_init();
-
-    devfs = malloc(sizeof(vfs_t));
-    if (devfs == NULL)
-    {
-        error("Failed to allocate memory for devfs");
-        return -1;
-    }
-    if (devfs_init(devfs))
-    {
-        free(devfs);
-        error("Could not initialize devfs");
-        return -1;
-    }
-    vfs_mount("/dev", devfs);
-
-    return 0;
-}
-
-static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
-{
     interrupts_disable();
 
     paging_init();
@@ -55,9 +34,27 @@ static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
     pit_init();
     syscall_init();
 
+    vfs_init();
+
+    /* Init devfs */
+    {
+        devfs = malloc(sizeof(vfs_t));
+        if (devfs == NULL)
+        {
+            error("Failed to allocate memory for devfs");
+            return -1;
+        }
+        else if (devfs_create(devfs))
+        {
+            free(devfs);
+            error("Could not initialize devfs");
+            return -1;
+        }
+        vfs_mount("/dev", devfs);
+    }
+
     if 
     (
-        kernel_init_fs() ||
         scheduler_init() || 
         acpi_init() || 
         pci_init() || 

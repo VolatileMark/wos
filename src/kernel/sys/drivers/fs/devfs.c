@@ -21,16 +21,47 @@ typedef struct
     devfs_inode_t* tail;
 } devfs_inode_list_t;
 
+typedef struct devfs_vfss_list_entry
+{
+    struct devfs_vfss_list_entry* next;
+    vnode_t root;
+} devfs_vfss_list_entry_t;
+
+typedef struct
+{
+    devfs_vfss_list_entry_t* head;
+    devfs_vfss_list_entry_t* tail;
+} devfs_vfss_list_t;
+
+static uint64_t index;
+static devfs_vfss_list_t vfss_list;
 static devfs_inode_list_t inodes_list;
-static vnode_t root;
 static vnode_ops_t vnode_ops;
 static vfs_ops_t vfs_ops;
 
+static devfs_vfss_list_entry_t* devfs_get_entry(uint64_t index)
+{
+    devfs_vfss_list_entry_t* entry;
+    for 
+    (
+        entry = vfss_list.head; 
+        index > 0 && entry != NULL; 
+        index--, entry = entry->next
+    );
+    if (index > 0)
+        return NULL;
+    return entry;
+}
+
 static int devfs_root(vfs_t* vfs, vnode_t* out)
 {
-    UNUSED(vfs);
-    out->ops = root.ops;
-    out->data = root.data;
+    devfs_vfss_list_entry_t* entry;
+
+    entry = devfs_get_entry(vfs->index);
+    if (entry == NULL)
+        return -1;
+    out->ops = entry->root.ops;
+    out->data = entry->root.data;
     return 0;
 }
 
@@ -138,16 +169,36 @@ int devfs_add_device(const char* path, vnode_t* node)
 }
 
 
-int devfs_init(vfs_t* vfs)
+int devfs_create(vfs_t* vfs)
 {
+    devfs_vfss_list_entry_t* entry;
+
+    entry = malloc(sizeof(devfs_vfss_list_entry_t));
+    if (entry == NULL)
+        return -1;
+
+    entry->root.ops = &vnode_ops;
+    entry->next = NULL;
+    if (vfss_list.tail == NULL)
+        vfss_list.head = entry;
+    else
+        vfss_list.tail->next = entry;
+    vfss_list.tail = entry;
+
+    vfs->index = index++;
+    vfs->ops = &vfs_ops;
+    return 0;
+}
+
+void devfs_init(void)
+{
+    index = 0;
+    vfss_list.head = NULL;
+    vfss_list.tail = NULL;
     vnode_ops.open = &devfs_open;
     vnode_ops.read = &devfs_read;
     vnode_ops.write = &devfs_write;
     vnode_ops.lookup = &devfs_lookup;
     vnode_ops.get_attribs = &devfs_get_attribs;
-
-    root.ops = &vnode_ops;
     vfs_ops.root = &devfs_root;
-    vfs->ops = &vfs_ops;
-    return 0;
 }
