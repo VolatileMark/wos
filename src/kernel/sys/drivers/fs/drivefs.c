@@ -110,7 +110,7 @@ int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_by
     drive->interface = interface;
     drive->ops = ops;
 
-    if (drive->ops->identify(drive->interface))
+    if (drivefs_identify(drive))
     {
         free(drive);
         trace_drive_manager("Failed to IDENTIFY drive");
@@ -163,7 +163,24 @@ void drivefs_init(void)
     drive_manager_vnode_ops.get_attribs = &drivefs_get_attribs_stub;
 }
 
+drive_t* drivefs_lookup(const char* path)
+{
+    vnode_t out;
+    vfs_lookup(path, &out);
+    return ((drive_t*) out.data);
+}
+
 uint64_t drivefs_read(drive_t* drive, uint64_t lba, uint64_t bytes, void* buffer)
 {
     return drive->ops->read(drive->interface, lba, bytes, buffer);
+}
+
+int drivefs_identify(drive_t* drive)
+{
+    return drive->ops->identify(drive->interface);
+}
+
+uint64_t drivefs_property(drive_t* drive)
+{
+    return drive->ops->identify(drive->interface);
 }

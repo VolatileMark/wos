@@ -2,7 +2,7 @@
 #define __PAGING_H__
 
 #include <stdint.h>
-#include "../utils/constants.h"
+#include "../../utils/constants.h"
 
 struct page_table_entry
 {

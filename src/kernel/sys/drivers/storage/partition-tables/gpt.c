@@ -16,7 +16,7 @@ typedef struct gpea_chain_entry
 
 void gpt_load(drive_t* drive, gpt_t* gpt)
 {
-    drive->ops->read(drive->interface, 1, sizeof(gpt_t), gpt);
+    drivefs_read(drive, 1, sizeof(gpt_t), gpt);
 }
 
 int gpt_check(drive_t* drive)
@@ -67,7 +67,7 @@ int gpt_find_partitions(drive_t* drive, gpt_t* gpt)
         i++, lba++
     )
     {
-        drive->ops->read(drive->interface, lba, drive->sector_bytes, sector);
+        drivefs_read(drive, lba, drive->sector_bytes, sector);
         for (offset = 0; offset < drive->sector_bytes; offset += gpt->gpea_entry_size)
         {
             gpt_entry = (gpt_entry_t*)(sector + offset);

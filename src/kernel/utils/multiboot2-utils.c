@@ -1,6 +1,6 @@
 #include "multiboot2-utils.h"
 #include "macros.h"
-#include "../mem/paging.h"
+#include "../sys/mem/paging.h"
 #include <mem.h>
 #include <stddef.h>
 

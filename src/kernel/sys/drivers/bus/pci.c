@@ -1,6 +1,6 @@
 #include "pci.h"
 #include "../power/acpi.h"
-#include "../../../mem/paging.h"
+#include "../../mem/paging.h"
 #include "../../../utils/log.h"
 #include "../../../utils/alloc.h"
 #include <stddef.h>

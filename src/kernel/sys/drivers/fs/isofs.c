@@ -124,6 +124,7 @@ typedef struct isofs_vfss_list_entry
 {
     struct isofs_vfss_list_entry* next;
     vnode_t root;
+    isofs_directory_entry_t iso_root;
     drive_t* drive;
     drive_partition_t* partition;
 } isofs_vfss_list_entry_t;
@@ -141,7 +142,7 @@ static vnode_ops_t vnode_ops;
 
 void isofs_load_volume_descriptor(drive_t* drive, isofs_volume_descriptor_t* desc, uint64_t index)
 {
-    drive->ops->read(drive->interface, ((ISOFS_VOLDESC_START + index) * ISOFS_SECTOR_SIZE) / drive->sector_bytes, sizeof(isofs_volume_descriptor_t), desc);
+    drivefs_read(drive, ((ISOFS_VOLDESC_START + index) * ISOFS_SECTOR_SIZE) / drive->sector_bytes, sizeof(isofs_volume_descriptor_t), desc);
 }
 
 drive_partition_fs_t isofs_check(drive_t* drive)
@@ -185,7 +186,8 @@ static int isofs_root(vfs_t* vfs, vnode_t* out)
 
 static int isofs_open(vnode_t* node)
 {
-    return -1;
+    UNUSED(node);
+    return 0;
 }
 
 static int isofs_read(vnode_t* node, void* buffer, uint64_t count)

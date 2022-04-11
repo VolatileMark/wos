@@ -1,5 +1,5 @@
 #include "framebuffer.h"
-#include "../../../mem/paging.h"
+#include "../../mem/paging.h"
 #include "../../../utils/checksum.h"
 #include "../../../utils/multiboot2-utils.h"
 

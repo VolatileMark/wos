@@ -2,7 +2,7 @@
 #define __PROCESS_H__
 
 #include "../sys/cpu/isr.h"
-#include "../mem/paging.h"
+#include "../sys/mem/paging.h"
 #include <stdint.h>
 
 #define PROC_MAX_FDS 64

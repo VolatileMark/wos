@@ -1,6 +1,6 @@
 #include "paging.h"
 #include "pfa.h"
-#include "../kernel.h"
+#include "../../kernel.h"
 #include <math.h>
 #include <mem.h>
 

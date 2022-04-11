@@ -1,9 +1,9 @@
 #include "heap.h"
 #include "pfa.h"
 #include "paging.h"
-#include "../utils/constants.h"
-#include "../utils/alloc.h"
-#include "../utils/log.h"
+#include "../../utils/constants.h"
+#include "../../utils/alloc.h"
+#include "../../utils/log.h"
 #include <stddef.h>
 #include <math.h>
 #include <mem.h>

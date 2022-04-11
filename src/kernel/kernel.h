@@ -1,10 +1,6 @@
 #ifndef __KERNEL_H__
 #define __KERNEL_H__
 
-#include "mem/paging.h"
-#include "mem/mmap.h"
-#include "mem/pfa.h"
-#include "mem/heap.h"
 #include "utils/macros.h"
 #include "utils/log.h"
 #include "utils/tty.h"
@@ -12,6 +8,10 @@
 #include "utils/multiboot2-utils.h"
 #include "utils/crc32.h"
 #include "utils/alloc.h"
+#include "sys/mem/paging.h"
+#include "sys/mem/mmap.h"
+#include "sys/mem/pfa.h"
+#include "sys/mem/heap.h"
 #include "sys/cpu/gdt.h"
 #include "sys/cpu/idt.h"
 #include "sys/cpu/isr.h"

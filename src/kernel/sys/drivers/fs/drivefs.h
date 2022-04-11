@@ -46,7 +46,9 @@ typedef struct drive_ops
 int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_bytes);
 void drivefs_init(void);
 
-drive_t* drivefs_get_drive(const char* path);
+drive_t* drivefs_lookup(const char* path);
 uint64_t drivefs_read(drive_t* drive, uint64_t lba, uint64_t bytes, void* buffer);
+int drivefs_identify(drive_t* drive);
+uint64_t drivefs_property(drive_t* drive);
 
 #endif

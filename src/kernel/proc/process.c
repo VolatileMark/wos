@@ -4,13 +4,13 @@
 #include "vfs/vnode.h"
 #include "vfs/vattribs.h"
 #include "../kernel.h"
-#include "../mem/pfa.h"
-#include "../mem/paging.h"
+#include "../sys/mem/pfa.h"
+#include "../sys/mem/paging.h"
+#include "../sys/cpu/gdt.h"
 #include "../utils/elf.h"
 #include "../utils/constants.h"
 #include "../utils/macros.h"
 #include "../utils/alloc.h"
-#include "../sys/cpu/gdt.h"
 #include <stddef.h>
 #include <mem.h>
 #include <math.h>

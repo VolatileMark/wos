@@ -1,5 +1,5 @@
 #include "acpi.h"
-#include "../../../mem/paging.h"
+#include "../../mem/paging.h"
 #include "../../../utils/log.h"
 #include "../../../utils/multiboot2-utils.h"
 #include "../../../utils/checksum.h"

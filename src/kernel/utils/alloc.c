@@ -1,6 +1,6 @@
 #include "alloc.h"
 #include "checksum.h"
-#include "../mem/heap.h"
+#include "../sys/mem/heap.h"
 #include <stddef.h>
 #include <mem.h>
 

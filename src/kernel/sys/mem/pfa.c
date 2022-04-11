@@ -1,8 +1,8 @@
 #include "pfa.h"
 #include "mmap.h"
 #include "paging.h"
-#include "../utils/constants.h"
-#include "../utils/multiboot2.h"
+#include "../../utils/constants.h"
+#include "../../utils/multiboot2.h"
 #include <math.h>
 #include <stddef.h>
 #include <mem.h>

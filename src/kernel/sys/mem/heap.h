@@ -1,7 +1,7 @@
 #ifndef __KHEAP_H__
 #define __KHEAP_H__
 
-#include "../proc/process.h"
+#include "../../proc/process.h"
 #include <stdint.h>
 
 struct heap_segment_header 
