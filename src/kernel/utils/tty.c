@@ -6,6 +6,7 @@
 #include <stdarg.h>
 #include <string.h>
 
+static uint32_t palette[5];
 static uint32_t cursor_x, cursor_y;
 static uint32_t max_x, max_y;
 static uint32_t offset_x, offset_y;
@@ -16,7 +17,7 @@ extern volatile psf2_file_t _binary_font_psf_start;
 #define font_header _binary_font_psf_start.header
 #define font_glyphs _binary_font_psf_start.glyphs
 
-static void putc(char c)
+static void tty_putc(char c)
 {
     uint64_t glyph_offset;
     uint64_t x, y, sx, sy;
@@ -61,17 +62,18 @@ static void putc(char c)
         cursor_y = 0;
 }
 
-static void puts(char* str)
+static void tty_puts(char* str)
 {
     while (*str != '\0')
-        putc(*str++);
+        tty_putc(*str++);
 }
 
-void printf(const char* str, ...)
+void tty_printf(const char* str, ...)
 {
     va_list ap;
     char* p;
     char tmp_str[64];
+    uint8_t i;
 
     va_start(ap, str);
 
@@ -79,7 +81,7 @@ void printf(const char* str, ...)
     {
         if (*p != '%')
         {
-            putc(*p);
+            tty_putc(*p);
             continue;
         }
 
@@ -87,36 +89,40 @@ void printf(const char* str, ...)
         switch (*(++p))
         {
         case 'c':
-            putc((uint8_t) va_arg(ap, uint32_t));
+            tty_putc((uint8_t) va_arg(ap, uint32_t));
             break;
         case 'p':
-            puts(utoan(va_arg(ap, uint64_t), tmp_str, 16, 16));
+            tty_puts(utoan(va_arg(ap, uint64_t), tmp_str, 16, 16));
             break;
         case 'x':
-            puts(itoa(va_arg(ap, long), tmp_str, 16));
+            tty_puts(itoa(va_arg(ap, long), tmp_str, 16));
             break;
         case 'd':
         case 'i':
-            puts(itoa(va_arg(ap, long), tmp_str, 10));
+            tty_puts(itoa(va_arg(ap, long), tmp_str, 10));
             break;
         case 'f':
             break;
         case 's':
-            puts(va_arg(ap, char*));
+            tty_puts(va_arg(ap, char*));
             break;
         case 'u':
-            puts(utoa(va_arg(ap, uint64_t), tmp_str, 10));
+            tty_puts(utoa(va_arg(ap, uint64_t), tmp_str, 10));
             break;
         case '%':
-            putc('%');
+            tty_putc('%');
             break;
+        default:
+            i = *p - '0';
+            if (i < sizeof(palette) / sizeof(uint32_t))
+                fg_color = palette[i];
         }
     }
 
     va_end(ap);
 }
 
-void clear_screen(void)
+void tty_clear_screen(void)
 {
     uint32_t* fb_ptr;
     uint64_t i;
@@ -150,8 +156,14 @@ int tty_init(void)
     offset_x = 0;
     offset_y = 0;
 
-    fg_color = framebuffer_color(255, 255, 255);
-    bg_color = framebuffer_color(0, 0, 0);
+    palette[0] = framebuffer_color(255, 255, 255);
+    palette[1] = framebuffer_color(145, 25, 0);
+    palette[2] = framebuffer_color(225, 225, 0);
+    palette[3] = framebuffer_color(10, 128, 10);
+    palette[4] = framebuffer_color(0, 0, 0);
+
+    fg_color = palette[0];
+    bg_color = palette[4];
 
     info("Framebuffer located at %p, mapped at %p, has size %u bytes", multiboot_get_tag_framebuffer()->common.framebuffer_addr, fb->addr, fb->size);
     info("TTY initialized. Resolution is %ux%u pixels or %ux%u characters", fb->width, fb->height, max_x, max_y);
@@ -187,4 +199,14 @@ int tty_is_initialized(void)
         font_header.width == 8 &&
         max_x && max_y
     );
+}
+
+void tty_set_background_color(uint8_t r, uint8_t g, uint8_t b)
+{
+    bg_color = framebuffer_color(r, g, b);
+}
+
+void tty_set_foreground_color(uint8_t r, uint8_t g, uint8_t b)
+{
+    fg_color = framebuffer_color(r, g, b);
 }
