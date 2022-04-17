@@ -5,7 +5,9 @@
 #include "../../../utils/alloc.h"
 #include <stddef.h>
 #include <string.h>
+#include <mem.h>
 
+#define ISOFS_MAX_VDS 3
 #define ISOFS_SECTOR_SIZE 2048
 #define ISOFS_VOLDESC_START 16
 #define ISOFS_VOLDESC_SIG "CD001"
@@ -13,6 +15,8 @@
 #define ISOFS_VOLDESC_BOOT 0
 #define ISOFS_VOLDESC_PRIM 1
 #define ISOFS_VOLDESC_TERM 255
+
+#define isofs_block_to_lba(block, sector) (((block) * ISOFS_SECTOR_SIZE) / (sector))
 
 struct isofs_date
 {
@@ -29,7 +33,7 @@ typedef struct isofs_date isofs_date_t;
 
 struct isofs_directory_entry_date
 {
-    uint8_t years_since_xxsec; /* # of years since 1900 */
+    uint8_t years_since_1900; /* # of years since 1900 */
     uint8_t month_of_year; /* Month of year (1-12) */
     uint8_t day_of_month; /* Day of month (1-31) */
     uint8_t hour; /* Hour of the day (0-23) */
@@ -38,6 +42,18 @@ struct isofs_directory_entry_date
     uint8_t gmt_offset; /* Offset from GMT in 15 minutes intervals from -48 east to +52 west */
 } __attribute__((packed));
 typedef struct isofs_directory_entry_date isofs_directory_entry_date_t;
+
+struct isofs_file_flags
+{
+    uint8_t hidden : 1;
+    uint8_t is_directory : 1;
+    uint8_t is_associated_file : 1;
+    uint8_t extended_has_format_info : 1;
+    uint8_t extended_has_group_and_owner : 1;
+    uint8_t reserved : 2;
+    uint8_t not_final_record : 1;
+} __attribute__((packed));
+typedef struct isofs_file_flags isofs_file_flags_t;
 
 struct isofs_directory_entry
 {
@@ -48,7 +64,7 @@ struct isofs_directory_entry
     uint32_t bytes_lsb;
     uint32_t bytes_msb;
     isofs_directory_entry_date_t date;
-    uint8_t file_flags;
+    isofs_file_flags_t file_flags;
     uint8_t interleaved_file_unit_size;
     uint8_t interleaved_gap_size;
     uint16_t volume_sequence_number_lsb;
@@ -107,6 +123,8 @@ struct isofs_primary_volume_descriptor
     isofs_directory_entry_t root;
     char volume_set_identifier[128];
     char publisher_identifier[128];
+    char data_preparer_identifier[128];
+    char application_identifier[128];
     char copyright_file_identifier[37];
     char abstract_file_identifier[37];
     char bibliographic_file_identifier[37];
@@ -115,8 +133,9 @@ struct isofs_primary_volume_descriptor
     isofs_date_t volume_expiration_date;
     isofs_date_t volume_effective_date;
     uint8_t file_structure_version;
+    uint8_t zero3;
     uint8_t application_used[512];
-    uint8_t reserved[ISOFS_SECTOR_SIZE - 0x28D];
+    uint8_t reserved[ISOFS_SECTOR_SIZE - 1395];
 } __attribute__((packed));
 typedef struct isofs_primary_volume_descriptor isofs_primary_volume_descriptor_t;
 
@@ -124,10 +143,13 @@ typedef struct isofs_vfss_list_entry
 {
     struct isofs_vfss_list_entry* next;
     vnode_t root;
-    isofs_directory_entry_t iso_root;
-    drive_t* drive;
-    drive_partition_t* partition;
 } isofs_vfss_list_entry_t;
+
+typedef struct
+{
+    drive_t* drive;
+    isofs_directory_entry_t dir;
+} isofs_inode_t;
 
 typedef struct
 {
@@ -140,9 +162,16 @@ static isofs_vfss_list_t vfss_list;
 static vfs_ops_t vfs_ops;
 static vnode_ops_t vnode_ops;
 
-void isofs_load_volume_descriptor(drive_t* drive, isofs_volume_descriptor_t* desc, uint64_t index)
+int isofs_load_volume_descriptor(drive_t* drive, isofs_volume_descriptor_t* desc, uint8_t type)
 {
-    drivefs_read(drive, ((ISOFS_VOLDESC_START + index) * ISOFS_SECTOR_SIZE) / drive->sector_bytes, sizeof(isofs_volume_descriptor_t), desc);
+    uint8_t index;
+
+    index = 0;
+    do {
+        drivefs_read(drive, isofs_block_to_lba(ISOFS_VOLDESC_START + (index++), drive->sector_bytes), sizeof(isofs_volume_descriptor_t), desc);
+    } while (desc->hdr.type != type && index < ISOFS_MAX_VDS);
+
+    return -(index == ISOFS_MAX_VDS);
 }
 
 drive_partition_fs_t isofs_check(drive_t* drive)
@@ -197,6 +226,9 @@ static int isofs_read(vnode_t* node, void* buffer, uint64_t count)
 
 static int isofs_write(vnode_t* node, const char* data, uint64_t count)
 {
+    UNUSED(node);
+    UNUSED(data);
+    UNUSED(count);
     return -1;
 }
 
@@ -208,19 +240,70 @@ static int isofs_get_attribs(vnode_t* node, vattribs_t* attr)
 static int isofs_lookup(vnode_t* dir, const char* path, vnode_t* out)
 {
     return -1;
+    isofs_directory_entry_t* iso_dir;
+    isofs_inode_t* inode;
+    uint8_t* sector;
+    uint64_t path_offset, bytes_offset;
+
+    inode = dir->data;
+    if (!inode->dir.file_flags.is_directory)
+        return -1;
+
+    if (*path == '/')
+        ++path;
+    for (path_offset = 0; path[path_offset] != '\0' && path[path_offset] != '/'; path_offset++);
+
+    sector = malloc(ISOFS_SECTOR_SIZE);
+    if (sector == NULL)
+        return -1;
+        
+    if (drivefs_read(inode->drive, isofs_block_to_lba(inode->dir.lba_lsb, inode->drive->sector_bytes), inode->dir.bytes_lsb, sector) < ISOFS_SECTOR_SIZE)
+    {
+        free(sector);
+        return -1;
+    }
+
+    for 
+    (
+        bytes_offset = 0, iso_dir = (isofs_directory_entry_t*) sector; 
+        iso_dir->file_name_length < path_offset || strncmp(path, (const char*) iso_dir->file_name, path_offset) != 0; 
+        bytes_offset += iso_dir->entry_length
+    ) 
+        iso_dir = (isofs_directory_entry_t*) (sector + bytes_offset);
+
+    out->ops = &vnode_ops;
+    out->data = malloc(sizeof(isofs_inode_t));
+    ((isofs_inode_t*) out->data)->dir = *iso_dir;
+    ((isofs_inode_t*) out->data)->drive = inode->drive;
+    
+    free(sector);
+    return 0;
 }
 
 int isofs_create(vfs_t* vfs, drive_t* drive, uint64_t partition_index)
 {
+    isofs_inode_t* inode;
     isofs_vfss_list_entry_t* entry;
+    isofs_primary_volume_descriptor_t pvd;
+    
+    if (isofs_load_volume_descriptor(drive, (isofs_volume_descriptor_t*) &pvd, ISOFS_VOLDESC_PRIM))
+        return -1;
 
     entry = malloc(sizeof(isofs_vfss_list_entry_t));
     if (entry == NULL)
         return -1;
     
     entry->root.ops = &vnode_ops;
-    entry->drive = drive;
-    entry->partition = &drive->partitions[partition_index];
+    inode = malloc(sizeof(isofs_inode_t));
+    if (inode == NULL)
+    {
+        free(entry);
+        return -1;
+    }
+    inode->drive = drive;
+    memcpy(&inode->dir, &pvd.root, sizeof(isofs_directory_entry_t));
+    entry->root.data = inode;
+
     entry->next = NULL;
     if (vfss_list.tail == NULL)
         vfss_list.head = entry;

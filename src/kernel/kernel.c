@@ -61,7 +61,7 @@ static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
         ahci_init()
     )
         return -1;
-    
+
     return 0;
 }
 
@@ -73,5 +73,10 @@ void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
             error("Could not initialize kernel");
         return;
     }
+    vfs_t* isofs = malloc(sizeof(vfs_t));
+    isofs_create(isofs, drivefs_lookup("/dev/sda"), 0);
+    vfs_mount("/", isofs);
+    vnode_t out;
+    vfs_lookup("/boot/wkernel.elf", &out);
     info("Kernel initialized (FREE: %u kB | USED: %u kB)", pfa_get_free_memory() >> 10, pfa_get_used_memory() >> 10);
 }

@@ -23,6 +23,7 @@
 #include "sys/drivers/video/framebuffer.h"
 #include "sys/drivers/storage/ahci.h"
 #include "sys/drivers/fs/devfs.h"
+#include "sys/drivers/fs/isofs.h"
 #include "sys/drivers/fs/drivefs.h"
 #include "proc/process.h"
 #include "proc/scheduler.h"

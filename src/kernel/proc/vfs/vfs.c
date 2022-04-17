@@ -2,14 +2,13 @@
 #include "../../utils/log.h"
 #include "../../utils/alloc.h"
 #include "../../sys/drivers/fs/devfs.h"
+#include "../../sys/drivers/fs/drivefs.h"
 #include "../../sys/drivers/fs/isofs.h"
 #include <stddef.h>
 #include <string.h>
 #include <mem.h>
 
 #define trace_vfs(msg, ...) trace("VIFS", msg, ##__VA_ARGS__) 
-
-#define THIS_FOLDER_PREFIX "./"
 
 typedef struct vfs_list_entry
 {
@@ -31,6 +30,7 @@ void vfs_init(void)
     vfs_list.tail = NULL;
     
     devfs_init();
+    drivefs_init();
     isofs_init();
 }
 
@@ -81,7 +81,7 @@ static uint64_t find_longest_mount_path(const char* path, vfs_t** vfs_root)
             path_len++
         );
 
-        if (path_len > max_path_len)
+        if (path_len > max_path_len && *mount_path_ptr == '\0')
         {
             *vfs_root = entry->vfs;
             max_path_len = path_len;
@@ -93,7 +93,7 @@ static uint64_t find_longest_mount_path(const char* path, vfs_t** vfs_root)
 
 int vfs_lookup(const char* path, vnode_t* out)
 {
-    uint64_t path_length, prefix_length, slash_offset;
+    uint64_t path_length, slash_offset;
     vfs_t* mount_vfs;
     vnode_t node;
     char* new_path;
@@ -109,8 +109,7 @@ int vfs_lookup(const char* path, vnode_t* out)
         return -1;
     }
     
-    prefix_length = strlen(THIS_FOLDER_PREFIX);
-    path_length = strlen(path);
+    path_length = strlen(path) + 1;
     if (path_length == 0)
     {
         out->ops = node.ops;
@@ -118,12 +117,11 @@ int vfs_lookup(const char* path, vnode_t* out)
         return 0;
     }
     
-    new_path = malloc(prefix_length + path_length);
+    new_path = malloc(path_length);
     new_path_ptr = new_path;
     exit_code = 0;
 
-    memcpy(new_path, THIS_FOLDER_PREFIX, prefix_length);
-    memcpy(new_path + prefix_length, path, path_length);
+    memcpy(new_path, path, path_length);
 
     while (strlen(new_path_ptr) > 0 && exit_code == 0)
     {
@@ -140,7 +138,7 @@ int vfs_lookup(const char* path, vnode_t* out)
     out->ops = node.ops;
 
     if (exit_code != 0)
-        trace_vfs("Lookup error: %d", exit_code);
+        trace_vfs("Lookup error: %d", (long) exit_code);
 
     return exit_code;
 }

@@ -79,14 +79,13 @@ int atoi(const char* str)
 char* itoa(long val, char* str, int base)
 {
     uint64_t i;
+    char is_negative;
     long num;
     
     i = 0;
-    if (val < 0)
-    {
-        str[i++] = '-';
+    is_negative = (val < 0);
+    if (is_negative)
         val *= -1;
-    }
 
     do {
         num = (val % base);
@@ -98,6 +97,10 @@ char* itoa(long val, char* str, int base)
         else
             str[i++] = num + '0';
     } while ((val /= base) > 0);
+
+    if (is_negative)
+        str[i++] = '-';
+    
     str[i] = '\0';
 
     strrev(str);

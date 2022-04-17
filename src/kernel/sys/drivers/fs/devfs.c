@@ -105,6 +105,8 @@ static int devfs_lookup(vnode_t* dir, const char* path, vnode_t* out)
         trace_devfs("Trying to lookup a NULL path");
         return -1;
     }
+    else if (path[0] == '/')
+        ++path;
 
     for (inode = inodes_list.head; inode != NULL; inode = inode->next)
     {
