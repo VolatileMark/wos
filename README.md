@@ -16,7 +16,7 @@ why live?
 
 no, lmao.
 
-#### What are your political views?
+#### Are you human?
 
 So anyways, this is my free-time/i-have-no-social-life project, and my 6th attempt at making an OS all by myself, yes, I am aware of the definition of insanity. It is designed to run ONLY on x86-64 CPUs, because, god forbid, I have touch ARM assembly.
 

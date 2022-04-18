@@ -1,9 +1,38 @@
 #include "kernel.h"
 
-static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
+static int kernel_init_fs(void)
 {
     vfs_t* devfs;
+    vnode_t* vnode;
 
+    vfs_init();
+    devfs_init();
+    drivefs_init();
+    isofs_init();
+    
+    devfs = malloc(sizeof(vfs_t));
+    if (devfs == NULL)
+    {
+        error("Failed to allocate memory for devfs");
+        return -1;
+    }
+    else if (devfs_create(devfs))
+    {
+        free(devfs);
+        error("Could not initialize devfs");
+        return -1;
+    }
+    vfs_mount("/dev", devfs);
+    
+    vnode = malloc(sizeof(vnode_t));
+    tty_get_vnode(vnode);
+    devfs_add_device("tty0", vnode);
+
+    return 0;
+}
+
+static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
+{
     interrupts_disable();
 
     paging_init();
@@ -34,24 +63,8 @@ static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
     pit_init();
     syscall_init();
 
-    vfs_init();
-
-    /* Init devfs */
-    {
-        devfs = malloc(sizeof(vfs_t));
-        if (devfs == NULL)
-        {
-            error("Failed to allocate memory for devfs");
-            return -1;
-        }
-        else if (devfs_create(devfs))
-        {
-            free(devfs);
-            error("Could not initialize devfs");
-            return -1;
-        }
-        vfs_mount("/dev", devfs);
-    }
+    if (kernel_init_fs())
+        return -1;
 
     if 
     (
@@ -73,10 +86,5 @@ void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
             error("Could not initialize kernel");
         return;
     }
-    vfs_t* isofs = malloc(sizeof(vfs_t));
-    isofs_create(isofs, drivefs_lookup("/dev/sda"), 0);
-    vfs_mount("/", isofs);
-    vnode_t out;
-    vfs_lookup("/boot/wkernel.elf", &out);
     info("Kernel initialized (FREE: %u kB | USED: %u kB)", pfa_get_free_memory() >> 10, pfa_get_used_memory() >> 10);
 }

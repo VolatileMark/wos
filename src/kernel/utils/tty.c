@@ -1,18 +1,23 @@
 #include "tty.h"
 #include "multiboot2-utils.h"
 #include "psf.h"
+#include "macros.h"
 #include "log.h"
+#include "../proc/vfs/vattribs.h"
 #include "../sys/drivers/video/framebuffer.h"
 #include <stdarg.h>
+#include <stddef.h>
 #include <string.h>
+
+extern volatile psf2_file_t _binary_font_psf_start;
 
 static uint32_t palette[5];
 static uint32_t cursor_x, cursor_y;
 static uint32_t max_x, max_y;
 static uint32_t offset_x, offset_y;
 static uint32_t fg_color, bg_color;
+static vnode_ops_t vnode_ops;
 static framebuffer_info_t* fb;
-extern volatile psf2_file_t _binary_font_psf_start;
 
 #define font_header _binary_font_psf_start.header
 #define font_glyphs _binary_font_psf_start.glyphs
@@ -62,10 +67,26 @@ static void tty_putc(char c)
         cursor_y = 0;
 }
 
-static void tty_puts(char* str)
+static void tty_puts(const char* str)
 {
+    uint8_t c;
     while (*str != '\0')
-        tty_putc(*str++);
+    {
+        if (*str != '@')
+        {
+            tty_putc(*str++);
+            continue;
+        }
+    
+        c = *(++str) - '0';
+        if (c < (sizeof(palette) / sizeof(uint32_t)))
+        {
+            fg_color = palette[c];
+            ++str;
+        }
+        else
+            tty_putc('@');
+    }
 }
 
 void tty_printf(const char* str, ...)
@@ -79,7 +100,19 @@ void tty_printf(const char* str, ...)
 
     for (p = ((char*) str); *p != '\0'; p++)
     {
-        if (*p != '%')
+        if (*p == '@')
+        {
+            i = *(p + 1) - '0';
+            if (i < (sizeof(palette) / sizeof(uint32_t)))
+            {
+                fg_color = palette[i];
+                ++p;
+            }
+            else
+                tty_putc(*p);
+            continue;
+        }
+        else if (*p != '%')
         {
             tty_putc(*p);
             continue;
@@ -112,10 +145,6 @@ void tty_printf(const char* str, ...)
         case '%':
             tty_putc('%');
             break;
-        default:
-            i = *p - '0';
-            if (i < sizeof(palette) / sizeof(uint32_t))
-                fg_color = palette[i];
         }
     }
 
@@ -130,6 +159,43 @@ void tty_clear_screen(void)
     fb_ptr = (uint32_t*) fb->addr;
     for (i = 0; i < fb->size; i++)
         fb_ptr[i] = bg_color;
+}
+
+static int tty_open(vnode_t* vnode)
+{
+    UNUSED(vnode);
+    return 0;
+}
+
+static int tty_lookup(vnode_t* vnode, const char* path, vnode_t* out)
+{
+    UNUSED(vnode);
+    UNUSED(path);
+    UNUSED(out);
+    return -1;
+}
+
+static int tty_read(vnode_t* vnode, void* buffer, uint64_t count)
+{
+    UNUSED(vnode);
+    UNUSED(buffer);
+    UNUSED(count);
+    return -1;
+}
+
+static int tty_write(vnode_t* vnode, const char* data, uint64_t count)
+{
+    UNUSED(vnode);
+    UNUSED(count);
+    tty_puts(data);
+    return 0;
+}
+
+static int tty_get_attribs(vnode_t* vnode, vattribs_t* attr)
+{
+    UNUSED(vnode);
+    attr->size = fb->size;
+    return 0;
 }
 
 int tty_init(void)
@@ -164,6 +230,12 @@ int tty_init(void)
 
     fg_color = palette[0];
     bg_color = palette[4];
+
+    vnode_ops.open = &tty_open;
+    vnode_ops.lookup = &tty_lookup;
+    vnode_ops.read = &tty_read;
+    vnode_ops.write = &tty_write;
+    vnode_ops.get_attribs = &tty_get_attribs;
 
     info("Framebuffer located at %p, mapped at %p, has size %u bytes", multiboot_get_tag_framebuffer()->common.framebuffer_addr, fb->addr, fb->size);
     info("TTY initialized. Resolution is %ux%u pixels or %ux%u characters", fb->width, fb->height, max_x, max_y);
@@ -209,4 +281,11 @@ void tty_set_background_color(uint8_t r, uint8_t g, uint8_t b)
 void tty_set_foreground_color(uint8_t r, uint8_t g, uint8_t b)
 {
     fg_color = framebuffer_color(r, g, b);
+}
+
+int tty_get_vnode(vnode_t* out)
+{
+    out->ops = &vnode_ops;
+    out->data = NULL;
+    return 0;
 }

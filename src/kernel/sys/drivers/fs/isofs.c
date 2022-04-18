@@ -59,8 +59,8 @@ struct isofs_directory_entry
 {
     uint8_t entry_length;
     uint8_t extended_attribute_record_length;
-    uint32_t lba_lsb;
-    uint32_t lba_msb;
+    uint32_t block_lsb;
+    uint32_t block_msb;
     uint32_t bytes_lsb;
     uint32_t bytes_msb;
     isofs_directory_entry_date_t date;
@@ -148,7 +148,12 @@ typedef struct isofs_vfss_list_entry
 typedef struct
 {
     drive_t* drive;
-    isofs_directory_entry_t dir;
+    uint8_t is_directory : 1;
+    uint8_t is_hidden : 1;
+    uint8_t exists : 1;
+    uint8_t reserved : 5;
+    uint64_t data_block;
+    uint64_t data_size;
 } isofs_inode_t;
 
 typedef struct
@@ -204,7 +209,6 @@ static isofs_vfss_list_entry_t* isofs_get_entry(uint64_t index)
 static int isofs_root(vfs_t* vfs, vnode_t* out)
 {
     isofs_vfss_list_entry_t* entry;
-
     entry = isofs_get_entry(vfs->index);
     if (entry == NULL)
         return -1;
@@ -215,13 +219,22 @@ static int isofs_root(vfs_t* vfs, vnode_t* out)
 
 static int isofs_open(vnode_t* node)
 {
-    UNUSED(node);
+    isofs_inode_t* inode;
+    inode = node->data;
+    if (inode->is_directory || !inode->exists)
+        return -1;
     return 0;
 }
 
 static int isofs_read(vnode_t* node, void* buffer, uint64_t count)
 {
-    return -1;
+    isofs_inode_t* inode;
+    inode = node->data;
+    if (inode->is_directory || inode->exists)
+        return -1;
+    if (drivefs_read(inode->drive, isofs_block_to_lba(inode->data_block, inode->drive->sector_bytes), count, buffer) < count)
+        return -1;
+    return 0;
 }
 
 static int isofs_write(vnode_t* node, const char* data, uint64_t count)
@@ -234,19 +247,21 @@ static int isofs_write(vnode_t* node, const char* data, uint64_t count)
 
 static int isofs_get_attribs(vnode_t* node, vattribs_t* attr)
 {
-    return -1;
+    isofs_inode_t* inode;
+    inode = node->data;
+    attr->size = inode->data_size;
+    return 0;
 }
 
 static int isofs_lookup(vnode_t* dir, const char* path, vnode_t* out)
 {
-    return -1;
     isofs_directory_entry_t* iso_dir;
     isofs_inode_t* inode;
     uint8_t* sector;
     uint64_t path_offset, bytes_offset;
 
     inode = dir->data;
-    if (!inode->dir.file_flags.is_directory)
+    if (!inode->is_directory)
         return -1;
 
     if (*path == '/')
@@ -256,8 +271,8 @@ static int isofs_lookup(vnode_t* dir, const char* path, vnode_t* out)
     sector = malloc(ISOFS_SECTOR_SIZE);
     if (sector == NULL)
         return -1;
-        
-    if (drivefs_read(inode->drive, isofs_block_to_lba(inode->dir.lba_lsb, inode->drive->sector_bytes), inode->dir.bytes_lsb, sector) < ISOFS_SECTOR_SIZE)
+    
+    if (drivefs_read(inode->drive, isofs_block_to_lba(inode->data_block, inode->drive->sector_bytes), inode->data_size, sector) < ISOFS_SECTOR_SIZE)
     {
         free(sector);
         return -1;
@@ -266,16 +281,29 @@ static int isofs_lookup(vnode_t* dir, const char* path, vnode_t* out)
     for 
     (
         bytes_offset = 0, iso_dir = (isofs_directory_entry_t*) sector; 
-        iso_dir->file_name_length < path_offset || strncmp(path, (const char*) iso_dir->file_name, path_offset) != 0; 
+        bytes_offset < inode->data_size && bytes_offset < ISOFS_SECTOR_SIZE;
         bytes_offset += iso_dir->entry_length
     ) 
+    {
         iso_dir = (isofs_directory_entry_t*) (sector + bytes_offset);
+        if 
+        (
+            iso_dir->file_name_length >= path_offset &&
+            strncmp(path, (const char*) iso_dir->file_name, path_offset) == 0
+        )
+            break;
+    }
 
     out->ops = &vnode_ops;
     out->data = malloc(sizeof(isofs_inode_t));
-    ((isofs_inode_t*) out->data)->dir = *iso_dir;
     ((isofs_inode_t*) out->data)->drive = inode->drive;
-    
+    inode = out->data;
+    inode->is_directory = iso_dir->file_flags.is_directory;
+    inode->is_hidden = iso_dir->file_flags.hidden;
+    inode->exists = 1;
+    inode->data_block = iso_dir->block_lsb;
+    inode->data_size = iso_dir->bytes_lsb;
+
     free(sector);
     return 0;
 }
@@ -301,7 +329,10 @@ int isofs_create(vfs_t* vfs, drive_t* drive, uint64_t partition_index)
         return -1;
     }
     inode->drive = drive;
-    memcpy(&inode->dir, &pvd.root, sizeof(isofs_directory_entry_t));
+    inode->is_hidden = pvd.root.file_flags.hidden;
+    inode->is_directory = pvd.root.file_flags.is_directory;
+    inode->data_block = pvd.root.block_lsb;
+    inode->data_size = pvd.root.bytes_lsb;
     entry->root.data = inode;
 
     entry->next = NULL;

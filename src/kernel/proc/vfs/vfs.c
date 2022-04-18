@@ -1,9 +1,6 @@
 #include "vfs.h"
 #include "../../utils/log.h"
 #include "../../utils/alloc.h"
-#include "../../sys/drivers/fs/devfs.h"
-#include "../../sys/drivers/fs/drivefs.h"
-#include "../../sys/drivers/fs/isofs.h"
 #include <stddef.h>
 #include <string.h>
 #include <mem.h>
@@ -28,10 +25,6 @@ void vfs_init(void)
 {
     vfs_list.head = NULL;    
     vfs_list.tail = NULL;
-    
-    devfs_init();
-    drivefs_init();
-    isofs_init();
 }
 
 int vfs_mount(const char* path, vfs_t* vfs)
