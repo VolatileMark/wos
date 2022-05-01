@@ -2,15 +2,10 @@
 #define __DRIVEFS_H__
 
 #include <stdint.h>
+#include "../../../proc/vfs/vnode.h"
+#include "../../../proc/vfs/vfs.h"
 
 struct drive_ops;
-
-typedef enum
-{
-    DRIVE_FS_UNKNOWN,
-    DRIVE_FS_FAT,
-    DRIVE_FS_ISO9660
-} drive_partition_fs_t;
 
 typedef enum
 {
@@ -19,12 +14,12 @@ typedef enum
 
 typedef struct
 {
-    drive_partition_fs_t fs;
+    char fs_sig[8];
+    vfs_t vfs;
     uint64_t lba_start;
     uint64_t lba_end;
     uint64_t sectors;
     uint64_t flags;
-    const char* mountpoint;
 } drive_partition_t;
 
 typedef struct

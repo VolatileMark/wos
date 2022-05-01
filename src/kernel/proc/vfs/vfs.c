@@ -84,19 +84,15 @@ static uint64_t find_longest_mount_path(const char* path, vfs_t** vfs_root)
     return max_path_len;
 }
 
-int vfs_lookup(const char* path, vnode_t* out)
+int vfs_instance_lookup(vfs_t* vfs, const char* path, vnode_t* out)
 {
     uint64_t path_length, slash_offset;
-    vfs_t* mount_vfs;
     vnode_t node;
     char* new_path;
     char* new_path_ptr;
     int exit_code;
 
-    path_length = find_longest_mount_path(path, &mount_vfs);
-    path += path_length;
-
-    if (mount_vfs->ops->root(mount_vfs, &node))
+    if (vfs->ops->root(vfs, &node))
     {
         trace_vfs("Failed to retrieve root node for path: %s", path);
         return -1;
@@ -105,8 +101,11 @@ int vfs_lookup(const char* path, vnode_t* out)
     path_length = strlen(path) + 1;
     if (path_length == 0)
     {
-        out->ops = node.ops;
-        out->data = node.data;
+        if (out != NULL)
+        {
+            out->ops = node.ops;
+            out->data = node.data;
+        }
         return 0;
     }
     
@@ -127,9 +126,23 @@ int vfs_lookup(const char* path, vnode_t* out)
 
     free(new_path);
     
-    out->data = node.data;
-    out->ops = node.ops;
+    if (out != NULL)
+    {
+        out->data = node.data;
+        out->ops = node.ops;
+    }
 
+    return exit_code;
+}
+
+int vfs_lookup(const char* path, vnode_t* out)
+{
+    int exit_code;
+
+    vfs_t* mount_vfs;
+    path += find_longest_mount_path(path, &mount_vfs);
+    
+    exit_code = vfs_instance_lookup(mount_vfs, path, out);
     if (exit_code != 0)
         trace_vfs("Lookup error: %d", (long) exit_code);
 

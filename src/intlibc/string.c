@@ -17,7 +17,7 @@ uint64_t strlen(const char* str)
 
 char strcmp(const char* str1, const char* str2)
 {
-    return strncmp(str1, str2, minu(strlen(str1), strlen(str2)));
+    return strncmp(str1, str2, maxu(strlen(str1), strlen(str2)));
 }
 
 char strncmp(const char* str1, const char* str2, uint64_t bytes)
@@ -25,10 +25,13 @@ char strncmp(const char* str1, const char* str2, uint64_t bytes)
     for 
     (
         ; 
-        bytes > 0 && *str1++ == *str2++ && *str1 != '\0' && *str2 != '\0'; 
+        bytes > 0 && *str1 != '\0' && *str2 != '\0' && *str1++ == *str2++; 
         bytes--
     );
-    return (*(str1 - 1) - *(str2 - 1));
+    --str1; --str2;
+    if (*str1 == *str2 && bytes > 0)
+        return -1;
+    return (*str1 - *str2);
 }
 
 uint64_t strcspn(const char* str1, const char* str2)

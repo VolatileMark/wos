@@ -3,20 +3,20 @@
 #include "isofs.h"
 #include "../storage/partition-tables/mbr.h"
 #include "../storage/partition-tables/gpt.h"
-#include "../../../proc/vfs/vnode.h"
 #include "../../../utils/alloc.h"
 #include "../../../utils/macros.h"
 #include "../../../utils/log.h"
+#include "../../../kernel.h"
 #include <stddef.h>
 
-#define trace_drive_manager(msg, ...) trace("STOR", msg, ##__VA_ARGS__)
+#define trace_drivefs(msg, ...) trace("DRFS", msg, ##__VA_ARGS__)
 
-typedef drive_partition_fs_t (*fs_check_t)(drive_t* drive);
+typedef int (*fs_create_t)(drive_t* drive, uint64_t partition_index);
 
 static uint64_t drive_index;
-static vnode_ops_t drive_manager_vnode_ops;
-static fs_check_t fss[] = {
-    &isofs_check
+static vnode_ops_t drivefs_vnode_ops;
+static fs_create_t fss[] = {
+    &isofs_create
 };
 
 static int drivefs_open_stub(vnode_t* node)
@@ -79,12 +79,15 @@ static int drivefs_detect_partitions(drive_t* drive)
     return 0;
 }
 
-static drive_partition_fs_t drivefs_detect_partition_fs(drive_t* drive, uint64_t index)
+static int drivefs_detect_partition_fs(drive_t* drive, uint64_t index)
 {
-    drive_partition_fs_t fs;
     uint64_t i;
-    for (i = 0; i < (sizeof(fss) / sizeof(uint64_t)) && (fs = fss[i](drive)) == DRIVE_FS_UNKNOWN; i++);
-    return fs;
+    for (i = 0; i < (sizeof(fss) / sizeof(fs_create_t)); i++)
+    {
+        if (!fss[i](drive, index))
+            return 0;
+    }
+    return -1;
 }
 
 int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_bytes)
@@ -92,18 +95,19 @@ int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_by
     uint64_t i;
     drive_t* drive;
     vnode_t* vnode;
-    char path[] = "sda";
+    drive_partition_t* part;
+    char path[] = "sda\0";
 
     if (drive_index > 'z' - 'a')
     {
-        trace_drive_manager("Maximum drive number reached");
+        trace_drivefs("Maximum drive number reached");
         return -1;
     }
 
     drive = malloc(sizeof(drive_t));
     if (drive == NULL)
     {
-        trace_drive_manager("Failed to allocate memory for drive descriptor");
+        trace_drivefs("Failed to allocate memory for drive descriptor");
         return -1;
     }
 
@@ -113,7 +117,7 @@ int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_by
     if (drivefs_identify(drive))
     {
         free(drive);
-        trace_drive_manager("Failed to IDENTIFY drive");
+        trace_drivefs("Failed to IDENTIFY drive");
     }
     drive->sector_bytes = drive->ops->property(drive->interface, DRIVE_PROPERTY_SECSIZE);
     
@@ -121,12 +125,12 @@ int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_by
     if (vnode == NULL)
     {
         free(drive);
-        trace_drive_manager("Failed to allocate memory for new devfs vnode");
+        trace_drivefs("Failed to allocate memory for new devfs vnode");
         return -1;
     }
 
     vnode->data = drive;
-    vnode->ops = &drive_manager_vnode_ops;
+    vnode->ops = &drivefs_vnode_ops;
 
     path[2] += drive_index;
 
@@ -143,8 +147,29 @@ int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_by
     {
         for (i = 0; i < drive->num_partitions; i++)
         {
-            drive->partitions[i].fs = drivefs_detect_partition_fs(drive, i);
-            info("Detected partition of type %u saved as /dev/%s%u", drive->partitions[i].fs, path, i + 1);
+            part = &drive->partitions[i];
+            path[3] = '1' + i;
+            if (drivefs_detect_partition_fs(drive, i))
+                trace_drivefs("No filesystem found for /dev/%s", path);
+            else
+            {
+                vnode = malloc(sizeof(vnode_t));
+                if (vnode == NULL)
+                    continue;
+                vnode->data = part;
+                vnode->ops = &drivefs_vnode_ops;
+                if (devfs_add_device((const char*) path, vnode))
+                    free(vnode);
+                else
+                {
+                    info("%s filesystem detected for /dev/%s", drive->partitions[i].fs_sig, path);
+                    if (!vfs_instance_lookup(&part->vfs, KERNEL_FILE_PATH, NULL))
+                    {
+                        vfs_mount("/", &part->vfs);
+                        info("System is booting from /dev/%s", path);
+                    }
+                }
+            }
         }
     }
 
@@ -156,11 +181,11 @@ int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_by
 void drivefs_init(void)
 {
     drive_index = 0;
-    drive_manager_vnode_ops.open = &drivefs_open_stub;
-    drive_manager_vnode_ops.lookup = &drivefs_lookup_stub;
-    drive_manager_vnode_ops.read = &drivefs_read_stub;
-    drive_manager_vnode_ops.write = &drivefs_write_stub;
-    drive_manager_vnode_ops.get_attribs = &drivefs_get_attribs_stub;
+    drivefs_vnode_ops.open = &drivefs_open_stub;
+    drivefs_vnode_ops.lookup = &drivefs_lookup_stub;
+    drivefs_vnode_ops.read = &drivefs_read_stub;
+    drivefs_vnode_ops.write = &drivefs_write_stub;
+    drivefs_vnode_ops.get_attribs = &drivefs_get_attribs_stub;
 }
 
 drive_t* drivefs_lookup(const char* path)

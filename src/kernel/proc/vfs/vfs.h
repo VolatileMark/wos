@@ -22,6 +22,7 @@ typedef struct vfs_ops
 void vfs_init(void);
 
 int vfs_mount(const char* path, vfs_t* vfs);
+int vfs_instance_lookup(vfs_t* vfs, const char* path, vnode_t* out);
 int vfs_lookup(const char* path, vnode_t* out);
 int vfs_open(vnode_t* target);
 int vfs_read(vnode_t* target, void* buffer, uint64_t bytes);

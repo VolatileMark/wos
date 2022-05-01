@@ -7,6 +7,7 @@
 #include <string.h>
 #include <mem.h>
 
+#define ISOFS_SIG "ISO9660"
 #define ISOFS_MAX_VDS 3
 #define ISOFS_SECTOR_SIZE 2048
 #define ISOFS_VOLDESC_START 16
@@ -179,17 +180,17 @@ int isofs_load_volume_descriptor(drive_t* drive, isofs_volume_descriptor_t* desc
     return -(index == ISOFS_MAX_VDS);
 }
 
-drive_partition_fs_t isofs_check(drive_t* drive)
+int isofs_check(drive_t* drive)
 {
     isofs_volume_descriptor_t desc;
-    isofs_load_volume_descriptor(drive, &desc, 0);
+    isofs_load_volume_descriptor(drive, &desc, ISOFS_VOLDESC_BOOT);
     if 
     (
         strncmp(desc.hdr.sig, ISOFS_VOLDESC_SIG, 5) == 0 && 
         desc.hdr.ver == ISOFS_VOLDESC_VER
     )
-        return DRIVE_FS_ISO9660;
-    return DRIVE_FS_UNKNOWN;
+        return 0;
+    return -1;
 }
 
 static isofs_vfss_list_entry_t* isofs_get_entry(uint64_t index)
@@ -281,7 +282,7 @@ static int isofs_lookup(vnode_t* dir, const char* path, vnode_t* out)
     for 
     (
         bytes_offset = 0, iso_dir = (isofs_directory_entry_t*) sector; 
-        bytes_offset < inode->data_size && bytes_offset < ISOFS_SECTOR_SIZE;
+        bytes_offset < inode->data_size && bytes_offset < ISOFS_SECTOR_SIZE && iso_dir->entry_length != 0;
         bytes_offset += iso_dir->entry_length
     ) 
     {
@@ -291,9 +292,13 @@ static int isofs_lookup(vnode_t* dir, const char* path, vnode_t* out)
             iso_dir->file_name_length >= path_offset &&
             strncmp(path, (const char*) iso_dir->file_name, path_offset) == 0
         )
-            break;
+            goto SUCCESS;
     }
 
+    free(sector);
+    return -1;
+
+SUCCESS:
     out->ops = &vnode_ops;
     out->data = malloc(sizeof(isofs_inode_t));
     ((isofs_inode_t*) out->data)->drive = inode->drive;
@@ -308,13 +313,17 @@ static int isofs_lookup(vnode_t* dir, const char* path, vnode_t* out)
     return 0;
 }
 
-int isofs_create(vfs_t* vfs, drive_t* drive, uint64_t partition_index)
+int isofs_create(drive_t* drive, uint64_t partition_index)
 {
     isofs_inode_t* inode;
     isofs_vfss_list_entry_t* entry;
     isofs_primary_volume_descriptor_t pvd;
     
-    if (isofs_load_volume_descriptor(drive, (isofs_volume_descriptor_t*) &pvd, ISOFS_VOLDESC_PRIM))
+    if 
+    (
+        isofs_check(drive) ||
+        isofs_load_volume_descriptor(drive, (isofs_volume_descriptor_t*) &pvd, ISOFS_VOLDESC_PRIM)
+    )
         return -1;
 
     entry = malloc(sizeof(isofs_vfss_list_entry_t));
@@ -342,8 +351,10 @@ int isofs_create(vfs_t* vfs, drive_t* drive, uint64_t partition_index)
         vfss_list.tail->next = entry;
     vfss_list.tail = entry;
 
-    vfs->index = index++;
-    vfs->ops = &vfs_ops;
+    drive->partitions[partition_index].vfs.index = index++;
+    drive->partitions[partition_index].vfs.ops = &vfs_ops;
+    strcpy(drive->partitions[partition_index].fs_sig, ISOFS_SIG);
+
     return 0;
 }
 
