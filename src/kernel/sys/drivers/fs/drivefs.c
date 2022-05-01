@@ -163,7 +163,11 @@ int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_by
                 else
                 {
                     info("%s filesystem detected for /dev/%s", drive->partitions[i].fs_sig, path);
-                    if (!vfs_instance_lookup(&part->vfs, KERNEL_FILE_PATH, NULL))
+                    if 
+                    (
+                        vfs_lookup("/", NULL) &&
+                        !vfs_instance_lookup(&part->vfs, KERNEL_FILE_PATH, NULL)
+                    )
                     {
                         vfs_mount("/", &part->vfs);
                         info("System is booting from /dev/%s", path);

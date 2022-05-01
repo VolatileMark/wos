@@ -92,6 +92,12 @@ int vfs_instance_lookup(vfs_t* vfs, const char* path, vnode_t* out)
     char* new_path_ptr;
     int exit_code;
 
+    if (vfs == NULL)
+    {
+        trace_vfs("VFS is null");
+        return -1;
+    }
+
     if (vfs->ops->root(vfs, &node))
     {
         trace_vfs("Failed to retrieve root node for path: %s", path);
@@ -124,6 +130,9 @@ int vfs_instance_lookup(vfs_t* vfs, const char* path, vnode_t* out)
         new_path_ptr += slash_offset;
     }
 
+    if (exit_code != 0)
+        trace_vfs("Lookup error: %d", (long) exit_code);
+
     free(new_path);
     
     if (out != NULL)
@@ -137,16 +146,9 @@ int vfs_instance_lookup(vfs_t* vfs, const char* path, vnode_t* out)
 
 int vfs_lookup(const char* path, vnode_t* out)
 {
-    int exit_code;
-
     vfs_t* mount_vfs;
-    path += find_longest_mount_path(path, &mount_vfs);
-    
-    exit_code = vfs_instance_lookup(mount_vfs, path, out);
-    if (exit_code != 0)
-        trace_vfs("Lookup error: %d", (long) exit_code);
-
-    return exit_code;
+    path += find_longest_mount_path(path, &mount_vfs);   
+    return vfs_instance_lookup(mount_vfs, path, out);
 }
 
 int vfs_open(vnode_t* target)

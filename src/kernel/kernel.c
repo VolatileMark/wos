@@ -22,11 +22,26 @@ static int kernel_init_fs(void)
         error("Could not initialize devfs");
         return -1;
     }
-    vfs_mount("/dev", devfs);
+    else if (vfs_mount("/dev", devfs))
+    {
+        free(devfs);
+        error("Could not mount devfs");
+        return -1;
+    }
     
     vnode = malloc(sizeof(vnode_t));
+    if (vnode == NULL)
+    {
+        error("Could not allocate vnode for tty0");
+        return -1;
+    }
     tty_get_vnode(vnode);
-    devfs_add_device("tty0", vnode);
+    if (devfs_add_device("tty0", vnode))
+    {
+        free(vnode);
+        error("Could not add tty0 to devfs");
+        return -1;
+    }
 
     return 0;
 }

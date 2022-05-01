@@ -18,6 +18,6 @@ void tty_clear_screen(void);
 void tty_set_background_color(uint8_t r, uint8_t g, uint8_t b);
 void tty_set_foreground_color(uint8_t r, uint8_t g, uint8_t b);
 
-int tty_get_vnode(vnode_t* out);
+void tty_get_vnode(vnode_t* out);
 
 #endif
