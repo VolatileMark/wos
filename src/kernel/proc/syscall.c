@@ -21,18 +21,6 @@ typedef int (*syscall_handler_t)(uint64_t* stack_ptr);
 
 extern void switch_to_kernel(cpu_state_t* state, uint64_t args_to_copy);
 
-/*
-static void* pmalloc(uint64_t size)
-{
-    return (void*) allocate_heap_memory(get_current_scheduled_process()->heap, size);
-}
-
-static void pfree(void* addr)
-{
-    free_heap_memory(get_current_scheduled_process()->heap, (uint64_t) addr);
-}
-*/
-
 DEFINE_SYSCALL(exit)
 {
     UNUSED(stack);
@@ -80,7 +68,8 @@ DEFINE_SYSCALL(vm_map)
     offset = POP_STACK(long);
     window = POP_STACK(uint64_t*);
     ps = scheduler_get_current_scheduled_process();
-
+    vaddr = 0;
+    
     *window = (uint64_t) -1;
 
     if 

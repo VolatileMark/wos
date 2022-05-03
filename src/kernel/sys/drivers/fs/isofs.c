@@ -231,7 +231,7 @@ static int isofs_read(vnode_t* node, void* buffer, uint64_t count)
 {
     isofs_inode_t* inode;
     inode = node->data;
-    if (inode->is_directory || inode->exists)
+    if (inode->is_directory || !inode->exists)
         return -1;
     if (drivefs_read(inode->drive, isofs_block_to_lba(inode->data_block, inode->drive->sector_bytes), count, buffer) < count)
         return -1;
