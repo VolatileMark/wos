@@ -1,7 +1,7 @@
 #ifndef __MULTIBOOT2_UTILS_H__
 #define __MULTIBOOT2_UTILS_H__
 
-#include "multiboot2.h"
+#include "../headers/multiboot2.h"
 #include <stdint.h>
 
 int multiboot_parse_struct(uint64_t addr);

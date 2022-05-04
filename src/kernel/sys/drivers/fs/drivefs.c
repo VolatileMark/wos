@@ -90,7 +90,7 @@ static int drivefs_detect_partition_fs(drive_t* drive, uint64_t index)
     return -1;
 }
 
-int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_bytes)
+int drivefs_register_drive(void* interface, drive_ops_t* ops)
 {
     uint64_t i;
     drive_t* drive;
@@ -119,7 +119,7 @@ int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_by
         free(drive);
         trace_drivefs("Failed to IDENTIFY drive");
     }
-    drive->sector_bytes = drive->ops->property(drive->interface, DRIVE_PROPERTY_SECSIZE);
+    drive->sector_bytes = drivefs_get_property(drive, DRIVE_PROPERTY_SECSIZE);
     
     vnode = malloc(sizeof(vnode_t));
     if (vnode == NULL)
@@ -209,7 +209,7 @@ int drivefs_identify(drive_t* drive)
     return drive->ops->identify(drive->interface);
 }
 
-uint64_t drivefs_property(drive_t* drive)
+uint64_t drivefs_get_property(drive_t* drive, drive_property_t prop)
 {
-    return drive->ops->identify(drive->interface);
+    return drive->ops->get_property(drive->interface, prop);
 }

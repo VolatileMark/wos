@@ -95,8 +95,7 @@ typedef struct hba_mem hba_mem_t;
 typedef struct
 {
     ahci_device_type_t type;
-    uint32_t index;
-    uint32_t sector_size;
+    uint64_t index;
     uint64_t clb_vaddr;
     uint64_t fb_vaddr;
     uint64_t ctb_vaddr;

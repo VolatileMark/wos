@@ -1,6 +1,6 @@
 #include "gdt.h"
 #include "tss.h"
-#include "../../utils/constants.h"
+#include "../../headers/constants.h"
 #include <mem.h>
 
 #define GDT_NUM_TSS_ENTRIES 1

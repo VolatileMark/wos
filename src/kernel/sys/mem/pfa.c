@@ -1,8 +1,8 @@
 #include "pfa.h"
 #include "mmap.h"
 #include "paging.h"
-#include "../../utils/constants.h"
-#include "../../utils/multiboot2.h"
+#include "../../headers/constants.h"
+#include "../../headers/multiboot2.h"
 #include <math.h>
 #include <stddef.h>
 #include <mem.h>
@@ -103,7 +103,7 @@ void pfa_init(void)
     bitmap_size = ceil(((double) total_memory) / SIZE_4KB / 8.0);
     bitmap_paddr = pfa_request_pages(ceil((double) bitmap_size / SIZE_4KB));
     kernel_get_next_vaddr(bitmap_size, &bitmap_vaddr);
-    kernel_map_memory(bitmap_paddr, bitmap_vaddr, bitmap_size, PAGE_ACCESS_WX, PL0);
+    kernel_map_memory(bitmap_paddr, bitmap_vaddr, bitmap_size, PAGE_ACCESS_RW, PL0);
     memset((void*) bitmap_vaddr, 0, bitmap_size);
 
     /* Copy the old bitmap over */

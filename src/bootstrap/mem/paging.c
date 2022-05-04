@@ -39,7 +39,7 @@ uint64_t pte_get_address(page_table_entry_t* entry)
 static uint64_t paging_get_next_tmp_index(void)
 {
     uint64_t index;
-    if (bootstrap_tmp_index >= MAX_PAGE_TABLE_ENTRIES) { return 0; }
+    if (bootstrap_tmp_index >= PT_MAX_ENTRIES) { return 0; }
     index = bootstrap_tmp_index++;
     for 
     (
@@ -102,7 +102,7 @@ static uint64_t pt_unmap_memory
     pt_idx = VADDR_TO_PT_IDX(vaddr);
     unmapped_size = 0;
 
-    while (unmapped_size < size && pt_idx < MAX_PAGE_TABLE_ENTRIES)
+    while (unmapped_size < size && pt_idx < PT_MAX_ENTRIES)
     {
         if (pt[pt_idx].present)
         {
@@ -136,7 +136,7 @@ static uint64_t pd_unmap_memory
     unmapped_size = 0;
     total_unmapped_size = 0;
 
-    while (total_unmapped_size < size && pd_idx < MAX_PAGE_TABLE_ENTRIES)
+    while (total_unmapped_size < size && pd_idx < PT_MAX_ENTRIES)
     {
         entry = pd[pd_idx];
 
@@ -154,11 +154,11 @@ static uint64_t pd_unmap_memory
         pt = (page_table_t) pt_vaddr;
         unmapped_size = pt_unmap_memory(pt, vaddr, size - total_unmapped_size);
 
-        for (i = 0; i < MAX_PAGE_TABLE_ENTRIES && !pt[i].present; i++);
+        for (i = 0; i < PT_MAX_ENTRIES && !pt[i].present; i++);
 
         paging_unmap_temporary_page(pt_vaddr);
 
-        if (i == MAX_PAGE_TABLE_ENTRIES)
+        if (i == PT_MAX_ENTRIES)
         {
             pfa_free_page(pt_paddr);
             PTE_CLEAR(&pd[pd_idx]);
@@ -190,7 +190,7 @@ static uint64_t pdp_unmap_memory
     unmapped_size = 0;
     total_unmapped_size = 0;
 
-    while (total_unmapped_size < size && pdp_idx < MAX_PAGE_TABLE_ENTRIES)
+    while (total_unmapped_size < size && pdp_idx < PT_MAX_ENTRIES)
     {
         entry = pdp[pdp_idx];
 
@@ -208,11 +208,11 @@ static uint64_t pdp_unmap_memory
         pd = (page_table_t) pd_vaddr;
         unmapped_size = pd_unmap_memory(pd, vaddr, size - total_unmapped_size);
 
-        for (i = 0; i < MAX_PAGE_TABLE_ENTRIES && !pd[i].present; i++);
+        for (i = 0; i < PT_MAX_ENTRIES && !pd[i].present; i++);
 
         paging_unmap_temporary_page(pd_vaddr);
 
-        if (i == MAX_PAGE_TABLE_ENTRIES)
+        if (i == PT_MAX_ENTRIES)
         {
             pfa_free_page(pd_paddr);
             PTE_CLEAR(&pdp[pdp_idx]);
@@ -245,7 +245,7 @@ uint64_t pml4_unmap_memory
     unmapped_size = 0;
     total_unmapped_size = 0;
 
-    while (total_unmapped_size < size && pml4_idx < MAX_PAGE_TABLE_ENTRIES)
+    while (total_unmapped_size < size && pml4_idx < PT_MAX_ENTRIES)
     {
         entry = pml4[pml4_idx];
 
@@ -263,11 +263,11 @@ uint64_t pml4_unmap_memory
         pdp = (page_table_t) pdp_vaddr;
         unmapped_size = pdp_unmap_memory(pdp, vaddr, size - total_unmapped_size);
 
-        for (i = 0; i < MAX_PAGE_TABLE_ENTRIES && !pdp[i].present; i++);
+        for (i = 0; i < PT_MAX_ENTRIES && !pdp[i].present; i++);
 
         paging_unmap_temporary_page(pdp_vaddr);
 
-        if (i == MAX_PAGE_TABLE_ENTRIES)
+        if (i == PT_MAX_ENTRIES)
         {
             pfa_free_page(pdp_paddr);
             PTE_CLEAR(&pml4[pml4_idx]);
@@ -297,7 +297,7 @@ static uint64_t pt_map_memory
     pt_idx = VADDR_TO_PT_IDX(vaddr);
     mapped_size = 0;
 
-    while (mapped_size < size && pt_idx < MAX_PAGE_TABLE_ENTRIES)
+    while (mapped_size < size && pt_idx < PT_MAX_ENTRIES)
     {
         if (pt[pt_idx].present) { return 0; }
         pte_create(pt, pt_idx, paddr, access, privilege_level);
@@ -330,7 +330,7 @@ static uint64_t pd_map_memory
     mapped_size = 0;
     total_mapped_size = 0;
 
-    while (total_mapped_size < size && pd_idx < MAX_PAGE_TABLE_ENTRIES)
+    while (total_mapped_size < size && pd_idx < PT_MAX_ENTRIES)
     {
         entry = pd[pd_idx];
 
@@ -384,7 +384,7 @@ static uint64_t pdp_map_memory
     mapped_size = 0;
     total_mapped_size = 0;
 
-    while (total_mapped_size < size && pdp_idx < MAX_PAGE_TABLE_ENTRIES)
+    while (total_mapped_size < size && pdp_idx < PT_MAX_ENTRIES)
     {
         entry = pdp[pdp_idx];
 
@@ -439,7 +439,7 @@ uint64_t pml4_map_memory
     mapped_size = 0;
     total_mapped_size = 0;
 
-    while (total_mapped_size < size && pml4_idx < MAX_PAGE_TABLE_ENTRIES)
+    while (total_mapped_size < size && pml4_idx < PT_MAX_ENTRIES)
     {
         entry = pml4[pml4_idx];
 

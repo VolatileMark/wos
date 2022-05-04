@@ -34,16 +34,16 @@ typedef struct
 typedef struct drive_ops
 {
     int (*identify)(void* inteface);
-    uint64_t (*property)(void* interface, drive_property_t property);
+    uint64_t (*get_property)(void* interface, drive_property_t property);
     uint64_t (*read)(void* interface, uint64_t lba, uint64_t size, void* buffer);
 } drive_ops_t;
 
-int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_bytes);
+int drivefs_register_drive(void* interface, drive_ops_t* ops);
 void drivefs_init(void);
 
 drive_t* drivefs_lookup(const char* path);
 uint64_t drivefs_read(drive_t* drive, uint64_t lba, uint64_t bytes, void* buffer);
 int drivefs_identify(drive_t* drive);
-uint64_t drivefs_property(drive_t* drive);
+uint64_t drivefs_get_property(drive_t* drive, drive_property_t prop);
 
 #endif

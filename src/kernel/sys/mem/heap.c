@@ -1,7 +1,7 @@
 #include "heap.h"
 #include "pfa.h"
 #include "paging.h"
-#include "../../utils/constants.h"
+#include "../../headers/constants.h"
 #include "../../utils/alloc.h"
 #include "../../utils/log.h"
 #include <stddef.h>
@@ -39,7 +39,7 @@ static uint64_t heap_expand(uint64_t size)
     if (pages_paddr == 0)
         return 0;
     
-    mapped_size = kernel_map_memory(pages_paddr, kernel_heap.end_vaddr, new_size, PAGE_ACCESS_WX, PL0);
+    mapped_size = kernel_map_memory(pages_paddr, kernel_heap.end_vaddr, new_size, PAGE_ACCESS_RW, PL0);
     if (mapped_size < new_size)
     {
         pfa_free_pages(pages_paddr, pages_count);

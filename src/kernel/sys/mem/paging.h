@@ -2,7 +2,7 @@
 #define __PAGING_H__
 
 #include <stdint.h>
-#include "../../utils/constants.h"
+#include "../../headers/constants.h"
 
 struct page_table_entry
 {
@@ -28,9 +28,6 @@ typedef page_table_entry_t* page_table_t;
 
 typedef enum
 {
-    PAGE_ACCESS_00 = 0b0000,
-    PAGE_ACCESS_RX = 0b0100,
-    PAGE_ACCESS_WX = 0b0101,
     PAGE_ACCESS_RO = 0b0110,
     PAGE_ACCESS_RW = 0b0111
 } page_access_type_t;
@@ -54,11 +51,11 @@ typedef enum
 #define VADDR_GET_TEMPORARY(idx) VADDR_GET(511, 510, 0, idx)
 #define GET_ADDR_OFFSET(addr) (addr & 0x0000000000000FFF)
 
-#define MAX_PAGE_TABLE_ENTRIES 512
+#define PT_MAX_ENTRIES 512
 #define PT_ENTRY_SIZE ((uint64_t) SIZE_4KB)
-#define PD_ENTRY_SIZE (PT_ENTRY_SIZE * MAX_PAGE_TABLE_ENTRIES)
-#define PDP_ENTRY_SIZE (PD_ENTRY_SIZE * MAX_PAGE_TABLE_ENTRIES)
-#define PML4_ENTRY_SIZE (PDP_ENTRY_SIZE * MAX_PAGE_TABLE_ENTRIES)
+#define PD_ENTRY_SIZE (PT_ENTRY_SIZE * PT_MAX_ENTRIES)
+#define PDP_ENTRY_SIZE (PD_ENTRY_SIZE * PT_MAX_ENTRIES)
+#define PML4_ENTRY_SIZE (PDP_ENTRY_SIZE * PT_MAX_ENTRIES)
 
 extern void pml4_load(uint64_t pml4_paddr);
 extern void tlb_flush(void);

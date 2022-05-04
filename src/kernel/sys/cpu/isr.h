@@ -62,7 +62,6 @@ DECLARE_IRQ(13);
 DECLARE_IRQ(14);
 DECLARE_IRQ(15);
 
-DECLARE_SFT(128);
 
 
 struct interrupt_info

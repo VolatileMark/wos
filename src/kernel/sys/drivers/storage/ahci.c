@@ -3,7 +3,7 @@
 #include "../fs/drivefs.h"
 #include "../../mem/pfa.h"
 #include "../../mem/paging.h"
-#include "../../../utils/constants.h"
+#include "../../../headers/constants.h"
 #include "../../../utils/macros.h"
 #include "../../../utils/alloc.h"
 #include "../../../utils/log.h"
@@ -322,7 +322,7 @@ static uint64_t ahci_read_bytes_capped(ahci_port_descriptor_t* desc, uint64_t lb
     cmd_fis->lba5 = (uint8_t) (lba >> 0x28);
 
     cmd_fis->device = AHCI_ATA_DEV_MODE_LBA;
-    cmd_fis->count = ceil((double) bytes / desc->sector_size);
+    cmd_fis->count = ceil((double) bytes / AHCI_SECTOR_SIZE);
 
     for 
     (
@@ -355,12 +355,15 @@ static uint64_t ahci_read_bytes_capped(ahci_port_descriptor_t* desc, uint64_t lb
 static uint64_t ahci_read_bytes(void* desc, uint64_t lba, uint64_t bytes, void* buffer)
 {
     uint64_t bytes_read, bytes_read_now, buffer_addr;
+    void* tmp_buffer;
+    
+    tmp_buffer = malloc(alignu(bytes, AHCI_SECTOR_SIZE));
 
     bytes_read = 0;
-    buffer_addr = (uint64_t) buffer;
+    buffer_addr = (uint64_t) tmp_buffer;
     while (bytes > 0)
     {
-        bytes_read_now = ahci_read_bytes_capped((ahci_port_descriptor_t*) desc, lba, bytes, buffer_addr);
+        bytes_read_now = ahci_read_bytes_capped(desc, lba, bytes, buffer_addr);
         if (bytes_read_now == 0)
             return bytes_read;
         buffer_addr += bytes_read_now;
@@ -369,10 +372,12 @@ static uint64_t ahci_read_bytes(void* desc, uint64_t lba, uint64_t bytes, void* 
         lba += (bytes_read_now / AHCI_SECTOR_SIZE);
     }
 
+    memcpy(buffer, tmp_buffer, bytes_read);
+    free(tmp_buffer);
     return bytes_read;
 }
 
-static int ahci_identify_port(void* desc_ptr)
+static int ahci_send_ata_command_to_port(void* desc_ptr, uint8_t command)
 {
     ahci_port_descriptor_t* desc;
     hba_cmd_header_t* cmd_header;
@@ -404,7 +409,7 @@ static int ahci_identify_port(void* desc_ptr)
     cmd_fis = (fis_reg_h2d_t*) &cmd_tbl->command_fis;
     cmd_fis->fis_type = FIS_TYPE_REG_H2D;
     cmd_fis->c_bit = 1;
-    cmd_fis->command = AHCI_ATA_CMD_IDENTIFY_EX;
+    cmd_fis->command = command;
     
     cmd_fis->lba0 = 0;
     cmd_fis->lba1 = 0;
@@ -434,7 +439,7 @@ static int ahci_identify_port(void* desc_ptr)
     {
         if (desc->port->is & AHCI_HBA_PxIS_TFES)
         {
-            trace_ahci("Disk IDENTIFY error (port %u)", desc->index);
+            trace_ahci("ATA command error (port %u)", desc->index);
             return -1;
         }
         else if (!(desc->port->ci & (1 << slot)))
@@ -643,7 +648,7 @@ static void ahci_init_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
             if (!ahci_test_disk_read(desc))
                 trace_ahci("Port %u failed the read test", port_index);
             else
-                drivefs_register_drive(desc, &ahci_ops, desc->sector_size);
+                drivefs_register_drive(desc, &ahci_ops);
             ++port_index;
         }
         pi >>= 1;
@@ -710,7 +715,7 @@ static uint64_t ahci_init_controller(pci_header_0x0_t* pci_header)
     return 1;
 }
 
-static uint64_t ahci_get_port_property(void* desc_ptr, drive_property_t prop)
+static uint64_t ahci_get_property(void* desc_ptr, drive_property_t prop)
 {
     hba_fis_t* fis;
 
@@ -724,6 +729,11 @@ static uint64_t ahci_get_port_property(void* desc_ptr, drive_property_t prop)
     return 0;
 }
 
+static int ahci_identify(void* desc)
+{
+    return ahci_send_ata_command_to_port(desc, AHCI_ATA_CMD_IDENTIFY_EX);
+}
+
 int ahci_init(void)
 {
     pci_devices_list_t* controllers;
@@ -732,8 +742,8 @@ int ahci_init(void)
     uint64_t controllers_online;
 
     memset(&ahci_controllers, 0, sizeof(ahci_controllers_list_t));
-    ahci_ops.identify = &ahci_identify_port;
-    ahci_ops.property = &ahci_get_port_property;
+    ahci_ops.identify = &ahci_identify;
+    ahci_ops.get_property = &ahci_get_property;
     ahci_ops.read = &ahci_read_bytes;
 
     controllers = pci_find_devices(0x1, 0x6, -1);

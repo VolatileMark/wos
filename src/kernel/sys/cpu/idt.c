@@ -2,8 +2,7 @@
 #include "isr.h"
 #include "gdt.h"
 #include "../chips/pic.h"
-#include "../../proc/scheduler.h"
-#include "../../utils/constants.h"
+#include "../../headers/constants.h"
 
 #define SET_ISR(index) idt_set_gate(index, (uint64_t) &isr##index, gdt_get_kernel_cs(), PL0, IDT_INTERRUPT_GATE, 1)
 #define SET_IRQ(index) idt_set_gate(IRQ(index), (uint64_t) &irq##index, gdt_get_kernel_cs(), PL0, IDT_INTERRUPT_GATE, 0)
@@ -128,8 +127,6 @@ void init_idt(void)
     SET_IRQ(13);
     SET_IRQ(14);
     SET_IRQ(15);
-
-    SET_SFT(128); /* Yield (probably useless, but just for fun) */
 
     idt_load((uint64_t) &idt_descriptor);
 }

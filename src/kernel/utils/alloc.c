@@ -8,9 +8,9 @@
 
 struct align_header
 {
-    uint16_t offset;
+    uint64_t offset;
     uint32_t magic;
-    uint16_t checksum;
+    uint32_t checksum;
 } __attribute__((packed));
 typedef struct align_header align_header_t;
 
@@ -27,9 +27,9 @@ void* aligned_alloc(uint64_t align, uint64_t size)
     seg = heap_allocate_memory(size);
     seg->data = alignu(seg->data, align);
     alignhd = (align_header_t*)(seg->data - sizeof(align_header_t));
-    alignhd->offset = (uint16_t)(seg->data - ((uint64_t) seg));
+    alignhd->offset = (seg->data - ((uint64_t) seg));
     alignhd->magic = ALIGN_HEADER_MAGIC;
-    gen_struct_checksum16(alignhd, sizeof(align_header_t));
+    gen_struct_checksum32(alignhd, sizeof(align_header_t));
     return ((void*) seg->data);
 }
 

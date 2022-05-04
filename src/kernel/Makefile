@@ -18,7 +18,7 @@ C_OBJS = $(patsubst $(SOURCE_DIR)%.c, $(BUILD_DIR)%.o, $(C_SRCS))
 ASM_SRCS = $(shell find $(SOURCE_DIR) -name '*.asm')
 ASM_OBJS = $(patsubst $(SOURCE_DIR)%.asm, $(BUILD_DIR)%_asm.o, $(ASM_SRCS))
 
-FONT_SRC = $(SOURCE_DIR)/utils/font.psf
+FONT_SRC = $(SOURCE_DIR)/font.psf
 FONT_OBJ = $(patsubst $(SOURCE_DIR)%.psf, $(BUILD_DIR)%.o, $(FONT_SRC))
 
 LDS = $(SOURCE_DIR)/Linker.ld
