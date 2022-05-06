@@ -70,7 +70,7 @@ void idt_set_interrupt_present(uint8_t interrupt_number, uint8_t value)
     idt[interrupt_number].present = value;
 }
 
-void init_idt(void)
+void idt_init(void)
 {
     idt_descriptor.limit = (IDT_NUM_ENTRIES * sizeof(idt64_entry_t)) - 1;
     idt_descriptor.base = (uint64_t) &idt;

@@ -101,15 +101,19 @@ struct stack_state
 } __attribute__((packed));
 typedef struct stack_state stack_state_t;
 
-typedef __attribute__((aligned(16))) uint8_t fpu_state_t[512];
+struct fpu_state
+{
+    uint8_t data[512];
+} __attribute((packed));
+typedef struct fpu_state fpu_state_t;
 
 struct interrupt_frame
 {
+    fpu_state_t fpu_state;
     interrupt_info_t interrupt_info;
     registers_state_t registers_state;
     stack_state_t stack_state;
-    fpu_state_t fpu_state;
-} __attribute__((packed));
+} __attribute__((packed,aligned(16)));
 typedef struct interrupt_frame interrupt_frame_t;
 
 typedef void (*isr_handler_t)(const interrupt_frame_t* info); 

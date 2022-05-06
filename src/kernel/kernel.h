@@ -25,6 +25,8 @@
 #include "sys/drivers/fs/devfs.h"
 #include "sys/drivers/fs/isofs.h"
 #include "sys/drivers/fs/drivefs.h"
+#include "proc/process.h"
+#include "proc/scheduler.h"
 #include "proc/syscall.h"
 #include "proc/vfs/vfs.h"
 #include <stdint.h>

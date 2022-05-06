@@ -355,12 +355,11 @@ static uint64_t ahci_read_bytes_capped(ahci_port_descriptor_t* desc, uint64_t lb
 static uint64_t ahci_read_bytes(void* desc, uint64_t lba, uint64_t bytes, void* buffer)
 {
     uint64_t bytes_read, bytes_read_now, buffer_addr;
-    void* tmp_buffer;
+    void* raw_buffer_ptr;
     
-    tmp_buffer = malloc(alignu(bytes, AHCI_SECTOR_SIZE));
-
+    raw_buffer_ptr = malloc(alignu(bytes, AHCI_SECTOR_SIZE));
     bytes_read = 0;
-    buffer_addr = (uint64_t) tmp_buffer;
+    buffer_addr = (uint64_t) raw_buffer_ptr;
     while (bytes > 0)
     {
         bytes_read_now = ahci_read_bytes_capped(desc, lba, bytes, buffer_addr);
@@ -368,12 +367,12 @@ static uint64_t ahci_read_bytes(void* desc, uint64_t lba, uint64_t bytes, void* 
             return bytes_read;
         buffer_addr += bytes_read_now;
         bytes_read += bytes_read_now;
-        bytes -= bytes_read_now;
         lba += (bytes_read_now / AHCI_SECTOR_SIZE);
+        bytes -= bytes_read_now;
     }
 
-    memcpy(buffer, tmp_buffer, bytes_read);
-    free(tmp_buffer);
+    memcpy(buffer, raw_buffer_ptr, bytes_read);
+    free(raw_buffer_ptr);
     return bytes_read;
 }
 

@@ -43,7 +43,7 @@ static void pit_handler(const interrupt_frame_t* frame)
     }
 }
 
-int register_pit_callback(isr_handler_t handler)
+int pit_register_callback(isr_handler_t handler)
 {
     if (callbacks.start == NULL)
     {
@@ -70,7 +70,7 @@ int register_pit_callback(isr_handler_t handler)
     return 0;
 }
 
-void set_pit_interval(uint64_t interval)
+void pit_set_interval(uint64_t interval)
 {
     uint64_t frequency;
     uint16_t divider;

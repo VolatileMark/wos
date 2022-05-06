@@ -42,7 +42,7 @@ typedef struct
 
 static sdt_t main_sdt;
 
-static rsdp_descriptor_v1_t* get_rsdp(void)
+static rsdp_descriptor_v1_t* acpi_get_rsdp(void)
 {
     struct multiboot_tag_new_acpi* new;
     new = multiboot_get_tag_new_acpi();
@@ -55,7 +55,7 @@ int acpi_init(void)
     sdt_header_t* mapped_sdt_header;
     rsdp_descriptor_v1_t* rsdp;
     
-    rsdp = get_rsdp();
+    rsdp = acpi_get_rsdp();
     if (strncmp(rsdp->signature, RSDP_SIG, 8))
     {
         trace_acpi("RSDP signature mismatch");
@@ -108,7 +108,7 @@ int acpi_init(void)
     return 0;
 }
 
-static uint64_t sdt_get_next_entry_pointer(sdt_t* sdt, uint64_t index)
+static uint64_t acpi_get_next_sdt_entry_pointer(sdt_t* sdt, uint64_t index)
 {
     uint64_t entries_array, entry_offset;
     uint64_t entry_pointer, byte_offset, byte;
@@ -135,7 +135,7 @@ sdt_header_t* acpi_find_table(const char* signature)
     uint64_t entry_paddr, entry_vaddr, entry_size, entry;
     for (entry = 0; entry < main_sdt.entries; entry++)
     {
-        entry_paddr = sdt_get_next_entry_pointer(&main_sdt, entry);
+        entry_paddr = acpi_get_next_sdt_entry_pointer(&main_sdt, entry);
         header = (sdt_header_t*) (kernel_map_temporary_page(entry_paddr, PAGE_ACCESS_RO, PL0) + GET_ADDR_OFFSET(entry_paddr));
         if (!strncmp(header->signature, signature, 4))
         {

@@ -19,7 +19,8 @@
     uint64_t i; \
     uint8_t* ptr; \
     uint##bits##_t checksum; \
-    checksum = 0; \
+    size -= sizeof(uint##bits##_t); \
+    checksum = *((uint##bits##_t*)(((uint64_t) addr) + size)); \
     ptr = (uint8_t*) addr; \
     for (i = 0; i < size; i++) \
         checksum += ptr[i]; \

@@ -23,14 +23,15 @@ void* aligned_alloc(uint64_t align, uint64_t size)
 {
     heap_segment_header_t* seg;
     align_header_t* alignhd;
-    size = alignu(size + sizeof(align_header_t), align);
+    uint64_t data_ptr;
+    size += align;
     seg = heap_allocate_memory(size);
-    seg->data = alignu(seg->data, align);
-    alignhd = (align_header_t*)(seg->data - sizeof(align_header_t));
-    alignhd->offset = (seg->data - ((uint64_t) seg));
+    data_ptr = alignu(seg->data, align);
+    alignhd = (align_header_t*)(data_ptr - sizeof(align_header_t));
+    alignhd->offset = (data_ptr - ((uint64_t) seg));
     alignhd->magic = ALIGN_HEADER_MAGIC;
     gen_struct_checksum32(alignhd, sizeof(align_header_t));
-    return ((void*) seg->data);
+    return ((void*) data_ptr);
 }
 
 void* calloc(uint64_t n, uint64_t size)
@@ -61,7 +62,7 @@ void free(void* ptr)
     if 
     (
         alignhd->magic == ALIGN_HEADER_MAGIC &&
-        checksum16(alignhd, sizeof(align_header_t))
+        checksum32(alignhd, sizeof(align_header_t))
     )
         seg = (heap_segment_header_t*) (((uint64_t) ptr) - alignhd->offset);
     else

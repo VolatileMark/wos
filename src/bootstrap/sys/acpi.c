@@ -58,7 +58,7 @@ static int acpi_checksum(void* rsdp, uint64_t size)
     return (checksum == 0);
 }
 
-static uint64_t sdt_get_next_entry_pointer(sdt_t* sdt, uint64_t index)
+static uint64_t acpi_get_next_sdt_entry_pointer(sdt_t* sdt, uint64_t index)
 {
     uint64_t entries_array, entry_offset, entry_pointer, byte_offset, byte;
 
@@ -113,7 +113,7 @@ int acpi_lock_sdt_pages(uint64_t rsdp_start_paddr, uint64_t* rsdp_size)
         entry++
     )
     {
-        addr = sdt_get_next_entry_pointer(&sdt, entry);
+        addr = acpi_get_next_sdt_entry_pointer(&sdt, entry);
         if (addr > max_addr) { max_addr = addr; }
         if (addr < min_addr) { min_addr = addr; }
     }
