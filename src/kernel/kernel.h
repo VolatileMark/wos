@@ -36,7 +36,7 @@
 #include <mem.h>
 
 #define KERNEL_FILE_PATH "/boot/wkernel.elf"
-#define KERNEL_STACK_SIZE 16384
+#define KERNEL_STACK_SIZE 32768
 #define KERNEL_HEAP_START_ADDR VADDR_GET(256, 0, 0, 0)
 #define KERNEL_HEAP_CEIL_ADDR VADDR_GET(511, 509, 511, 511)
 

@@ -49,8 +49,8 @@ static uint64_t heap_expand(uint64_t size)
     kernel_heap.end_vaddr += mapped_size;
 
     new->free = 1;
+    new->align_offset = 0;
     new->size = new_size - sizeof(heap_segment_header_t);
-    new->data = (uint64_t)(new + 1);
     new->prev = kernel_heap.tail;
     new->next = NULL;
     if (kernel_heap.tail != NULL)
@@ -134,14 +134,79 @@ heap_segment_header_t* heap_allocate_memory(uint64_t size)
             return 0;
     } while (seg->size < size);
     
-    new = (heap_segment_header_t*) (seg->data + size);
+    new = (heap_segment_header_t*) (((uint64_t)(seg + 1)) + size);
     new->free = 1;
+    new->align_offset = 0;
     new->size = seg->size - size - sizeof(heap_segment_header_t);
     new->prev = seg;
     new->next = seg->next;
     if (new->next != NULL)
         new->next->prev = new;
-    new->data = (uint64_t)(new + 1);
+    if (seg == kernel_heap.tail)
+        kernel_heap.tail = new;
+
+    seg->free = 0;
+    seg->size = size;
+    seg->next = new;
+
+    return seg;
+}
+
+heap_segment_header_t* heap_allocate_aligned_memory(uint64_t alignment, uint64_t size)
+{
+    heap_segment_header_t* seg;
+    heap_segment_header_t* alg;
+    heap_segment_header_t* new;
+    uint64_t aligned_data_addr, data_addr, total_size;
+
+    size = ((size < MIN_ALLOC_SIZE) ? MIN_ALLOC_SIZE : size);
+    total_size = size + alignment;
+
+    do {
+        seg = heap_next_free_segment(total_size + sizeof(heap_segment_header_t));
+        if (seg == NULL)
+            return 0;
+    } while (seg->size < total_size);
+    
+    data_addr = (uint64_t)(seg + 1);
+    aligned_data_addr = alignu(data_addr, alignment);
+    total_size = seg->size;
+
+    if (aligned_data_addr > data_addr)
+    {
+        if (aligned_data_addr - data_addr < sizeof(heap_segment_header_t))
+        {
+            alg = ((heap_segment_header_t*) aligned_data_addr);
+            *alg = *seg;
+            alg->align_offset = (alg - seg);
+            seg = ((heap_segment_header_t*) aligned_data_addr) - 1;
+            if (alg->prev != NULL)
+                alg->prev->next = seg;
+            if (alg->next != NULL)
+                alg->next->prev = seg;
+            *seg = *alg;
+        }
+        else
+        {
+            alg = ((heap_segment_header_t*) aligned_data_addr) - 1;
+            *alg = *seg;
+            alg->align_offset = (uint64_t) (alg - seg);
+            if (alg->prev != NULL)
+                alg->prev->next = alg;
+            if (alg->next != NULL)
+                alg->next->prev = alg;
+            seg = alg;
+        }
+    }
+
+    new = (heap_segment_header_t*) (aligned_data_addr + size);
+    new->free = 1;
+    new->align_offset = 0;
+    new->size = total_size - (size + seg->align_offset) - sizeof(heap_segment_header_t);
+    new->prev = seg;
+    new->next = seg->next;
+    if (new->next != NULL)
+        new->next->prev = new;
     if (seg == kernel_heap.tail)
         kernel_heap.tail = new;
 
@@ -154,6 +219,36 @@ heap_segment_header_t* heap_allocate_memory(uint64_t size)
 
 void heap_free_memory(heap_segment_header_t* seg)
 {
+    heap_segment_header_t* cpy;
+    
+    if (seg->align_offset > 0)
+    {
+        if (seg->align_offset < sizeof(heap_segment_header_t) * 2)
+        {
+            cpy = (heap_segment_header_t*) (seg + 1);
+            *cpy = *seg;
+            seg = (heap_segment_header_t*) (((uint64_t) seg) - cpy->align_offset);
+            if (cpy->prev != NULL)
+                cpy->prev->next = seg;
+            if (cpy->next != NULL)
+                cpy->next->prev = seg;
+            *seg = *cpy;
+            
+        }
+        else
+        {
+            cpy = (heap_segment_header_t*) (((uint64_t) seg) - seg->align_offset);
+            *cpy = *seg;
+            if (cpy->prev != NULL)
+                cpy->prev->next = cpy;
+            if (cpy->next != NULL)
+                cpy->next->prev = cpy;
+            seg = cpy;
+        }
+        seg->size += seg->align_offset;
+        seg->align_offset = 0;
+    }
+
     seg->free = 1;
     heap_combine_forward(seg);
     heap_combine_backward(seg);

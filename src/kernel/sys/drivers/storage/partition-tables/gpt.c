@@ -1,5 +1,6 @@
 #include "gpt.h"
 #include "mbr.h"
+#include "../../../../headers/constants.h"
 #include "../../../../utils/crc32.h"
 #include "../../../../utils/alloc.h"
 #include "../../../../utils/log.h"
@@ -48,17 +49,10 @@ static int gpt_guidcmp(guid_t* guid1, guid_t guid2)
 int gpt_find_partitions(drive_t* drive, gpt_t* gpt)
 {
     uint64_t i, offset, lba;
-    uint8_t* sector;
+    uint8_t sector[SIZE_SECTOR];
     gpt_entry_t* gpt_entry;
     gpea_chain_entry_t* chain;
     gpea_chain_entry_t* next;
-
-    sector = malloc(drive->sector_bytes);
-    if (sector == NULL)
-    {
-        trace_gpt("Could not allocate space for sector buffer");
-        return 0;
-    }
 
     for 
     (
@@ -67,26 +61,26 @@ int gpt_find_partitions(drive_t* drive, gpt_t* gpt)
         i++, lba++
     )
     {
-        drivefs_read(drive, lba, drive->sector_bytes, sector);
-        for (offset = 0; offset < drive->sector_bytes; offset += gpt->gpea_entry_size)
+        drivefs_read(drive, lba, SIZE_SECTOR, sector);
+        for (offset = 0; offset < SIZE_SECTOR; offset += gpt->gpea_entry_size)
         {
             gpt_entry = (gpt_entry_t*)(sector + offset);
             if (gpt_guidcmp(&gpt_entry->partition_guid, GPT_ENTRY_NULL))
-                goto END_LOOP;
+                goto END;
             chain = malloc(sizeof(gpea_chain_entry_t));
             if (chain == NULL)
             {
                 trace_gpt("Could not allocate space for GPT Entry Array link");
-                goto END_LOOP;
+                goto END;
             }
             chain->entry = *gpt_entry;
             chain->next = next;
             next = chain;
         }
     }
-    END_LOOP:
-    free(sector);
-    
+
+    END:
+
     drive->partitions = malloc(sizeof(drive_partition_t) * i);
     if (drive->partitions == NULL)
         trace_gpt("Could not allocate space for partition array");

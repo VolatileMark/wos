@@ -113,13 +113,6 @@ int drivefs_register_drive(void* interface, drive_ops_t* ops)
 
     drive->interface = interface;
     drive->ops = ops;
-
-    if (drivefs_identify(drive))
-    {
-        free(drive);
-        trace_drivefs("Failed to IDENTIFY drive");
-    }
-    drive->sector_bytes = drivefs_get_property(drive, DRIVE_PROPERTY_SECSIZE);
     
     vnode = malloc(sizeof(vnode_t));
     if (vnode == NULL)
@@ -202,14 +195,4 @@ drive_t* drivefs_lookup(const char* path)
 uint64_t drivefs_read(drive_t* drive, uint64_t lba, uint64_t bytes, void* buffer)
 {
     return drive->ops->read(drive->interface, lba, bytes, buffer);
-}
-
-int drivefs_identify(drive_t* drive)
-{
-    return drive->ops->identify(drive->interface);
-}
-
-uint64_t drivefs_get_property(drive_t* drive, drive_property_t prop)
-{
-    return drive->ops->get_property(drive->interface, prop);
 }

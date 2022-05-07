@@ -17,7 +17,7 @@
 #define ISOFS_VOLDESC_PRIM 1
 #define ISOFS_VOLDESC_TERM 255
 
-#define isofs_block_to_lba(block, sector) (((block) * ISOFS_BLOCK_SIZE) / (sector))
+#define isofs_block_to_lba(block) (((block) * ISOFS_BLOCK_SIZE) / SIZE_SECTOR)
 
 struct isofs_date
 {
@@ -174,7 +174,7 @@ int isofs_load_volume_descriptor(drive_t* drive, isofs_volume_descriptor_t* desc
 
     index = 0;
     do {
-        drivefs_read(drive, isofs_block_to_lba(ISOFS_VOLDESC_START + (index++), drive->sector_bytes), sizeof(isofs_volume_descriptor_t), desc);
+        drivefs_read(drive, isofs_block_to_lba(ISOFS_VOLDESC_START + (index++)), sizeof(isofs_volume_descriptor_t), desc);
     } while (desc->hdr.type != type && index < ISOFS_MAX_VDS);
 
     return -(index == ISOFS_MAX_VDS);
@@ -233,7 +233,7 @@ static int isofs_read(vnode_t* node, void* buffer, uint64_t count)
     inode = node->data;
     if (inode->is_directory || !inode->exists)
         return -1;
-    if (drivefs_read(inode->drive, isofs_block_to_lba(inode->data_block, inode->drive->sector_bytes), count, buffer) < count)
+    if (drivefs_read(inode->drive, isofs_block_to_lba(inode->data_block), count, buffer) < count)
         return -1;
     return 0;
 }
@@ -258,7 +258,7 @@ static int isofs_lookup(vnode_t* dir, const char* path, vnode_t* out)
 {
     isofs_directory_entry_t* iso_dir;
     isofs_inode_t* inode;
-    uint8_t* sector;
+    uint8_t sector[ISOFS_BLOCK_SIZE];
     uint64_t path_offset, bytes_offset;
 
     inode = dir->data;
@@ -269,15 +269,8 @@ static int isofs_lookup(vnode_t* dir, const char* path, vnode_t* out)
         ++path;
     for (path_offset = 0; path[path_offset] != '\0' && path[path_offset] != '/'; path_offset++);
 
-    sector = malloc(ISOFS_BLOCK_SIZE);
-    if (sector == NULL)
+    if (drivefs_read(inode->drive, isofs_block_to_lba(inode->data_block), inode->data_size, sector) < ISOFS_BLOCK_SIZE)
         return -1;
-    
-    if (drivefs_read(inode->drive, isofs_block_to_lba(inode->data_block, inode->drive->sector_bytes), inode->data_size, sector) < ISOFS_BLOCK_SIZE)
-    {
-        free(sector);
-        return -1;
-    }
 
     for 
     (
@@ -295,7 +288,6 @@ static int isofs_lookup(vnode_t* dir, const char* path, vnode_t* out)
             goto SUCCESS;
     }
 
-    free(sector);
     return -1;
 
 SUCCESS:
@@ -309,7 +301,6 @@ SUCCESS:
     inode->data_block = iso_dir->block_lsb;
     inode->data_size = iso_dir->bytes_lsb;
 
-    free(sector);
     return 0;
 }
 

@@ -98,7 +98,7 @@ static int process_load_exec_path(process_t* ps, const char* path)
     return 0;
 }
 
-static int process_load_executable(process_t* ps, const char* path)
+static int process_load_elf(process_t* ps, const char* path)
 {
     vnode_t file;
     vattribs_t attr;
@@ -172,7 +172,7 @@ static int process_load_executable(process_t* ps, const char* path)
             interp_path = malloc(phdr->p_memsz);
             strcpy(interp_path, (char*) (buffer + phdr->p_offset));
             free(buffer);
-            process_load_executable(ps, interp_path);
+            process_load_elf(ps, interp_path);
             free(interp_path);
             return 0;
             
@@ -289,7 +289,7 @@ process_t* process_create(const char* path, const char** argv, const char** envp
         return NULL;
     }
 
-    if (process_load_executable(ps, path))
+    if (process_load_elf(ps, path))
     {
         trace_process("Failed to load process executable");
         process_delete_and_free(ps);
