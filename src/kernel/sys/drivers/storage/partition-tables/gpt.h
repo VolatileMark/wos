@@ -1,10 +1,8 @@
 #ifndef __GPT_H__
 #define __GPT_H__
 
-#include "../../fs/drivefs.h"
-#include "../../../../utils/guid.h"
 #include "mbr.h"
-#include <stdint.h>
+#include "../../../../utils/guid.h"
 
 #define GPT_GUID(da1, da2, da3, da4, da5) ((guid_t) { .d1 = da1, .d2 = da2, .d3 = da3, .d4 = da4, .d5 = da5 })
 

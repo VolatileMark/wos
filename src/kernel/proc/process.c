@@ -1,10 +1,8 @@
 #include "process.h"
-#include "vfs/vfs.h"
 #include "../headers/elf.h"
 #include "../utils/alloc.h"
 #include "../utils/log.h"
 #include "../sys/mem/pfa.h"
-#include "../sys/mem/paging.h"
 #include "../sys/cpu/gdt.h"
 #include <stddef.h>
 #include <string.h>

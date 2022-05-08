@@ -9,6 +9,7 @@ build/
 .vscode/
 .vagrant/
 .cache/
+doxygen/
 compile_commands.json
 
 tools/x86_64-elf-cross

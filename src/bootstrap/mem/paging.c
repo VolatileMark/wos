@@ -1,6 +1,5 @@
 #include "paging.h"
 #include "pfa.h"
-#include <math.h>
 #include <mem.h>
 
 static page_table_t bootstrap_pml4;

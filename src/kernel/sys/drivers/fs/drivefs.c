@@ -1,13 +1,6 @@
 #include "drivefs.h"
-#include "devfs.h"
-#include "isofs.h"
-#include "../storage/partition-tables/mbr.h"
 #include "../storage/partition-tables/gpt.h"
-#include "../../../utils/alloc.h"
-#include "../../../utils/macros.h"
-#include "../../../utils/log.h"
 #include "../../../kernel.h"
-#include <stddef.h>
 
 #define trace_drivefs(msg, ...) trace("DRFS", msg, ##__VA_ARGS__)
 

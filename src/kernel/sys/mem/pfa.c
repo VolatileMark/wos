@@ -1,10 +1,7 @@
 #include "pfa.h"
 #include "mmap.h"
 #include "paging.h"
-#include "../../headers/constants.h"
-#include "../../headers/multiboot2.h"
 #include <math.h>
-#include <stddef.h>
 #include <mem.h>
 
 #define PFA_GET_PAGE_IDX(addr) (addr / SIZE_4KB)

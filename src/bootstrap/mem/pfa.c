@@ -1,9 +1,7 @@
 #include "pfa.h"
 #include "mmap.h"
 #include "../utils/constants.h"
-#include "../utils/multiboot2.h"
 #include <math.h>
-#include <stddef.h>
 #include <mem.h>
 
 #define PFA_MAX_MEM_SIZE 0x08000000 /* 128MB */

@@ -1,11 +1,8 @@
 #include "isofs.h"
-#include "../../../proc/vfs/vnode.h"
-#include "../../../proc/vfs/vattribs.h"
 #include "../../../utils/macros.h"
 #include "../../../utils/alloc.h"
 #include <stddef.h>
 #include <string.h>
-#include <mem.h>
 
 #define ISOFS_SIG "ISO9660"
 #define ISOFS_MAX_VDS 3

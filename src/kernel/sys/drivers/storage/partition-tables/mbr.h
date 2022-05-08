@@ -2,7 +2,6 @@
 #define __MBR_H__
 
 #include "../../fs/drivefs.h"
-#include <stdint.h>
 
 #define MBR_PART_NULL 0x00
 #define MBR_PART_FAT12 0x01

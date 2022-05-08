@@ -1,8 +1,6 @@
 #ifndef __DRIVEFS_H__
 #define __DRIVEFS_H__
 
-#include <stdint.h>
-#include "../../../proc/vfs/vnode.h"
 #include "../../../proc/vfs/vfs.h"
 
 struct drive_ops;

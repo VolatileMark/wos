@@ -1,11 +1,10 @@
 #ifndef __PROCESS_H__
 #define __PROCESS_H__
 
-#include "vfs/vnode.h"
+#include "vfs/vfs.h"
 #include "../sys/mem/paging.h"
 #include "../sys/cpu/isr.h"
 #include "../utils/macros.h"
-#include <stdint.h>
 
 #define PROC_MAX_FDS 64
 #define PROC_DEFAULT_RFLAGS 0x202

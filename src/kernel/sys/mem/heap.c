@@ -1,8 +1,6 @@
 #include "heap.h"
 #include "pfa.h"
 #include "paging.h"
-#include "../../headers/constants.h"
-#include "../../utils/alloc.h"
 #include "../../utils/log.h"
 #include <stddef.h>
 #include <math.h>

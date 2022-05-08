@@ -1,7 +1,5 @@
 #include "paging.h"
-#include "pfa.h"
 #include "../../kernel.h"
-#include <math.h>
 #include <mem.h>
 
 #define KERNEL_PML4_VADDR VADDR_GET_TEMPORARY(0)

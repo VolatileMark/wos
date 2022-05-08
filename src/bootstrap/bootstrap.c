@@ -1,14 +1,10 @@
-#include <stdint.h>
 #include <stddef.h>
 #include <math.h>
 #include <mem.h>
 #include "mem/mmap.h"
 #include "mem/pfa.h"
 #include "mem/paging.h"
-#include "utils/multiboot2.h"
-#include "utils/constants.h"
 #include "utils/elf.h"
-#include "utils/bitmap.h"
 #include "sys/acpi.h"
 
 static int parse_multiboot_struct(uint64_t addr, uint64_t* out_size, struct multiboot_tag_old_acpi** out_rsdp, struct multiboot_tag_module** out_module)

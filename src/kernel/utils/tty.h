@@ -2,7 +2,6 @@
 #define __SCREEN_H__
 
 #include "../proc/vfs/vnode.h"
-#include <stdint.h>
 
 int tty_init(void);
 

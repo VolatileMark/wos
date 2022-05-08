@@ -1,6 +1,5 @@
 #include "framebuffer.h"
 #include "../../mem/paging.h"
-#include "../../../utils/checksum.h"
 #include "../../../utils/multiboot2-utils.h"
 
 #define FRAMEBUFFER_DIRECT_COLOR 1

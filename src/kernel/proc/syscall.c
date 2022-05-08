@@ -1,5 +1,4 @@
 #include "../utils/macros.h"
-#include <stdint.h>
 
 #define SYSCALL(name) sys_##name
 #define DEFSYSCALL(name) int SYSCALL(name)(uint64_t* stack)

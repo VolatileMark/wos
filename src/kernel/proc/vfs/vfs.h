@@ -2,8 +2,6 @@
 #define __VFS_H__
 
 #include "vnode.h"
-#include "vattribs.h"
-#include <stdint.h>
 
 struct vfs_ops;
 

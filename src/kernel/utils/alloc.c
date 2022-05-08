@@ -1,8 +1,5 @@
 #include "alloc.h"
-#include "checksum.h"
 #include "../sys/mem/heap.h"
-#include <stddef.h>
-#include <math.h>
 #include <mem.h>
 
 void* malloc(uint64_t size)

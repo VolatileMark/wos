@@ -1,5 +1,4 @@
 #include "checksum.h"
-#include <stdint.h>
 
 #define STRUCT_CHECKSUM(bits) inline void gen_struct_checksum##bits(void* addr, uint64_t size) \
 {\

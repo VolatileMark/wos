@@ -1,6 +1,5 @@
 #include "pit.h"
 #include "../cpu/io.h"
-#include "../cpu/interrupts.h"
 #include "../../utils/alloc.h"
 #include "../../utils/log.h"
 #include <stddef.h>

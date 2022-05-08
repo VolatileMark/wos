@@ -1,7 +1,6 @@
 #ifndef __PAGING_H__
 #define __PAGING_H__
 
-#include <stdint.h>
 #include "../utils/constants.h"
 
 struct page_table_entry

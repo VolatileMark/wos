@@ -1,12 +1,10 @@
 #include "scheduler.h"
 #include "../utils/alloc.h"
-#include "../utils/macros.h"
 #include "../utils/log.h"
 #include "../sys/chips/pic.h"
 #include "../sys/chips/pit.h"
 #include "../sys/cpu/tss.h"
 #include "../sys/cpu/interrupts.h"
-#include "../sys/mem/paging.h"
 #include <stddef.h>
 #include <math.h>
 #include <mem.h>
