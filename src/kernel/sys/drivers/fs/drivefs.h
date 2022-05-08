@@ -24,16 +24,17 @@ typedef struct
 {
     void* interface;
     struct drive_ops* ops;
-    uint64_t num_partitions;
+    uint32_t num_partitions;
+    uint32_t sector_bytes;
     drive_partition_t* partitions;
 } drive_t;
 
 typedef struct drive_ops
 {
-    uint64_t (*read)(void* interface, uint64_t lba, uint64_t size, void* buffer);
+    uint64_t (*read)(drive_t* drive, uint64_t lba, uint64_t size, void* buffer);
 } drive_ops_t;
 
-int drivefs_register_drive(void* interface, drive_ops_t* ops);
+int drivefs_register_drive(drive_t* drive);
 void drivefs_init(void);
 
 drive_t* drivefs_lookup(const char* path);

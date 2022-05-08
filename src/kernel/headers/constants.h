@@ -3,7 +3,6 @@
 
 #define SIZE_4KB 0x1000
 #define SIZE_1MB 0x100000
-#define SIZE_SECTOR 512
 
 typedef enum
 {

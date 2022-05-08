@@ -83,10 +83,9 @@ static int drivefs_detect_partition_fs(drive_t* drive, uint64_t index)
     return -1;
 }
 
-int drivefs_register_drive(void* interface, drive_ops_t* ops)
+int drivefs_register_drive(drive_t* drive)
 {
     uint64_t i;
-    drive_t* drive;
     vnode_t* vnode;
     drive_partition_t* part;
     char path[] = "sda\0";
@@ -96,21 +95,10 @@ int drivefs_register_drive(void* interface, drive_ops_t* ops)
         trace_drivefs("Maximum drive number reached");
         return -1;
     }
-
-    drive = malloc(sizeof(drive_t));
-    if (drive == NULL)
-    {
-        trace_drivefs("Failed to allocate memory for drive descriptor");
-        return -1;
-    }
-
-    drive->interface = interface;
-    drive->ops = ops;
     
     vnode = malloc(sizeof(vnode_t));
     if (vnode == NULL)
     {
-        free(drive);
         trace_drivefs("Failed to allocate memory for new devfs vnode");
         return -1;
     }
@@ -187,5 +175,5 @@ drive_t* drivefs_lookup(const char* path)
 
 uint64_t drivefs_read(drive_t* drive, uint64_t lba, uint64_t bytes, void* buffer)
 {
-    return drive->ops->read(drive->interface, lba, bytes, buffer);
+    return drive->ops->read(drive, lba, bytes, buffer);
 }

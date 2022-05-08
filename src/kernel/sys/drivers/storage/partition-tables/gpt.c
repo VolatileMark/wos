@@ -48,7 +48,7 @@ static int gpt_guidcmp(guid_t* guid1, guid_t guid2)
 int gpt_find_partitions(drive_t* drive, gpt_t* gpt)
 {
     uint64_t i, offset, lba;
-    uint8_t sector[SIZE_SECTOR];
+    uint8_t sector[GPT_BLOCK_SIZE];
     gpt_entry_t* gpt_entry;
     gpea_chain_entry_t* chain;
     gpea_chain_entry_t* next;
@@ -60,8 +60,8 @@ int gpt_find_partitions(drive_t* drive, gpt_t* gpt)
         i++, lba++
     )
     {
-        drivefs_read(drive, lba, SIZE_SECTOR, sector);
-        for (offset = 0; offset < SIZE_SECTOR; offset += gpt->gpea_entry_size)
+        drivefs_read(drive, lba, GPT_BLOCK_SIZE, sector);
+        for (offset = 0; offset < GPT_BLOCK_SIZE; offset += gpt->gpea_entry_size)
         {
             gpt_entry = (gpt_entry_t*)(sector + offset);
             if (gpt_guidcmp(&gpt_entry->partition_guid, GPT_ENTRY_NULL))
