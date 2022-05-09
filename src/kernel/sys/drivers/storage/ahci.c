@@ -511,28 +511,30 @@ static uint64_t ahci_read_capped(drive_t* drive, uint64_t lba, uint64_t bytes, u
 
 static uint64_t ahci_read(drive_t* drive, uint64_t lba, uint64_t bytes, void* buffer)
 {
-    uint64_t bytes_read, bytes_read_now, buffer_addr;
+    uint64_t bytes_read, bytes_read_now, bytes_to_read, buffer_addr;
     uint8_t* raw_buffer_ptr;
     
     if (drive == NULL || drive->interface == NULL)
         return 0;
 
-    raw_buffer_ptr = aligned_alloc(0x10, alignu(bytes, drive->sector_bytes));
+    
+    bytes_to_read = alignu(bytes, drive->sector_bytes);
+    raw_buffer_ptr = aligned_alloc(0x10, bytes_to_read);
     bytes_read = 0;
     buffer_addr = (uint64_t) raw_buffer_ptr;
 
-    while (bytes > 0)
+    while (bytes_to_read > 0)
     {
-        bytes_read_now = ahci_read_capped(drive, lba, bytes, buffer_addr);
+        bytes_read_now = ahci_read_capped(drive, lba, bytes_to_read, buffer_addr);
         if (bytes_read_now == 0)
             return bytes_read;
         buffer_addr += bytes_read_now;
         bytes_read += bytes_read_now;
         lba += (bytes_read_now / drive->sector_bytes);
-        bytes -= bytes_read_now;
+        bytes_to_read -= bytes_read_now;
     }
 
-    memcpy(buffer, raw_buffer_ptr, bytes_read);
+    memcpy(buffer, raw_buffer_ptr, bytes);
     free(raw_buffer_ptr);
     return bytes_read;
 }

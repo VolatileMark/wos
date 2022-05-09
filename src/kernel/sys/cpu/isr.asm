@@ -1,11 +1,6 @@
-[bits 64]
-
 [section .bss]
 
 int_frame:
-    align 16
-    fpu_state:
-        resb 512
     int_info:
         .int_num: resq 1
         .err_code: resq 1
@@ -31,10 +26,14 @@ int_frame:
         .rflags: resq 1
         .rsp: resq 1
         .ss: resq 1
-
+    align 16
+    fpu_state:
+        resb 512
+    
 
 
 [section .text]
+[bits 64]
 
 %macro PUSHALL 0
     push rax

@@ -26,9 +26,9 @@ typedef struct
 
 typedef struct
 {
-    __attribute__((aligned(16))) fpu_state_t fpu;
-    stack_state_t stack;
     registers_state_t regs;
+    stack_state_t stack;
+    fpu_state_t fpu;
 } cpu_state_t;
 
 typedef vnode_t file_descriptor_t;

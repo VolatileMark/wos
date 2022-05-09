@@ -30,7 +30,8 @@ static process_list_t zombie;
 static process_list_t running;
 static uint64_t ms;
 
-extern void scheduler_switch_pml4_and_stack(uint64_t pml4_paddr);
+extern void scheduler_switch_pml4_and_stack(uint64_t pml4_paddr, uint64_t rsp);
+extern void scheduler_run_process(cpu_state_t* cpu);
 
 static uint64_t scheduler_get_max_pid_in_process_list(process_list_t* pss)
 {
@@ -79,14 +80,17 @@ static void scheduler_update_registers(cpu_state_t* cpu, const registers_state_t
     cpu->stack.cs = stack->cs;
 }
 
-static void scheduler_handle_interrupt(const registers_state_t* regs, const stack_state_t* stack, const fpu_state_t fpu, uint8_t interrupt_number)
+static void scheduler_handle_interrupt(const interrupt_frame_t* int_frame)
 {
     process_t* ps;
+    uint64_t ps_fpu, frame_fpu;
     interrupts_disable();
     ps = scheduler_get_current_scheduled_process();
-    scheduler_update_registers(&ps->cpu, regs, stack);
-    ps->cpu.fpu = fpu;
-    pic_acknowledge(interrupt_number);
+    ps_fpu = alignu((uint64_t) ps->cpu.fpu, 16);
+    frame_fpu = alignu((uint64_t) int_frame->fpu_state, 16);
+    memcpy((void*) ps_fpu, (void*) frame_fpu, 512);
+    scheduler_update_registers(&ps->cpu, &int_frame->registers_state, &int_frame->stack_state);
+    pic_acknowledge(int_frame->interrupt_info.interrupt_number);
     scheduler_run();
 }
 
@@ -96,7 +100,7 @@ static void scheduler_pit_handler(const interrupt_frame_t* int_frame)
     if (ms >= SCHEDULER_TIME_PER_PROC)
     {
         ms = 0;
-        scheduler_handle_interrupt(&int_frame->registers_state, &int_frame->stack_state, int_frame->fpu_state, int_frame->interrupt_info.interrupt_number);
+        scheduler_handle_interrupt(int_frame);
     }
     else
         pic_acknowledge((uint8_t) int_frame->interrupt_info.interrupt_number);
@@ -126,7 +130,7 @@ static int scheduler_queue_process_in_list(process_list_t* pss, process_t *ps)
     entry->next = NULL;
 
     if (pss->tail == NULL)
-        pss->head = NULL;
+        pss->head = entry;
     else
         pss->tail->next = entry;
     pss->tail = entry;
@@ -171,5 +175,6 @@ void scheduler_run(void)
 
     tss_set_kernel_stack(ps->stack_vaddr + PROC_STACK_SIZE - sizeof(uint64_t));
     kernel_inject_pml4(ps->pml4);
-    scheduler_switch_pml4_and_stack(ps->pml4_paddr);
+    scheduler_switch_pml4_and_stack(ps->pml4_paddr, ps->cpu.stack.rsp);
+    scheduler_run_process(&ps->cpu);
 }

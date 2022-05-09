@@ -61,6 +61,7 @@ int process_request_memory(process_t* ps, uint64_t size, uint64_t hint, page_acc
         return -1;
     }
 
+    entry->next = NULL;
     entry->paddr = paddr;
     entry->pages = pages;
 
@@ -201,30 +202,31 @@ static int process_load_elf(process_t* ps, const char* path)
 static int process_load_stack(process_t* ps, const char** argv, const char** envp)
 {
     int argc, envc, i;
-    uint64_t argv_size, envp_size, total_size, cpysize;
-    uint64_t env_kvaddr, stack_kvaddr, cpyptr;
-    uint64_t env_vaddr, env_paddr, stack_vaddr, stack_paddr;
+    uint64_t argv_size, envp_size, total_args_size, cpysize;
+    uint64_t args_kvaddr, stack_kvaddr;
+    uint64_t args_vaddr, args_paddr, stack_vaddr, stack_paddr;
     const char** stack_ptr;
+    char* cpyptr;
 
     for (argv_size = 0, argc = 0; argv != NULL && argv[argc] != NULL; argc++)
         argv_size += strlen(argv[argc]) + 1;
     for (envp_size = 0, envc = 0; envp != NULL && envp[envc] != NULL; envc++)
         envp_size += strlen(envp[envc]) + 1;
-    total_size = argv_size + envp_size;
+    total_args_size = argv_size + envp_size;
     
-    stack_vaddr = PROC_CEIL_VADDR - (PROC_STACK_SIZE + total_size);
-    env_vaddr = PROC_CEIL_VADDR - total_size;
+    args_vaddr = alignd(PROC_CEIL_VADDR - total_args_size, SIZE_4KB);
+    stack_vaddr = args_vaddr - PROC_STACK_SIZE;
     if 
     (
         process_request_memory(ps, PROC_STACK_SIZE, stack_vaddr, PAGE_ACCESS_RW, &stack_vaddr, &stack_paddr) ||
-        process_request_memory(ps, total_size, env_vaddr, PAGE_ACCESS_RO, &env_vaddr, &env_paddr)
+        process_request_memory(ps, total_args_size, args_vaddr, PAGE_ACCESS_RO, &args_vaddr, &args_paddr)
     )
         return -1;
     
     if 
     (
-        kernel_get_next_vaddr(total_size, &env_kvaddr) < total_size ||
-        kernel_map_memory(env_paddr, env_kvaddr, total_size, PAGE_ACCESS_RW, PL0) < total_size
+        kernel_get_next_vaddr(total_args_size, &args_kvaddr) < total_args_size ||
+        kernel_map_memory(args_paddr, args_kvaddr, total_args_size, PAGE_ACCESS_RW, PL0) < total_args_size
     )
         return -1;
     if
@@ -234,34 +236,37 @@ static int process_load_stack(process_t* ps, const char** argv, const char** env
     )
         return -1;
 
-    cpyptr = env_kvaddr;
+    cpyptr = (char*) args_kvaddr;
+    stack_ptr = (const char**) (stack_kvaddr + PROC_STACK_SIZE - sizeof(uint64_t));
     
-    stack_ptr = (const char**) stack_kvaddr;
-    for (i = 0; argv != NULL && i < argc; i++)
-    {
-        cpysize = strlen(argv[i]) + 1;
-        memcpy((void*) cpyptr, argv[i], cpysize);
-        stack_ptr[i] = (const char*) cpyptr;
-        cpyptr += cpysize;
-    }
-    stack_ptr[argc] = NULL;
-    
-    stack_ptr = &stack_ptr[argc + 1];
+    stack_ptr = &stack_ptr[-envc];
     for (i = 0; envp != NULL && i < envc; i++)
     {
         cpysize = strlen(envp[i]) + 1;
-        memcpy((void*) cpyptr, envp[i], cpysize);
-        stack_ptr[i] = (const char*) cpyptr;
+        memcpy(cpyptr, envp[i], cpysize);
+        stack_ptr[i] = (const char*) ((cpyptr - args_kvaddr) + args_vaddr);
         cpyptr += cpysize;
     }
     stack_ptr[envc] = NULL; 
 
-    kernel_unmap_memory(env_kvaddr, total_size);
+    stack_ptr = &stack_ptr[-(argc + 1)];
+    for (i = 0; argv != NULL && i < argc; i++)
+    {
+        cpysize = strlen(argv[i]) + 1;
+        memcpy(cpyptr, argv[i], cpysize);
+        stack_ptr[i] = (const char*) ((cpyptr - args_kvaddr) + args_vaddr);
+        cpyptr += cpysize;
+    }
+    stack_ptr[argc] = NULL;
+
+    kernel_unmap_memory(args_kvaddr, total_args_size);
     kernel_unmap_memory(stack_kvaddr, PROC_STACK_SIZE);
 
     ps->stack_vaddr = stack_vaddr;
-    ps->argv = ((const char**) stack_vaddr);
-    ps->envp = &((const char**) stack_vaddr)[argc + 1];
+    ps->cpu.regs.rbp = ps->stack_vaddr + PROC_STACK_SIZE - sizeof(uint64_t);
+    ps->envp = &((const char**) ps->cpu.regs.rbp)[-envc];
+    ps->argv = &ps->envp[-(argc + 1)];
+    ps->cpu.stack.rsp = ((uint64_t) ps->argv) - sizeof(uint64_t);
     ps->cpu.regs.rdi = argc;
     ps->cpu.regs.rsi = (uint64_t) ps->argv;
     ps->cpu.regs.rdx = (uint64_t) ps->envp;
