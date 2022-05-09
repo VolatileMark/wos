@@ -156,6 +156,7 @@ heap_segment_header_t* heap_allocate_aligned_memory(uint64_t alignment, uint64_t
     heap_segment_header_t* alg;
     heap_segment_header_t* new;
     uint64_t aligned_data_addr, data_addr, total_size;
+    uint8_t is_tail;
 
     size = ((size < MIN_ALLOC_SIZE) ? MIN_ALLOC_SIZE : size);
     total_size = size + alignment;
@@ -166,6 +167,7 @@ heap_segment_header_t* heap_allocate_aligned_memory(uint64_t alignment, uint64_t
             return 0;
     } while (seg->size < total_size);
     
+    is_tail = kernel_heap.tail == seg;
     data_addr = (uint64_t)(seg + 1);
     aligned_data_addr = alignu(data_addr, alignment);
     total_size = seg->size;
@@ -205,7 +207,7 @@ heap_segment_header_t* heap_allocate_aligned_memory(uint64_t alignment, uint64_t
     new->next = seg->next;
     if (new->next != NULL)
         new->next->prev = new;
-    if (seg == kernel_heap.tail)
+    if (is_tail)
         kernel_heap.tail = new;
 
     seg->free = 0;

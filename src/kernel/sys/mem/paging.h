@@ -34,6 +34,7 @@ typedef enum
 
 typedef enum
 {
+    PAGE_FLAG_PRESENT = 0,
     PAGE_FLAG_ALLOW_WRITES = 1,
     PAGE_FLAG_ALLOW_USER = 2,
     PAGE_FLAG_NO_WRITETHROUGH = 3,

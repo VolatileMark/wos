@@ -173,8 +173,8 @@ clean-all:
 
 .PHONY: grub-version
 grub-version:
-	@grub-mkrescue --version
-	@grub-mkstandalone --version
+	@$(MKRESCUE) --version
+	@$(MKSTANDALONE) --version
 
 .PHONY: qemu-version
 qemu-version:

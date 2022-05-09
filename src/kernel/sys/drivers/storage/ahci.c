@@ -407,7 +407,7 @@ static int ahci_identify_port(ahci_port_descriptor_t* desc)
         return -1;
     }
 
-    desc->port->ci = 1 << slot;
+    desc->port->ci |= 1 << slot;
 
     while (1)
     {
@@ -457,15 +457,16 @@ static uint64_t ahci_read_capped(drive_t* drive, uint64_t lba, uint64_t bytes, u
     {
         cmd_tbl->prdt_entry[i].data_base_address = kernel_get_paddr(buffer);
         cmd_tbl->prdt_entry[i].data_byte_count = SIZE_nMB(4) - 1;
-        cmd_tbl->prdt_entry[i].interrupt_completion = 1;
+        cmd_tbl->prdt_entry[i].interrupt_completion = 0;
         buffer += SIZE_nMB(4);
         count -= SIZE_nMB(4);
     }
     cmd_tbl->prdt_entry[i].data_base_address = kernel_get_paddr(buffer);
     cmd_tbl->prdt_entry[i].data_byte_count = count - 1;
-    cmd_tbl->prdt_entry[i].interrupt_completion = 1;
+    cmd_tbl->prdt_entry[i].interrupt_completion = 0;
 
     cmd_fis = (fis_reg_h2d_t*) &cmd_tbl->command_fis;
+    memset(cmd_fis, 0, sizeof(fis_reg_h2d_t));
     cmd_fis->fis_type = FIS_TYPE_REG_H2D;
     cmd_fis->c_bit = 1;
     cmd_fis->command = AHCI_ATA_CMD_READ_DMA_EX;
@@ -492,7 +493,7 @@ static uint64_t ahci_read_capped(drive_t* drive, uint64_t lba, uint64_t bytes, u
         return 0;
     }
 
-    desc->port->ci = 1 << slot;
+    desc->port->ci |= 1 << slot;
 
     while (1)
     {
@@ -516,7 +517,7 @@ static uint64_t ahci_read(drive_t* drive, uint64_t lba, uint64_t bytes, void* bu
     if (drive == NULL || drive->interface == NULL)
         return 0;
 
-    raw_buffer_ptr = aligned_alloc(sizeof(uint16_t), alignu(bytes, drive->sector_bytes));
+    raw_buffer_ptr = aligned_alloc(0x10, alignu(bytes, drive->sector_bytes));
     bytes_read = 0;
     buffer_addr = (uint64_t) raw_buffer_ptr;
 
