@@ -20,20 +20,20 @@ typedef struct pit_callback
 {
     isr_handler_t handler;
     struct pit_callback* next;
-} pit_callback_t;
+} pit_callback_list_entry_t;
 
 typedef struct
 {
-    pit_callback_t* start;
-    pit_callback_t* end;
+    pit_callback_list_entry_t* head;
+    pit_callback_list_entry_t* tail;
 } pit_callback_list_t;
 
 static pit_callback_list_t callbacks;
 
 static void pit_handler(const interrupt_frame_t* frame)
 {
-    pit_callback_t* callback;
-    callback = callbacks.start;
+    pit_callback_list_entry_t* callback;
+    callback = callbacks.head;
     while (callback != NULL)
     {
         if (callback->handler != NULL)
@@ -44,28 +44,24 @@ static void pit_handler(const interrupt_frame_t* frame)
 
 int pit_register_callback(isr_handler_t handler)
 {
-    if (callbacks.start == NULL)
+    pit_callback_list_entry_t* callback;
+
+    callback = malloc(sizeof(pit_callback_list_entry_t));
+    if (callback == NULL)
     {
-        callbacks.start = calloc(1, sizeof(pit_callback_t));
-        if (callbacks.start == NULL)
-        {
-            trace_pit("Could not initialize PIT callback list");
-            return -1;
-        }
-        callbacks.end = callbacks.start;
-        callbacks.end->handler = handler;
+        trace_pit("Could register callback");
+        return -1;
     }
+
+    callback->handler = handler;
+    callback->next = NULL;
+
+    if (callbacks.tail == NULL)
+        callbacks.head = callback;
     else
-    {
-        callbacks.end->next = calloc(1, sizeof(pit_callback_t));
-        if (callbacks.end->next == NULL)
-        {
-            trace_pit("Could not allocate next PIT callback entry");
-            return -1;
-        }
-        callbacks.end = callbacks.end->next;
-        callbacks.end->handler = handler;
-    }
+        callbacks.tail->next = callback;
+    callbacks.tail = callback;
+
     return 0;
 }
 
