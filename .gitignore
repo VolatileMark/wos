@@ -10,7 +10,7 @@ build/
 .vagrant/
 .cache/
 doxygen/
-src/test
+src/test/
 compile_commands.json
 
 tools/x86_64-elf-cross
