@@ -9,7 +9,8 @@
 #define PROC_MAX_FDS 64
 #define PROC_DEFAULT_RFLAGS 0x202
 #define PROC_CEIL_VADDR 0x800000000000
-#define PROC_STACK_SIZE SIZE_nMB(2)
+#define PROC_USER_STACK_SIZE SIZE_nMB(2)
+#define PROC_KERNEL_STACK_SIZE SIZE_nKB(16)
 
 typedef struct memory_segments_list_entry
 {
@@ -43,7 +44,8 @@ typedef struct
     const char** argv;
     const char** envp;
     uint64_t brk_vaddr;
-    uint64_t stack_vaddr;
+    uint64_t user_stack_vaddr;
+    uint64_t kernel_stack_vaddr;
     cpu_state_t cpu;
     memory_segments_list_t mem;
     file_descriptor_t fds[PROC_MAX_FDS];

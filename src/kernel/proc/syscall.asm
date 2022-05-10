@@ -4,6 +4,8 @@
 [extern gdt_get_kernel_cs]
 [extern gdt_get_kernel_ds]
 
+[extern tss_get]
+
 [extern syscall_handler]
 
 
@@ -45,9 +47,13 @@ syscall_hook:
     ; Save return address and FLAGS
     push rcx
     push r11
-    ; Save current RBP and replace it with the current RSP value
+    ; Save user RBP to the user stack and the user RSP to RBX
     push rbp
-    mov rbp, rsp
+    mov rbx, rsp
+    ; Load the kernel stack
+    call tss_get
+    mov rbp, [rax + 4]
+    mov rsp, rbp
     ; Store syscall arguments on the stack
     push rsi
     push rdx
@@ -58,8 +64,8 @@ syscall_hook:
     mov rsi, rbp
     ; Call syscall handler
     call syscall_handler
-    ; Clear the stack and restore previous RBP
-    mov rsp, rbp
+    ; Restore user stack RSP and RBP
+    mov rsp, rbx
     pop rbp
     ; Restore return address and FLAGS
     pop r11

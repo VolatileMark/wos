@@ -173,7 +173,7 @@ void scheduler_run(void)
         HALT();
     }
 
-    tss_set_kernel_stack(ps->stack_vaddr + PROC_STACK_SIZE - sizeof(uint64_t));
+    tss_set_kernel_stack(ps->kernel_stack_vaddr + PROC_KERNEL_STACK_SIZE - sizeof(uint64_t));
     kernel_inject_pml4(ps->pml4);
     scheduler_switch_pml4_and_stack(ps->pml4_paddr, ps->cpu.stack.rsp);
     scheduler_run_process(&ps->cpu);

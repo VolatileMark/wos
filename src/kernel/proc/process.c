@@ -33,7 +33,7 @@ static void process_delete_and_free(process_t* ps)
     free(ps);
 }
 
-int process_request_memory(process_t* ps, uint64_t size, uint64_t hint, page_access_type_t access, uint64_t* vaddr_out, uint64_t* paddr_out)
+int process_request_memory(process_t* ps, uint64_t size, uint64_t hint, page_access_type_t access, privilege_level_t privilege, uint64_t* vaddr_out, uint64_t* paddr_out)
 {
     uint64_t vaddr, paddr, pages;
     memory_segments_list_entry_t* entry;
@@ -53,7 +53,7 @@ int process_request_memory(process_t* ps, uint64_t size, uint64_t hint, page_acc
     if 
     (
         paddr == 0 ||
-        pml4_map_memory(ps->pml4, paddr, vaddr, size, access, PL3) < size
+        pml4_map_memory(ps->pml4, paddr, vaddr, size, access, privilege) < size
     )
     {
         free(entry);
@@ -176,7 +176,7 @@ static int process_load_elf(process_t* ps, const char* path)
             return 0;
             
         case PT_LOAD:
-            if (process_request_memory(ps, phdr->p_memsz, phdr->p_vaddr, PAGE_ACCESS_RO, NULL, &paddr))
+            if (process_request_memory(ps, phdr->p_memsz, phdr->p_vaddr, PAGE_ACCESS_RO, PL3, NULL, &paddr))
             {
                 free(buffer);
                 return -1;
@@ -199,7 +199,7 @@ static int process_load_elf(process_t* ps, const char* path)
     return 0;
 }
 
-static int process_load_stack(process_t* ps, const char** argv, const char** envp)
+static int process_build_user_stack(process_t* ps, const char** argv, const char** envp)
 {
     int argc, envc, i;
     uint64_t argv_size, envp_size, total_args_size, cpysize;
@@ -215,11 +215,11 @@ static int process_load_stack(process_t* ps, const char** argv, const char** env
     total_args_size = argv_size + envp_size;
     
     args_vaddr = alignd(PROC_CEIL_VADDR - total_args_size, SIZE_4KB);
-    stack_vaddr = args_vaddr - PROC_STACK_SIZE;
+    stack_vaddr = args_vaddr - PROC_USER_STACK_SIZE;
     if 
     (
-        process_request_memory(ps, PROC_STACK_SIZE, stack_vaddr, PAGE_ACCESS_RW, &stack_vaddr, &stack_paddr) ||
-        process_request_memory(ps, total_args_size, args_vaddr, PAGE_ACCESS_RO, &args_vaddr, &args_paddr)
+        process_request_memory(ps, PROC_USER_STACK_SIZE, stack_vaddr, PAGE_ACCESS_RW, PL3, &stack_vaddr, &stack_paddr) ||
+        process_request_memory(ps, total_args_size, args_vaddr, PAGE_ACCESS_RO, PL3, &args_vaddr, &args_paddr)
     )
         return -1;
     
@@ -231,13 +231,13 @@ static int process_load_stack(process_t* ps, const char** argv, const char** env
         return -1;
     if
     (
-        kernel_get_next_vaddr(PROC_STACK_SIZE, &stack_kvaddr) < PROC_STACK_SIZE ||
-        kernel_map_memory(stack_paddr, stack_kvaddr, PROC_STACK_SIZE, PAGE_ACCESS_RW, PL0) < PROC_STACK_SIZE
+        kernel_get_next_vaddr(PROC_USER_STACK_SIZE, &stack_kvaddr) < PROC_USER_STACK_SIZE ||
+        kernel_map_memory(stack_paddr, stack_kvaddr, PROC_USER_STACK_SIZE, PAGE_ACCESS_RW, PL0) < PROC_USER_STACK_SIZE
     )
         return -1;
 
     cpyptr = (char*) args_kvaddr;
-    stack_ptr = (const char**) (stack_kvaddr + PROC_STACK_SIZE - sizeof(uint64_t));
+    stack_ptr = (const char**) (stack_kvaddr + PROC_USER_STACK_SIZE - sizeof(uint64_t));
     
     stack_ptr = &stack_ptr[-envc];
     for (i = 0; envp != NULL && i < envc; i++)
@@ -260,10 +260,10 @@ static int process_load_stack(process_t* ps, const char** argv, const char** env
     stack_ptr[argc] = NULL;
 
     kernel_unmap_memory(args_kvaddr, total_args_size);
-    kernel_unmap_memory(stack_kvaddr, PROC_STACK_SIZE);
+    kernel_unmap_memory(stack_kvaddr, PROC_USER_STACK_SIZE);
 
-    ps->stack_vaddr = stack_vaddr;
-    ps->cpu.regs.rbp = ps->stack_vaddr + PROC_STACK_SIZE - sizeof(uint64_t);
+    ps->user_stack_vaddr = stack_vaddr;
+    ps->cpu.regs.rbp = ps->user_stack_vaddr + PROC_USER_STACK_SIZE - sizeof(uint64_t);
     ps->envp = &((const char**) ps->cpu.regs.rbp)[-envc];
     ps->argv = &ps->envp[-(argc + 1)];
     ps->cpu.stack.rsp = ((uint64_t) ps->argv) - sizeof(uint64_t);
@@ -271,6 +271,25 @@ static int process_load_stack(process_t* ps, const char** argv, const char** env
     ps->cpu.regs.rsi = (uint64_t) ps->argv;
     ps->cpu.regs.rdx = (uint64_t) ps->envp;
 
+    return 0;
+}
+
+int process_build_kernel_stack(process_t* ps)
+{
+    uint64_t hint, paddr;
+    if 
+    (
+        kernel_get_next_vaddr(PROC_KERNEL_STACK_SIZE, &hint) < PROC_KERNEL_STACK_SIZE ||
+        process_request_memory(ps, PROC_KERNEL_STACK_SIZE, hint, PAGE_ACCESS_RW, PL0, &ps->kernel_stack_vaddr, &paddr)
+    )
+        return -1;
+    if (kernel_map_memory(paddr, hint, PROC_KERNEL_STACK_SIZE, PAGE_ACCESS_RW, PL0) < PROC_KERNEL_STACK_SIZE)
+    {
+        kernel_unmap_memory(hint, PROC_KERNEL_STACK_SIZE);
+        return -1;
+    }
+    memset((void*) hint, 0, PROC_KERNEL_STACK_SIZE);
+    kernel_unmap_memory(hint, PROC_KERNEL_STACK_SIZE);
     return 0;
 }
 
@@ -287,22 +306,29 @@ process_t* process_create(const char* path, const char** argv, const char** envp
     
     if (process_create_pml4(ps))
     {
-        trace_process("Failed to create process PML4");
+        trace_process("Failed to create process PML4 (pid: %u)", pid);
         process_delete_and_free(ps);
         return NULL;
     }
 
     if (process_load_elf(ps, path))
     {
-        trace_process("Failed to load process executable");
+        trace_process("Failed to load process executable (pid: %u)", pid);
         process_delete_and_free(ps);
         return NULL;
     }
     ps->brk_vaddr = alignu(ps->brk_vaddr, SIZE_1MB);
 
-    if (process_load_stack(ps, argv, envp))
+    if (process_build_user_stack(ps, argv, envp))
     {
-        trace_process("Failed to load stack");
+        trace_process("Failed to build user stack (pid: %u)", pid);
+        process_delete_and_free(ps);
+        return NULL;
+    }
+
+    if (process_build_kernel_stack(ps))
+    {
+        trace_process("Failed to build kernel stack (pid: %u)", pid);
         process_delete_and_free(ps);
         return NULL;
     }
