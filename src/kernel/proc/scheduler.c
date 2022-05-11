@@ -53,7 +53,7 @@ uint64_t scheduler_get_next_pid(void)
     return (maxu(pid_running, pid_zombie) + 1);
 }
 
-process_t* scheduler_get_current_scheduled_process(void)
+process_t* scheduler_get_current_process(void)
 {
     return (running.head == NULL) ? NULL : running.head->ps;
 }
@@ -85,7 +85,7 @@ static void scheduler_handle_interrupt(const interrupt_frame_t* int_frame)
     process_t* ps;
     uint64_t ps_fpu, frame_fpu;
     interrupts_disable();
-    ps = scheduler_get_current_scheduled_process();
+    ps = scheduler_get_current_process();
     ps_fpu = alignu((uint64_t) ps->cpu.fpu, 16);
     frame_fpu = alignu((uint64_t) int_frame->fpu_state, 16);
     memcpy((void*) ps_fpu, (void*) frame_fpu, 512);
@@ -138,9 +138,55 @@ static int scheduler_queue_process_in_list(process_list_t* pss, process_t *ps)
     return 0;
 }
 
+static int scheduler_remove_process_from_list(process_list_t* pss, process_t* ps)
+{
+    process_list_entry_t* current;
+    process_list_entry_t* prev;
+
+    current = pss->head;
+    prev = NULL;
+
+    while (current != NULL)
+    {
+        if (current->ps != NULL && current->ps->pid == ps->pid)
+        {
+            if (prev == NULL)
+                pss->head = current->next;
+            else
+                prev->next = current->next;
+
+            if (current == pss->tail)
+            {
+                pss->tail = prev;
+                if (prev != NULL)
+                    prev->next = NULL;
+            }
+
+            free(current);
+            return 0;
+        }
+        prev = current;
+        current = current->next;
+    }
+
+    return -1;
+}
+
 int scheduler_queue_process(process_t* ps)
 {
     return scheduler_queue_process_in_list(&running, ps);
+}
+
+int scheduler_terminate_process(process_t* ps)
+{
+    if 
+    (
+        ps == NULL ||
+        scheduler_remove_process_from_list(&running, ps)
+    )
+        return -1;
+    process_delete_resources(ps);
+    return scheduler_queue_process_in_list(&zombie, ps);
 }
 
 static process_t* scheduler_fetch_next_running_process(void)

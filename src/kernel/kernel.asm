@@ -17,7 +17,7 @@ _start:
 %define KERNEL_STACK_SIZE 32768
 
 [global kernel_stack_top]
-[global kernel_stack_bottom]
 kernel_stack_top:
     resb KERNEL_STACK_SIZE
+[global kernel_stack_bottom]
 kernel_stack_bottom:

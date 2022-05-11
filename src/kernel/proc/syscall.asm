@@ -1,13 +1,41 @@
 [section .text]
 [bits 64]
 
+[extern kernel_stack_bottom]
+
 [extern gdt_get_kernel_cs]
 [extern gdt_get_kernel_ds]
 
+[extern memcpy]
 [extern tss_get]
 
 [extern syscall_handler]
 
+
+[global syscall_switch_to_kernel_stack]
+syscall_switch_to_kernel_stack:
+    ; Save return return function address to RBX
+    mov rbx, rdi
+    ; Load kernel stack
+    mov rbp, (kernel_stack_bottom - 8)
+    mov rsp, rbp
+    ; Move the stack pointer to make space for memcpy copy
+    sub rsp, 8*4
+    ; Set memcpy's dest address to the current stack pointer
+    mov rdi, rsp
+    ; Move the syscall stack pointer to the last parameter
+    ; NOTE: RSI is memcpy's src address
+    sub rsi, 8*4
+    ; Set memcpy size to (5 * sizeof(uint64_t))
+    mov rdx, 8*5
+    ; Start copy!
+    call memcpy
+    ; Load the new syscall stack pointer as parameter
+    mov rdi, rbp
+    ; Push return address to the stack
+    push rbx
+    ; Return to hook
+    ret
 
 [global syscall_init]
 syscall_init:
@@ -55,7 +83,7 @@ syscall_hook:
     mov rbp, [rax + 4]
     mov rsp, rbp
     ; Store syscall arguments on the stack
-    push rsi
+    mov [rsp], rsi
     push rdx
     push r10
     push r8

@@ -52,5 +52,8 @@ typedef struct
 } process_t;
 
 process_t* process_create(const char* path, const char** argv, const char** envp, uint64_t pid);
+void process_delete_resources(process_t* ps);
+void process_delete_and_free(process_t* ps);
+
 
 #endif

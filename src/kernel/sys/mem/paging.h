@@ -85,8 +85,8 @@ uint64_t pml4_get_paddr(page_table_t pml4, uint64_t vaddr);
 uint64_t pml4_delete(page_table_t pml4, uint64_t pml4_paddr);
 void kernel_inject_pml4(page_table_t pml4);
 
-uint64_t paging_get_kernel_pml4_paddr(void);
-page_table_t paging_get_kernel_pml4(void);
+uint64_t kernel_get_pml4_paddr(void);
+page_table_t kernel_get_pml4(void);
 
 int kernel_set_pte_flag(uint64_t vaddr, page_flag_t flag);
 int pml4_set_pte_flag(page_table_t pml4, uint64_t vaddr, page_flag_t flag);

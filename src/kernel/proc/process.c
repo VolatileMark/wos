@@ -18,7 +18,7 @@ static void process_release_all_memory(process_t* ps)
         pfa_free_pages(entry->paddr, entry->pages);
 }
 
-static void process_delete_resources(process_t* ps)
+void process_delete_resources(process_t* ps)
 {
     process_release_all_memory(ps);
     if (ps->exec_path != NULL)
@@ -27,13 +27,13 @@ static void process_delete_resources(process_t* ps)
         pml4_delete(ps->pml4, ps->pml4_paddr);
 }
 
-static void process_delete_and_free(process_t* ps)
+void process_delete_and_free(process_t* ps)
 {
     process_delete_resources(ps);
     free(ps);
 }
 
-int process_request_memory(process_t* ps, uint64_t size, uint64_t hint, page_access_type_t access, privilege_level_t privilege, uint64_t* vaddr_out, uint64_t* paddr_out)
+static int process_request_memory(process_t* ps, uint64_t size, uint64_t hint, page_access_type_t access, privilege_level_t privilege, uint64_t* vaddr_out, uint64_t* paddr_out)
 {
     uint64_t vaddr, paddr, pages;
     memory_segments_list_entry_t* entry;
@@ -274,7 +274,7 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
     return 0;
 }
 
-int process_build_kernel_stack(process_t* ps)
+static int process_build_kernel_stack(process_t* ps)
 {
     uint64_t hint, paddr;
     if 

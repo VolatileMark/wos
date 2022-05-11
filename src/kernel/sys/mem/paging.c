@@ -9,12 +9,12 @@ static page_table_t kernel_tmp_pt;
 static uint64_t kernel_tmp_index;
 static uint64_t kernel_pml4_paddr;
 
-uint64_t paging_get_kernel_pml4_paddr(void)
+uint64_t kernel_get_pml4_paddr(void)
 {
     return kernel_pml4_paddr;
 }
 
-page_table_t paging_get_kernel_pml4(void)
+page_table_t kernel_get_pml4(void)
 {
     return kernel_pml4;
 }
