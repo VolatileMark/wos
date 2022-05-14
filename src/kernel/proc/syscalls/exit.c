@@ -8,7 +8,7 @@ static void exit_hook(uint64_t* stack)
     int status;
     process_t* ps;
 
-    status = NARG(0, int);
+    status = get_arg(0, int);
     ps = scheduler_get_current_process();
     pml4_load(kernel_get_pml4_paddr());
     if (scheduler_terminate_process(ps))

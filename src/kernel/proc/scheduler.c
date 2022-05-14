@@ -172,6 +172,20 @@ static int scheduler_remove_process_from_list(process_list_t* pss, process_t* ps
     return -1;
 }
 
+int scheduler_replace_process(process_t* old, process_t* new)
+{
+    if 
+    (
+        scheduler_remove_process_from_list(&running, old) ||
+        scheduler_queue_process_in_list(&running, new)
+    )
+    {
+        trace_scheduler("Failed to replace process");
+        return -1;
+    }
+    return 0;
+}
+
 int scheduler_queue_process(process_t* ps)
 {
     return scheduler_queue_process_in_list(&running, ps);

@@ -1,7 +1,8 @@
 #include "syscall.h"
 
 static syscall_t syscalls[] = {
-    &SYSCALL(exit)
+    &SYSCALL(exit),
+    &SYSCALL(execve)
 };
 
 #define NUM_SYSCALLS (sizeof(syscalls) / sizeof(uint64_t))

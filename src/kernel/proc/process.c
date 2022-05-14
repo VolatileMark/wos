@@ -342,3 +342,27 @@ process_t* process_create(const char* path, const char** argv, const char** envp
 
     return ps;
 }
+
+static void process_copy_file_descriptors(process_t* dest, process_t* src)
+{
+    int i;
+    for (i = 0; i < PROC_MAX_FDS; i++)
+        dest->fds[i] = src->fds[i];
+}
+
+process_t* process_create_replacement(process_t* parent, const char* path, const char** argv, const char** envp)
+{
+    process_t* child;
+
+    child = process_create(path, argv, envp, parent->pid);
+    if (child == NULL)
+    {
+        trace_process("Could not create replacement from process with id %u", parent->pid);
+        return NULL;
+    }
+
+    child->parent_pid = parent->parent_pid;
+    process_copy_file_descriptors(child, parent);
+
+    return child;
+}
