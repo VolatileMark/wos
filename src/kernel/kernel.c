@@ -50,6 +50,8 @@ static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
     interrupts_disable();
 
+    scheduler_init_pss();
+
     paging_init();
     pfa_restore(current_bitmap);
     if (multiboot_parse_struct(multiboot_struct_addr))

@@ -106,11 +106,15 @@ static void scheduler_pit_handler(const interrupt_frame_t* int_frame)
         pic_acknowledge((uint8_t) int_frame->interrupt_info.interrupt_number);
 }
 
+void scheduler_init_pss(void)
+{
+    memset(&running, 0, sizeof(process_list_t));
+    memset(&zombie, 0, sizeof(process_list_t));
+}
+
 int scheduler_init(void)
 {
     ms = 0;
-    memset(&running, 0, sizeof(process_list_t));
-    memset(&zombie, 0, sizeof(process_list_t));
     pit_set_interval(SCHEDULER_PIT_INTERVAL);
     return pit_register_callback(&scheduler_pit_handler);
 }
@@ -234,7 +238,7 @@ void scheduler_run(void)
     }
 
     tss_set_kernel_stack(ps->kernel_stack_vaddr + PROC_KERNEL_STACK_SIZE - sizeof(uint64_t));
-    kernel_inject_pml4(ps->pml4);
-    scheduler_switch_pml4_and_stack(ps->pml4_paddr, ps->cpu.stack.rsp);
+    paging_inject_kernel_pml4(ps->pml4);
+    scheduler_switch_pml4_and_stack(ps->pml4_paddr, tss_get()->rsp0);
     scheduler_run_process(&ps->cpu);
 }

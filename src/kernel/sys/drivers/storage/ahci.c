@@ -455,13 +455,13 @@ static uint64_t ahci_read_capped(drive_t* drive, uint64_t lba, uint64_t bytes, u
     count = bytes;
     for (i = 0; i < cmd_header->prdt_length - 1; i++)
     {
-        cmd_tbl->prdt_entry[i].data_base_address = kernel_get_paddr(buffer);
+        cmd_tbl->prdt_entry[i].data_base_address = paging_get_paddr(buffer);
         cmd_tbl->prdt_entry[i].data_byte_count = SIZE_nMB(4) - 1;
         cmd_tbl->prdt_entry[i].interrupt_completion = 0;
         buffer += SIZE_nMB(4);
         count -= SIZE_nMB(4);
     }
-    cmd_tbl->prdt_entry[i].data_base_address = kernel_get_paddr(buffer);
+    cmd_tbl->prdt_entry[i].data_base_address = paging_get_paddr(buffer);
     cmd_tbl->prdt_entry[i].data_byte_count = count - 1;
     cmd_tbl->prdt_entry[i].interrupt_completion = 0;
 
@@ -542,16 +542,16 @@ static uint64_t ahci_read(drive_t* drive, uint64_t lba, uint64_t bytes, void* bu
 static pci_header_common_t* ahci_map_pci_header(uint64_t header_paddr)
 {
     uint64_t vaddr;
-    vaddr = kernel_map_temporary_page(header_paddr, PAGE_ACCESS_RO, PL0);
-    kernel_map_temporary_page(header_paddr + SIZE_4KB, PAGE_ACCESS_RO, PL0);
+    vaddr = paging_map_temporary_page(header_paddr, PAGE_ACCESS_RO, PL0);
+    paging_map_temporary_page(header_paddr + SIZE_4KB, PAGE_ACCESS_RO, PL0);
     return (pci_header_common_t*)(vaddr + GET_ADDR_OFFSET(header_paddr));
 }
 
 static void ahci_unmap_pci_header(uint64_t header_vaddr)
 {
     header_vaddr = alignd(header_vaddr, SIZE_4KB);
-    kernel_unmap_temporary_page(header_vaddr);
-    kernel_unmap_temporary_page(header_vaddr + SIZE_4KB);
+    paging_unmap_temporary_page(header_vaddr);
+    paging_unmap_temporary_page(header_vaddr + SIZE_4KB);
 }
 
 static ahci_device_type_t ahci_get_port_type(hba_port_t* port)
@@ -589,11 +589,11 @@ static hba_mem_t* ahci_map_abar(uint64_t abar_paddr)
         return NULL;
     if 
     (
-        kernel_map_memory(abar_paddr, abar_vaddr, sizeof(hba_mem_t), PAGE_ACCESS_RW, PL0) < sizeof(hba_mem_t) ||
-        kernel_flag_memory_area(abar_vaddr, sizeof(hba_mem_t), PAGE_FLAG_UNCACHABLE)
+        paging_map_memory(abar_paddr, abar_vaddr, sizeof(hba_mem_t), PAGE_ACCESS_RW, PL0) < sizeof(hba_mem_t) ||
+        paging_flag_memory_area(abar_vaddr, sizeof(hba_mem_t), PAGE_FLAG_UNCACHABLE)
     )
     {
-        kernel_unmap_memory(abar_vaddr, sizeof(hba_mem_t));
+        paging_unmap_memory(abar_vaddr, sizeof(hba_mem_t));
         return NULL;
     }
 
@@ -678,7 +678,7 @@ static void ahci_init_controller_ports(hba_mem_t* abar, pci_header_0x0_t* pci_he
     if (entry->base_paddr == 0)
         return;
 
-    if (kernel_map_memory(entry->base_paddr, entry->base_vaddr, controller_mem_size, PAGE_ACCESS_RW, PL0) < controller_mem_size)
+    if (paging_map_memory(entry->base_paddr, entry->base_vaddr, controller_mem_size, PAGE_ACCESS_RW, PL0) < controller_mem_size)
     {
         pfa_free_pages(entry->base_paddr, entry->pages);
         return;
@@ -769,7 +769,7 @@ static uint64_t ahci_init_controller(pci_header_0x0_t* pci_header)
     if (!abar->ghc.ae)
     {
         trace_ahci("AHCI is not supported by controller %x:%x", pci_header->common.vendor_id, pci_header->common.device_id);
-        kernel_unmap_memory((uint64_t) abar, sizeof(hba_mem_t));
+        paging_unmap_memory((uint64_t) abar, sizeof(hba_mem_t));
         return 0;
     }
 
@@ -777,7 +777,7 @@ static uint64_t ahci_init_controller(pci_header_0x0_t* pci_header)
     if (!(abar->cap.s64a))
     {
         trace_ahci("64-bit addressing not supported by controller %x:%x", pci_header->common.vendor_id, pci_header->common.device_id);
-        kernel_unmap_memory((uint64_t) abar, sizeof(hba_mem_t));
+        paging_unmap_memory((uint64_t) abar, sizeof(hba_mem_t));
         return 0;
     }
 
@@ -785,7 +785,7 @@ static uint64_t ahci_init_controller(pci_header_0x0_t* pci_header)
     if (entry == NULL)
     {
         trace_ahci("Could not allocate entry for controller %x:%x", pci_header->common.vendor_id, pci_header->common.device_id);
-        kernel_unmap_memory((uint64_t) abar, sizeof(hba_mem_t));
+        paging_unmap_memory((uint64_t) abar, sizeof(hba_mem_t));
         return 0;
     }
 

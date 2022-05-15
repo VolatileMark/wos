@@ -60,8 +60,11 @@ typedef enum
 
 extern void pml4_load(uint64_t pml4_paddr);
 extern void tlb_flush(void);
-extern uint64_t pml4_get_current_paddr(void);
 extern void pte_invalidate(uint64_t vaddr);
+
+uint64_t kernel_get_pml4_paddr(void);
+page_table_t paging_get_current_pml4(void);
+extern uint64_t paging_get_current_pml4_paddr(void);
 
 void pte_set_address(page_table_entry_t* entry, uint64_t addr);
 uint64_t pte_get_address(page_table_entry_t* entry);
@@ -69,35 +72,33 @@ uint64_t pte_get_address(page_table_entry_t* entry);
 void paging_init(void);
 
 uint64_t pml4_map_memory(page_table_t pml4, uint64_t paddr, uint64_t vaddr, uint64_t size, page_access_type_t access, privilege_level_t privilege_level);
-uint64_t kernel_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, page_access_type_t access, privilege_level_t privilege_level);
-uint64_t kernel_map_temporary_page(uint64_t paddr, page_access_type_t access, privilege_level_t privilege_level);
+uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, page_access_type_t access, privilege_level_t privilege_level);
+uint64_t paging_map_temporary_page(uint64_t paddr, page_access_type_t access, privilege_level_t privilege_level);
 
 uint64_t pml4_unmap_memory(page_table_t pml4, uint64_t vaddr, uint64_t size);
-uint64_t kernel_unmap_memory(uint64_t vaddr, uint64_t size);
-void kernel_unmap_temporary_page(uint64_t vaddr);
+uint64_t paging_unmap_memory(uint64_t vaddr, uint64_t size);
+void paging_unmap_temporary_page(uint64_t vaddr);
 
 uint64_t kernel_get_next_vaddr(uint64_t size, uint64_t* vaddr_out);
+uint64_t paging_get_next_vaddr(uint64_t vaddr_start, uint64_t size, uint64_t* vaddr_out);
 uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t size, uint64_t* vaddr_out);
 
-uint64_t kernel_get_paddr(uint64_t vaddr);
+uint64_t paging_get_paddr(uint64_t vaddr);
 uint64_t pml4_get_paddr(page_table_t pml4, uint64_t vaddr);
 
 uint64_t pml4_delete(page_table_t pml4, uint64_t pml4_paddr);
-void kernel_inject_pml4(page_table_t pml4);
+void paging_inject_kernel_pml4(page_table_t pml4);
 
-uint64_t kernel_get_pml4_paddr(void);
-page_table_t kernel_get_pml4(void);
-
-int kernel_set_pte_flag(uint64_t vaddr, page_flag_t flag);
+int paging_set_pte_flag(uint64_t vaddr, page_flag_t flag);
 int pml4_set_pte_flag(page_table_t pml4, uint64_t vaddr, page_flag_t flag);
 
-int kernel_reset_pte_flag(uint64_t vaddr, page_flag_t flag);
+int paging_reset_pte_flag(uint64_t vaddr, page_flag_t flag);
 int pml4_reset_pte_flag(page_table_t pml4, uint64_t vaddr, page_flag_t flag);
 
-int kernel_flag_memory_area(uint64_t vaddr, uint64_t size, page_flag_t flag);
+int paging_flag_memory_area(uint64_t vaddr, uint64_t size, page_flag_t flag);
 int pml4_flag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, page_flag_t flag);
 
-int kernel_unflag_memory_area(uint64_t vaddr, uint64_t size, page_flag_t flag);
+int paging_unflag_memory_area(uint64_t vaddr, uint64_t size, page_flag_t flag);
 int pml4_unflag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, page_flag_t flag);
 
 #endif

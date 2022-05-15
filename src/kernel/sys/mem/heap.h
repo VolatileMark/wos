@@ -8,8 +8,8 @@ struct heap_segment_header
     struct heap_segment_header* next;
     struct heap_segment_header* prev;
     uint64_t size;
-    uint64_t align_offset : 63;
     uint64_t free : 1;
+    uint64_t reserved : 63;
 } __attribute__((packed));
 typedef struct heap_segment_header heap_segment_header_t;
 

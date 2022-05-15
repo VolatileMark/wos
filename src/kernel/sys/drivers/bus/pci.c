@@ -17,7 +17,7 @@ static void pci_enumerate_function(uint64_t address, uint64_t num)
     uint64_t function_address;
     
     function_address = address + (num << 12);
-    header = (pci_header_common_t*) kernel_map_temporary_page(function_address, PAGE_ACCESS_RO, PL0);
+    header = (pci_header_common_t*) paging_map_temporary_page(function_address, PAGE_ACCESS_RO, PL0);
     if (header->device_id == 0 || header->device_id == 0xFFFF)
         return;
     
@@ -32,7 +32,7 @@ static void pci_enumerate_function(uint64_t address, uint64_t num)
 
     info("PCI device %x:%x found of type %x:%x:%x", header->vendor_id, header->device_id, header->class_code, header->subclass, header->program_interface);
 
-    kernel_unmap_temporary_page((uint64_t) header);
+    paging_unmap_temporary_page((uint64_t) header);
 }
 
 static void pci_enumerate_device(uint64_t address, uint64_t num)
@@ -42,12 +42,12 @@ static void pci_enumerate_device(uint64_t address, uint64_t num)
     uint64_t device_address;
     
     device_address = address + (num << 15);
-    header = (pci_header_common_t*) kernel_map_temporary_page(device_address, PAGE_ACCESS_RO, PL0);
+    header = (pci_header_common_t*) paging_map_temporary_page(device_address, PAGE_ACCESS_RO, PL0);
     if (header->device_id == 0 || header->device_id == 0xFFFF)
         return;
     for (function = 0; function < 8; function++)
         pci_enumerate_function(device_address, function);
-    kernel_unmap_temporary_page((uint64_t) header);
+    paging_unmap_temporary_page((uint64_t) header);
 }
 
 static void pci_enumerate_bus(uint64_t address, uint64_t num)
@@ -57,12 +57,12 @@ static void pci_enumerate_bus(uint64_t address, uint64_t num)
     uint64_t bus_address;
     
     bus_address = address + (num << 20);
-    header = (pci_header_common_t*) kernel_map_temporary_page(bus_address, PAGE_ACCESS_RO, PL0);
+    header = (pci_header_common_t*) paging_map_temporary_page(bus_address, PAGE_ACCESS_RO, PL0);
     if (header->device_id == 0 || header->device_id == 0xFFFF)
         return;
     for (device = 0; device < 32; device++)
         pci_enumerate_device(bus_address, device);
-    kernel_unmap_temporary_page((uint64_t) header);
+    paging_unmap_temporary_page((uint64_t) header);
 }
 
 static void pci_enumerate(mcfg_t* mcfg)
@@ -109,7 +109,7 @@ pci_devices_list_t* pci_find_devices(int class, int subclass, int program_interf
     {
         if (entry->header_paddr != 0)
         {
-            header = (pci_header_common_t*) (kernel_map_temporary_page(entry->header_paddr, PAGE_ACCESS_RO, PL0) + GET_ADDR_OFFSET(entry->header_paddr));
+            header = (pci_header_common_t*) (paging_map_temporary_page(entry->header_paddr, PAGE_ACCESS_RO, PL0) + GET_ADDR_OFFSET(entry->header_paddr));
             if 
             (
                 (class == -1 || header->class_code == (uint8_t) class) &&
@@ -120,7 +120,7 @@ pci_devices_list_t* pci_find_devices(int class, int subclass, int program_interf
                 new = malloc(sizeof(pci_devices_list_entry_t));
                 if (new == NULL)
                 {
-                    kernel_unmap_temporary_page((uint64_t) header);
+                    paging_unmap_temporary_page((uint64_t) header);
                     pci_delete_devices_list(devices_found);
                     free(devices_found);
                     return NULL;
@@ -133,7 +133,7 @@ pci_devices_list_t* pci_find_devices(int class, int subclass, int program_interf
                     devices_found->tail->next = new;
                 devices_found->tail = new;
             }
-            kernel_unmap_temporary_page((uint64_t) header);
+            paging_unmap_temporary_page((uint64_t) header);
         }
         entry = entry->next;
     }

@@ -35,9 +35,9 @@ int framebuffer_init(void)
     if (kernel_get_next_vaddr(framebuffer_info.size, &framebuffer_info.addr) < framebuffer_info.size)
         return -1;
 
-    if (kernel_map_memory(framebuffer_tag->common.framebuffer_addr, framebuffer_info.addr, framebuffer_info.size, PAGE_ACCESS_RW, PL0) < framebuffer_info.size)
+    if (paging_map_memory(framebuffer_tag->common.framebuffer_addr, framebuffer_info.addr, framebuffer_info.size, PAGE_ACCESS_RW, PL0) < framebuffer_info.size)
     {
-        kernel_unmap_memory(framebuffer_info.addr, framebuffer_info.size);
+        paging_unmap_memory(framebuffer_info.addr, framebuffer_info.size);
         return -1;
     }
 

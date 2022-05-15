@@ -84,13 +84,13 @@ static int process_create_pml4(process_t* ps)
     ps->pml4 = aligned_alloc(SIZE_4KB, SIZE_4KB);
     if (ps->pml4 == NULL)
         return -1;
-    ps->pml4_paddr = kernel_get_paddr((uint64_t) ps->pml4);
+    ps->pml4_paddr = paging_get_paddr((uint64_t) ps->pml4);
     return 0;
 }
 
 static int process_load_exec_path(process_t* ps, const char* path)
 {
-    ps->exec_path = malloc(strlen(path));
+    ps->exec_path = malloc(strlen(path) + 1);
     if (ps->exec_path == NULL)
         return -1;
     strcpy((char*) ps->exec_path, path);
@@ -184,11 +184,11 @@ static int process_load_elf(process_t* ps, const char* path)
             if 
             (
                 kernel_get_next_vaddr(phdr->p_filesz, &tmp_vaddr) < phdr->p_filesz ||
-                kernel_map_memory(paddr, tmp_vaddr, phdr->p_filesz, PAGE_ACCESS_RW, PL0) < phdr->p_filesz
+                paging_map_memory(paddr, tmp_vaddr, phdr->p_filesz, PAGE_ACCESS_RW, PL0) < phdr->p_filesz
             )
                 return -1;
             memcpy((void*) tmp_vaddr, buffer + phdr->p_offset, phdr->p_filesz);
-            kernel_unmap_memory(tmp_vaddr, phdr->p_filesz);
+            paging_unmap_memory(tmp_vaddr, phdr->p_filesz);
             break;
         }
     }
@@ -226,13 +226,13 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
     if 
     (
         kernel_get_next_vaddr(total_args_size, &args_kvaddr) < total_args_size ||
-        kernel_map_memory(args_paddr, args_kvaddr, total_args_size, PAGE_ACCESS_RW, PL0) < total_args_size
+        paging_map_memory(args_paddr, args_kvaddr, total_args_size, PAGE_ACCESS_RW, PL0) < total_args_size
     )
         return -1;
     if
     (
         kernel_get_next_vaddr(PROC_USER_STACK_SIZE, &stack_kvaddr) < PROC_USER_STACK_SIZE ||
-        kernel_map_memory(stack_paddr, stack_kvaddr, PROC_USER_STACK_SIZE, PAGE_ACCESS_RW, PL0) < PROC_USER_STACK_SIZE
+        paging_map_memory(stack_paddr, stack_kvaddr, PROC_USER_STACK_SIZE, PAGE_ACCESS_RW, PL0) < PROC_USER_STACK_SIZE
     )
         return -1;
 
@@ -259,8 +259,8 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
     }
     stack_ptr[argc] = NULL;
 
-    kernel_unmap_memory(args_kvaddr, total_args_size);
-    kernel_unmap_memory(stack_kvaddr, PROC_USER_STACK_SIZE);
+    paging_unmap_memory(args_kvaddr, total_args_size);
+    paging_unmap_memory(stack_kvaddr, PROC_USER_STACK_SIZE);
 
     ps->user_stack_vaddr = stack_vaddr;
     ps->cpu.regs.rbp = ps->user_stack_vaddr + PROC_USER_STACK_SIZE - sizeof(uint64_t);
@@ -283,13 +283,13 @@ static int process_build_kernel_stack(process_t* ps)
         process_request_memory(ps, PROC_KERNEL_STACK_SIZE, hint, PAGE_ACCESS_RW, PL0, &ps->kernel_stack_vaddr, &paddr)
     )
         return -1;
-    if (kernel_map_memory(paddr, hint, PROC_KERNEL_STACK_SIZE, PAGE_ACCESS_RW, PL0) < PROC_KERNEL_STACK_SIZE)
+    if (paging_map_memory(paddr, hint, PROC_KERNEL_STACK_SIZE, PAGE_ACCESS_RW, PL0) < PROC_KERNEL_STACK_SIZE)
     {
-        kernel_unmap_memory(hint, PROC_KERNEL_STACK_SIZE);
+        paging_unmap_memory(hint, PROC_KERNEL_STACK_SIZE);
         return -1;
     }
     memset((void*) hint, 0, PROC_KERNEL_STACK_SIZE);
-    kernel_unmap_memory(hint, PROC_KERNEL_STACK_SIZE);
+    paging_unmap_memory(hint, PROC_KERNEL_STACK_SIZE);
     return 0;
 }
 

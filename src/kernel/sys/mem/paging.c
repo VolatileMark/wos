@@ -1,5 +1,6 @@
 #include "paging.h"
 #include "../../kernel.h"
+#include "../../proc/scheduler.h"
 #include <mem.h>
 
 #define KERNEL_PML4_VADDR VADDR_GET_TEMPORARY(0)
@@ -14,8 +15,13 @@ uint64_t kernel_get_pml4_paddr(void)
     return kernel_pml4_paddr;
 }
 
-page_table_t kernel_get_pml4(void)
+page_table_t paging_get_current_pml4(void)
 {
+    process_t* current;
+
+    current = scheduler_get_current_process();
+    if (current != NULL)
+        return current->pml4;
     return kernel_pml4;
 }
 
@@ -67,7 +73,7 @@ static void pte_create(page_table_t table, uint64_t index, uint64_t paddr, page_
     /* entry->no_execute = (((uint64_t) access) & 0b0010) >> 1 */;
 }
 
-uint64_t kernel_map_temporary_page(uint64_t paddr, page_access_type_t access, privilege_level_t privilege_level)
+uint64_t paging_map_temporary_page(uint64_t paddr, page_access_type_t access, privilege_level_t privilege_level)
 {
     uint64_t index;
     index = paging_get_next_tmp_index();
@@ -75,7 +81,7 @@ uint64_t kernel_map_temporary_page(uint64_t paddr, page_access_type_t access, pr
     return VADDR_GET_TEMPORARY(index);
 }
 
-void kernel_unmap_temporary_page(uint64_t vaddr)
+void paging_unmap_temporary_page(uint64_t vaddr)
 {
     uint64_t index;
     if (!VADDR_IS_TEMPORARY(vaddr))
@@ -92,17 +98,17 @@ void paging_init(void)
     kernel_pml4 = (page_table_t) KERNEL_PML4_VADDR;
     kernel_tmp_pt = (page_table_t) VADDR_GET_TEMPORARY(1);
     kernel_tmp_index = 2;
-    kernel_pml4_paddr = kernel_get_paddr(KERNEL_PML4_VADDR);
+    kernel_pml4_paddr = paging_get_paddr(KERNEL_PML4_VADDR);
 }
 
-uint64_t kernel_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, page_access_type_t access, privilege_level_t privilege_level)
+uint64_t paging_map_memory(uint64_t paddr, uint64_t vaddr, uint64_t size, page_access_type_t access, privilege_level_t privilege_level)
 {
-    return pml4_map_memory(kernel_pml4, paddr, vaddr, size, access, privilege_level);
+    return pml4_map_memory(paging_get_current_pml4(), paddr, vaddr, size, access, privilege_level);
 }
 
-uint64_t kernel_unmap_memory(uint64_t vaddr, uint64_t size)
+uint64_t paging_unmap_memory(uint64_t vaddr, uint64_t size)
 {
-    return pml4_unmap_memory(kernel_pml4, vaddr, size);
+    return pml4_unmap_memory(paging_get_current_pml4(), vaddr, size);
 }
 
 static uint64_t pt_unmap_memory
@@ -165,14 +171,14 @@ static uint64_t pd_unmap_memory
         }
 
         pt_paddr = pte_get_address(&entry);
-        pt_vaddr = kernel_map_temporary_page(pt_paddr, PAGE_ACCESS_RW, PL0);
+        pt_vaddr = paging_map_temporary_page(pt_paddr, PAGE_ACCESS_RW, PL0);
 
         pt = (page_table_t) pt_vaddr;
         unmapped_size = pt_unmap_memory(pt, vaddr, size - total_unmapped_size);
 
         for (i = 0; i < PT_MAX_ENTRIES && !pt[i].present; i++);
 
-        kernel_unmap_temporary_page(pt_vaddr);
+        paging_unmap_temporary_page(pt_vaddr);
 
         if (i == PT_MAX_ENTRIES)
         {
@@ -219,14 +225,14 @@ static uint64_t pdp_unmap_memory
         }
 
         pd_paddr = pte_get_address(&entry);
-        pd_vaddr = kernel_map_temporary_page(pd_paddr, PAGE_ACCESS_RW, PL0);
+        pd_vaddr = paging_map_temporary_page(pd_paddr, PAGE_ACCESS_RW, PL0);
 
         pd = (page_table_t) pd_vaddr;
         unmapped_size = pd_unmap_memory(pd, vaddr, size - total_unmapped_size);
 
         for (i = 0; i < PT_MAX_ENTRIES && !pd[i].present; i++);
 
-        kernel_unmap_temporary_page(pd_vaddr);
+        paging_unmap_temporary_page(pd_vaddr);
 
         if (i == PT_MAX_ENTRIES)
         {
@@ -274,14 +280,14 @@ uint64_t pml4_unmap_memory
         }
 
         pdp_paddr = pte_get_address(&entry);
-        pdp_vaddr = kernel_map_temporary_page(pdp_paddr, PAGE_ACCESS_RW, PL0);
+        pdp_vaddr = paging_map_temporary_page(pdp_paddr, PAGE_ACCESS_RW, PL0);
 
         pdp = (page_table_t) pdp_vaddr;
         unmapped_size = pdp_unmap_memory(pdp, vaddr, size - total_unmapped_size);
 
         for (i = 0; i < PT_MAX_ENTRIES && !pdp[i].present; i++);
 
-        kernel_unmap_temporary_page(pdp_vaddr);
+        paging_unmap_temporary_page(pdp_vaddr);
 
         if (i == PT_MAX_ENTRIES)
         {
@@ -356,20 +362,20 @@ static uint64_t pd_map_memory
             pt_paddr = pfa_request_page();
             if (pt_paddr == 0)
                 return 0;
-            pt_vaddr = kernel_map_temporary_page(pt_paddr, PAGE_ACCESS_RW, privilege_level);
+            pt_vaddr = paging_map_temporary_page(pt_paddr, PAGE_ACCESS_RW, privilege_level);
             memset((void*) pt_vaddr, 0, SIZE_4KB);
             pte_create(pd, pd_idx, pt_paddr, PAGE_ACCESS_RW, privilege_level);
         }
         else
         {
             pt_paddr = pte_get_address(&entry);
-            pt_vaddr = kernel_map_temporary_page(pt_paddr, PAGE_ACCESS_RW, privilege_level);
+            pt_vaddr = paging_map_temporary_page(pt_paddr, PAGE_ACCESS_RW, privilege_level);
         }
 
         pt = (page_table_t) pt_vaddr;
         mapped_size = pt_map_memory(pt, paddr, vaddr, size - total_mapped_size, access, privilege_level);
 
-        kernel_unmap_temporary_page(pt_vaddr);
+        paging_unmap_temporary_page(pt_vaddr);
 
         if (mapped_size == 0)
             return 0;
@@ -412,20 +418,20 @@ static uint64_t pdp_map_memory
             pd_paddr = pfa_request_page();
             if (pd_paddr == 0)
                 return 0;
-            pd_vaddr = kernel_map_temporary_page(pd_paddr, PAGE_ACCESS_RW, privilege_level);
+            pd_vaddr = paging_map_temporary_page(pd_paddr, PAGE_ACCESS_RW, privilege_level);
             memset((void*) pd_vaddr, 0, SIZE_4KB);
             pte_create(pdp, pdp_idx, pd_paddr, PAGE_ACCESS_RW, privilege_level);
         }
         else
         {
             pd_paddr = pte_get_address(&entry);
-            pd_vaddr = kernel_map_temporary_page(pd_paddr, PAGE_ACCESS_RW, privilege_level);
+            pd_vaddr = paging_map_temporary_page(pd_paddr, PAGE_ACCESS_RW, privilege_level);
         }
 
         pd = (page_table_t) pd_vaddr;
         mapped_size = pd_map_memory(pd, paddr, vaddr, size - total_mapped_size, access, privilege_level);
 
-        kernel_unmap_temporary_page(pd_vaddr);
+        paging_unmap_temporary_page(pd_vaddr);
 
         if (mapped_size == 0)
             return 0;
@@ -469,20 +475,20 @@ uint64_t pml4_map_memory
             pdp_paddr = pfa_request_page();
             if (pdp_paddr == 0)
                 return 0;
-            pdp_vaddr = kernel_map_temporary_page(pdp_paddr, PAGE_ACCESS_RW, privilege_level);
+            pdp_vaddr = paging_map_temporary_page(pdp_paddr, PAGE_ACCESS_RW, privilege_level);
             memset((void*) pdp_vaddr, 0, SIZE_4KB);
             pte_create(pml4, pml4_idx, pdp_paddr, PAGE_ACCESS_RW, privilege_level);
         }
         else
         {
             pdp_paddr = pte_get_address(&entry);
-            pdp_vaddr = kernel_map_temporary_page(pdp_paddr, PAGE_ACCESS_RW, privilege_level);
+            pdp_vaddr = paging_map_temporary_page(pdp_paddr, PAGE_ACCESS_RW, privilege_level);
         }
 
         pdp = (page_table_t) pdp_vaddr;
         mapped_size = pdp_map_memory(pdp, paddr, vaddr, size - total_mapped_size, access, privilege_level);
 
-        kernel_unmap_temporary_page(pdp_vaddr);
+        paging_unmap_temporary_page(pdp_vaddr);
 
         if (mapped_size == 0)
             return 0;
@@ -498,13 +504,19 @@ uint64_t pml4_map_memory
 
 uint64_t kernel_get_next_vaddr(uint64_t size, uint64_t* vaddr_out)
 {
-    return pml4_get_next_vaddr(kernel_pml4, (uint64_t) &_end_addr, size, vaddr_out);
+    return paging_get_next_vaddr((uint64_t) &_end_addr, size, vaddr_out);
+}
+
+uint64_t paging_get_next_vaddr(uint64_t vaddr_start, uint64_t size, uint64_t *vaddr_out)
+{
+    return pml4_get_next_vaddr(paging_get_current_pml4(), vaddr_start, size, vaddr_out);
 }
 
 uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t size, uint64_t* vaddr_out)
 {
     uint64_t pml4_idx, pdp_idx, pd_idx, pt_idx;
     uint64_t total_size_found;
+    uint64_t vaddr;
     page_table_t pdp, pd, pt;
     page_table_entry_t entry;
 
@@ -515,6 +527,7 @@ uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t s
     pdp_idx = VADDR_TO_PDP_IDX(vaddr_start);
     pd_idx = VADDR_TO_PD_IDX(vaddr_start);
     pt_idx = VADDR_TO_PT_IDX(vaddr_start);
+    vaddr = 0;
 
     for
     (
@@ -526,7 +539,7 @@ uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t s
         entry = pml4[pml4_idx];
         if (entry.present)
         {
-            pdp = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RO, PL0);
+            pdp = (page_table_t) paging_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RO, PL0);
             for
             (
                 ;
@@ -537,7 +550,7 @@ uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t s
                 entry = pdp[pdp_idx];
                 if (entry.present)
                 {
-                    pd = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RO, PL0);
+                    pd = (page_table_t) paging_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RO, PL0);
                     for
                     (
                         ;
@@ -548,7 +561,7 @@ uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t s
                         entry = pd[pd_idx];
                         if (entry.present)
                         {
-                            pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RO, PL0);
+                            pt = (page_table_t) paging_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RO, PL0);
                             for
                             (
                                 ;
@@ -558,49 +571,69 @@ uint64_t pml4_get_next_vaddr(page_table_t pml4, uint64_t vaddr_start, uint64_t s
                             {
                                 entry = pt[pt_idx];
                                 if (entry.present)
+                                {
                                     total_size_found = 0;
+                                    vaddr = 0;
+                                }
                                 else
+                                {
+                                    if (vaddr == 0)
+                                        vaddr = VADDR_GET(pml4_idx, pdp_idx, pd_idx, pt_idx);
                                     total_size_found += SIZE_4KB;
+                                }
                             }
-                            kernel_unmap_temporary_page((uint64_t) pt);
+                            paging_unmap_temporary_page((uint64_t) pt);
                             if (total_size_found < size)
+                            {
                                 pt_idx = 0;
-                            else
-                                --pt_idx;
+                                vaddr = 0;
+                            }
                         }
                         else
+                        {
+                            if (vaddr == 0)
+                                vaddr = VADDR_GET(pml4_idx, pdp_idx, pd_idx, pt_idx);
                             total_size_found += PD_ENTRY_SIZE;
+                        }
                     }
-                    kernel_unmap_temporary_page((uint64_t) pd);
+                    paging_unmap_temporary_page((uint64_t) pd);
                     if (total_size_found < size)
+                    {
                         pd_idx = 0;
-                    else
-                        --pd_idx;
+                        vaddr = 0;
+                    }
                 }
                 else
+                {
+                    if (vaddr == 0)
+                        vaddr = VADDR_GET(pml4_idx, pdp_idx, pd_idx, pt_idx);
                     total_size_found += PDP_ENTRY_SIZE;
+                }
             }
-            kernel_unmap_temporary_page((uint64_t) pdp);
+            paging_unmap_temporary_page((uint64_t) pdp);
             if (total_size_found < size)
+            {
                 pdp_idx = 0;
-            else
-                --pdp_idx;
+                vaddr = 0;
+            }
         }
         else
+        {
+            if (vaddr == 0)
+                vaddr = VADDR_GET(pml4_idx, pdp_idx, pd_idx, pt_idx);
             total_size_found += PML4_ENTRY_SIZE;
+        }
     }
     if (total_size_found < size)
-        pml4_idx = 0;
-    else
-        --pml4_idx;
+        vaddr = 0;
     
-    *vaddr_out = VADDR_GET(pml4_idx, pdp_idx, pd_idx, pt_idx);
+    *vaddr_out = vaddr;
     return total_size_found;
 }
 
-uint64_t kernel_get_paddr(uint64_t vaddr)
+uint64_t paging_get_paddr(uint64_t vaddr)
 {
-    return pml4_get_paddr(kernel_pml4, vaddr);
+    return pml4_get_paddr(paging_get_current_pml4(), vaddr);
 }
 
 uint64_t pml4_get_paddr(page_table_t pml4, uint64_t vaddr)
@@ -615,23 +648,23 @@ uint64_t pml4_get_paddr(page_table_t pml4, uint64_t vaddr)
         return 0;
     
     pdp_idx = VADDR_TO_PDP_IDX(vaddr);
-    pdp = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RO, PL0);
+    pdp = (page_table_t) paging_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RO, PL0);
     entry = pdp[pdp_idx];
-    kernel_unmap_temporary_page((uint64_t) pdp);
+    paging_unmap_temporary_page((uint64_t) pdp);
     if (!entry.present)
         return 0;
     
     pd_idx = VADDR_TO_PD_IDX(vaddr);
-    pd = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RO, PL0);
+    pd = (page_table_t) paging_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RO, PL0);
     entry = pd[pd_idx];
-    kernel_unmap_temporary_page((uint64_t) pd);
+    paging_unmap_temporary_page((uint64_t) pd);
     if (!entry.present)
         return 0;
     
     pt_idx = VADDR_TO_PT_IDX(vaddr);
-    pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RO, PL0);
+    pt = (page_table_t) paging_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RO, PL0);
     entry = pt[pt_idx];
-    kernel_unmap_temporary_page((uint64_t) pt);
+    paging_unmap_temporary_page((uint64_t) pt);
     if (!entry.present)
         return 0;
     
@@ -674,9 +707,9 @@ static void delete_pdp(page_table_t pdp, uint64_t pdp_paddr, uint64_t pml4_idx)
         if (entry.present)
         {
             pd_paddr = pte_get_address(&entry);
-            pd = (page_table_t) kernel_map_temporary_page(pd_paddr, PAGE_ACCESS_RO, PL0);
+            pd = (page_table_t) paging_map_temporary_page(pd_paddr, PAGE_ACCESS_RO, PL0);
             delete_pd(pd, pd_paddr, pdp_idx, pml4_idx);
-            kernel_unmap_temporary_page((uint64_t) pd);
+            paging_unmap_temporary_page((uint64_t) pd);
         }
     }
     pfa_free_page(pdp_paddr);
@@ -699,9 +732,9 @@ uint64_t pml4_delete(page_table_t pml4, uint64_t pml4_paddr)
         if (entry.present)
         {
             pdp_paddr = pte_get_address(&entry);
-            pdp = (page_table_t) kernel_map_temporary_page(pdp_paddr, PAGE_ACCESS_RO, PL0);
+            pdp = (page_table_t) paging_map_temporary_page(pdp_paddr, PAGE_ACCESS_RO, PL0);
             delete_pdp(pdp, pdp_paddr, pml4_idx);
-            kernel_unmap_temporary_page((uint64_t) pdp);
+            paging_unmap_temporary_page((uint64_t) pdp);
         }
     }
     pfa_free_page(pml4_paddr);
@@ -709,7 +742,7 @@ uint64_t pml4_delete(page_table_t pml4, uint64_t pml4_paddr)
     return vaddr;
 }
 
-static void merge_pt_with_pt(page_table_t src, page_table_t dest, uint64_t vaddr)
+static void pt_merge_with_pt(page_table_t src, page_table_t dest, uint64_t vaddr)
 {
     uint64_t idx;
     page_table_entry_t src_entry, dest_entry;
@@ -729,7 +762,7 @@ static void merge_pt_with_pt(page_table_t src, page_table_t dest, uint64_t vaddr
     }
 }
 
-static void merge_pd_with_pd(page_table_t src, page_table_t dest, uint64_t vaddr)
+static void pd_merge_with_pd(page_table_t src, page_table_t dest, uint64_t vaddr)
 {
     uint64_t idx;
     page_table_entry_t src_entry, dest_entry;
@@ -743,11 +776,11 @@ static void merge_pd_with_pd(page_table_t src, page_table_t dest, uint64_t vaddr
             dest_entry = dest[idx];
             if (dest_entry.present)
             {
-                src_pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&src_entry), PAGE_ACCESS_RO, PL0);
-                dest_pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&dest_entry), PAGE_ACCESS_RW, PL0);
-                merge_pt_with_pt(src_pt, dest_pt, vaddr);
-                kernel_unmap_temporary_page((uint64_t) src_pt);
-                kernel_unmap_temporary_page((uint64_t) dest_pt);
+                src_pt = (page_table_t) paging_map_temporary_page(pte_get_address(&src_entry), PAGE_ACCESS_RO, PL0);
+                dest_pt = (page_table_t) paging_map_temporary_page(pte_get_address(&dest_entry), PAGE_ACCESS_RW, PL0);
+                pt_merge_with_pt(src_pt, dest_pt, vaddr);
+                paging_unmap_temporary_page((uint64_t) src_pt);
+                paging_unmap_temporary_page((uint64_t) dest_pt);
             }
             else
             {
@@ -759,7 +792,7 @@ static void merge_pd_with_pd(page_table_t src, page_table_t dest, uint64_t vaddr
     }
 }
 
-static void merge_pdp_with_pdp(page_table_t src, page_table_t dest, uint64_t vaddr)
+static void pdp_merge_with_pdp(page_table_t src, page_table_t dest, uint64_t vaddr)
 {
     uint64_t idx;
     page_table_entry_t src_entry, dest_entry;
@@ -773,11 +806,11 @@ static void merge_pdp_with_pdp(page_table_t src, page_table_t dest, uint64_t vad
             dest_entry = dest[idx];
             if (dest_entry.present)
             {
-                src_pd = (page_table_t) kernel_map_temporary_page(pte_get_address(&src_entry), PAGE_ACCESS_RO, PL0);
-                dest_pd = (page_table_t) kernel_map_temporary_page(pte_get_address(&dest_entry), PAGE_ACCESS_RW, PL0);
-                merge_pd_with_pd(src_pd, dest_pd, vaddr);
-                kernel_unmap_temporary_page((uint64_t) src_pd);
-                kernel_unmap_temporary_page((uint64_t) dest_pd);
+                src_pd = (page_table_t) paging_map_temporary_page(pte_get_address(&src_entry), PAGE_ACCESS_RO, PL0);
+                dest_pd = (page_table_t) paging_map_temporary_page(pte_get_address(&dest_entry), PAGE_ACCESS_RW, PL0);
+                pd_merge_with_pd(src_pd, dest_pd, vaddr);
+                paging_unmap_temporary_page((uint64_t) src_pd);
+                paging_unmap_temporary_page((uint64_t) dest_pd);
             }
             else
             {
@@ -789,7 +822,7 @@ static void merge_pdp_with_pdp(page_table_t src, page_table_t dest, uint64_t vad
     }
 }
 
-static void merge_pml4_with_pml4(page_table_t src, page_table_t dest, uint64_t vaddr)
+static void pml4_merge_with_pml4(page_table_t src, page_table_t dest, uint64_t vaddr)
 {
     uint64_t idx;
     page_table_entry_t src_entry, dest_entry;
@@ -803,11 +836,11 @@ static void merge_pml4_with_pml4(page_table_t src, page_table_t dest, uint64_t v
             dest_entry = dest[idx];
             if (dest_entry.present)
             {
-                src_pdp = (page_table_t) kernel_map_temporary_page(pte_get_address(&src_entry), PAGE_ACCESS_RO, PL0);
-                dest_pdp = (page_table_t) kernel_map_temporary_page(pte_get_address(&dest_entry), PAGE_ACCESS_RW, PL0);
-                merge_pdp_with_pdp(src_pdp, dest_pdp, vaddr);
-                kernel_unmap_temporary_page((uint64_t) src_pdp);
-                kernel_unmap_temporary_page((uint64_t) dest_pdp);
+                src_pdp = (page_table_t) paging_map_temporary_page(pte_get_address(&src_entry), PAGE_ACCESS_RO, PL0);
+                dest_pdp = (page_table_t) paging_map_temporary_page(pte_get_address(&dest_entry), PAGE_ACCESS_RW, PL0);
+                pdp_merge_with_pdp(src_pdp, dest_pdp, vaddr);
+                paging_unmap_temporary_page((uint64_t) src_pdp);
+                paging_unmap_temporary_page((uint64_t) dest_pdp);
             }
             else
             {
@@ -819,14 +852,14 @@ static void merge_pml4_with_pml4(page_table_t src, page_table_t dest, uint64_t v
     }
 }
 
-void kernel_inject_pml4(page_table_t pml4)
+void paging_inject_kernel_pml4(page_table_t pml4)
 {
-    merge_pml4_with_pml4(kernel_pml4, pml4, KERNEL_HEAP_START_ADDR);
+    pml4_merge_with_pml4(kernel_pml4, pml4, KERNEL_HEAP_START_ADDR);
 }
 
-int kernel_set_pte_flag(uint64_t vaddr, page_flag_t flag)
+int paging_set_pte_flag(uint64_t vaddr, page_flag_t flag)
 {
-    return pml4_set_pte_flag(kernel_pml4, vaddr, flag);
+    return pml4_set_pte_flag(paging_get_current_pml4(), vaddr, flag);
 }
 
 int pml4_set_pte_flag(page_table_t pml4, uint64_t vaddr, page_flag_t flag)
@@ -839,38 +872,38 @@ int pml4_set_pte_flag(page_table_t pml4, uint64_t vaddr, page_flag_t flag)
     entry = pml4[pt_idx];
     if (!entry.present)
         return -1;
-    pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
+    pt = (page_table_t) paging_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
 
     pt_idx = VADDR_TO_PDP_IDX(vaddr);
     entry = pt[pt_idx];
-    kernel_unmap_temporary_page((uint64_t) pt);
+    paging_unmap_temporary_page((uint64_t) pt);
     if (!entry.present)
         return -1;
-    pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
+    pt = (page_table_t) paging_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
 
     pt_idx = VADDR_TO_PD_IDX(vaddr);
     entry = pt[pt_idx];
-    kernel_unmap_temporary_page((uint64_t) pt);
+    paging_unmap_temporary_page((uint64_t) pt);
     if (!entry.present)
         return -1;
-    pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
+    pt = (page_table_t) paging_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
 
     pt_idx = VADDR_TO_PT_IDX(vaddr);
     entry = pt[pt_idx];
     if (!entry.present)
     {
-        kernel_unmap_temporary_page((uint64_t) pt);
+        paging_unmap_temporary_page((uint64_t) pt);
         return -1;
     }
     *((uint64_t*) &entry) |= ((uint64_t) 1 << flag);
-    kernel_unmap_temporary_page((uint64_t) pt);
+    paging_unmap_temporary_page((uint64_t) pt);
     
     return 0;
 }
 
-int kernel_reset_pte_flag(uint64_t vaddr, page_flag_t flag)
+int paging_reset_pte_flag(uint64_t vaddr, page_flag_t flag)
 {
-    return pml4_set_pte_flag(kernel_pml4, vaddr, flag);
+    return pml4_set_pte_flag(paging_get_current_pml4(), vaddr, flag);
 }
 
 int pml4_reset_pte_flag(page_table_t pml4, uint64_t vaddr, page_flag_t flag)
@@ -883,38 +916,38 @@ int pml4_reset_pte_flag(page_table_t pml4, uint64_t vaddr, page_flag_t flag)
     entry = pml4[pt_idx];
     if (!entry.present)
         return -1;
-    pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
+    pt = (page_table_t) paging_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
 
     pt_idx = VADDR_TO_PDP_IDX(vaddr);
     entry = pt[pt_idx];
-    kernel_unmap_temporary_page((uint64_t) pt);
+    paging_unmap_temporary_page((uint64_t) pt);
     if (!entry.present)
         return -1;
-    pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
+    pt = (page_table_t) paging_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
 
     pt_idx = VADDR_TO_PD_IDX(vaddr);
     entry = pt[pt_idx];
-    kernel_unmap_temporary_page((uint64_t) pt);
+    paging_unmap_temporary_page((uint64_t) pt);
     if (!entry.present)
         return -1;
-    pt = (page_table_t) kernel_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
+    pt = (page_table_t) paging_map_temporary_page(pte_get_address(&entry), PAGE_ACCESS_RW, PL0);
 
     pt_idx = VADDR_TO_PT_IDX(vaddr);
     entry = pt[pt_idx];
     if (!entry.present)
     {
-        kernel_unmap_temporary_page((uint64_t) pt);
+        paging_unmap_temporary_page((uint64_t) pt);
         return -1;
     }
     *((uint64_t*) &entry) &= ~((uint64_t) 1 << flag);
-    kernel_unmap_temporary_page((uint64_t) pt);
+    paging_unmap_temporary_page((uint64_t) pt);
 
     return 0;
 }
 
-int kernel_flag_memory_area(uint64_t vaddr, uint64_t size, page_flag_t flag)
+int paging_flag_memory_area(uint64_t vaddr, uint64_t size, page_flag_t flag)
 {
-    return pml4_flag_memory_area(kernel_pml4, vaddr, size, flag);
+    return pml4_flag_memory_area(paging_get_current_pml4(), vaddr, size, flag);
 }
 
 int pml4_flag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, page_flag_t flag)
@@ -933,9 +966,9 @@ int pml4_flag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, page
     return 0;
 }
 
-int kernel_unflag_memory_area(uint64_t vaddr, uint64_t size, page_flag_t flag)
+int paging_unflag_memory_area(uint64_t vaddr, uint64_t size, page_flag_t flag)
 {
-    return pml4_unflag_memory_area(kernel_pml4, vaddr, size, flag);
+    return pml4_unflag_memory_area(paging_get_current_pml4(), vaddr, size, flag);
 }
 
 int pml4_unflag_memory_area(page_table_t pml4, uint64_t vaddr, uint64_t size, page_flag_t flag)
