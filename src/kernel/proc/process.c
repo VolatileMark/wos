@@ -25,6 +25,12 @@ void process_delete_resources(process_t* ps)
         free((void*) ps->exec_path);
     if (ps->pml4 != NULL)
         pml4_delete(ps->pml4, ps->pml4_paddr);
+    if (ps->argv != NULL)
+    {
+        if (ps->argv[0] != NULL)
+            free((void*) ps->argv[0]);
+        free(ps->argv);
+    }
 }
 
 void process_delete_and_free(process_t* ps)
@@ -206,6 +212,7 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
     uint64_t args_kvaddr, stack_kvaddr;
     uint64_t args_vaddr, args_paddr, stack_vaddr, stack_paddr;
     const char** stack_ptr;
+    const char** args_ptr;
     char* cpyptr;
 
     for (argv_size = 0, argc = 0; argv != NULL && argv[argc] != NULL; argc++)
@@ -214,27 +221,42 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
         envp_size += strlen(envp[envc]) + 1;
     total_args_size = argv_size + envp_size;
     
+    args_ptr = calloc(1, (argc + envc + 2) * sizeof(const char*));
+    if (args_ptr == NULL)
+        return -1;
+    ps->argv = args_ptr;
+    ps->envp = args_ptr + (argc + 1);
+    
+    args_kvaddr = (uint64_t) aligned_alloc(SIZE_4KB, alignu(total_args_size, SIZE_4KB));
+    if (args_kvaddr == 0)
+    {
+        free((void*) args_kvaddr);
+        return -1;
+    }
+
     args_vaddr = alignd(PROC_CEIL_VADDR - total_args_size, SIZE_4KB);
+    args_paddr = paging_get_paddr(args_kvaddr);
     stack_vaddr = args_vaddr - PROC_USER_STACK_SIZE;
     if 
     (
         process_request_memory(ps, PROC_USER_STACK_SIZE, stack_vaddr, PAGE_ACCESS_RW, PL3, &stack_vaddr, &stack_paddr) ||
-        process_request_memory(ps, total_args_size, args_vaddr, PAGE_ACCESS_RO, PL3, &args_vaddr, &args_paddr)
+        paging_get_next_vaddr(args_vaddr, total_args_size, &args_vaddr) < total_args_size ||
+        pml4_map_memory(ps->pml4, args_paddr, args_vaddr, total_args_size, PAGE_ACCESS_RO, PL3) < total_args_size
     )
+    {
+        free((void*) args_kvaddr);
         return -1;
+    }
     
-    if 
-    (
-        kernel_get_next_vaddr(total_args_size, &args_kvaddr) < total_args_size ||
-        paging_map_memory(args_paddr, args_kvaddr, total_args_size, PAGE_ACCESS_RW, PL0) < total_args_size
-    )
-        return -1;
     if
     (
         kernel_get_next_vaddr(PROC_USER_STACK_SIZE, &stack_kvaddr) < PROC_USER_STACK_SIZE ||
         paging_map_memory(stack_paddr, stack_kvaddr, PROC_USER_STACK_SIZE, PAGE_ACCESS_RW, PL0) < PROC_USER_STACK_SIZE
     )
+    {
+        free((void*) args_kvaddr);
         return -1;
+    }
 
     cpyptr = (char*) args_kvaddr;
     stack_ptr = (const char**) (stack_kvaddr + PROC_USER_STACK_SIZE - sizeof(uint64_t));
@@ -245,6 +267,7 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
         cpysize = strlen(envp[i]) + 1;
         memcpy(cpyptr, envp[i], cpysize);
         stack_ptr[i] = (const char*) ((cpyptr - args_kvaddr) + args_vaddr);
+        args_ptr[(argc + 1) + i] = (const char*) cpyptr;
         cpyptr += cpysize;
     }
     stack_ptr[envc] = NULL; 
@@ -255,21 +278,19 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
         cpysize = strlen(argv[i]) + 1;
         memcpy(cpyptr, argv[i], cpysize);
         stack_ptr[i] = (const char*) ((cpyptr - args_kvaddr) + args_vaddr);
+        args_ptr[i] = (const char*) cpyptr;
         cpyptr += cpysize;
     }
     stack_ptr[argc] = NULL;
 
-    paging_unmap_memory(args_kvaddr, total_args_size);
     paging_unmap_memory(stack_kvaddr, PROC_USER_STACK_SIZE);
 
     ps->user_stack_vaddr = stack_vaddr;
     ps->cpu.regs.rbp = ps->user_stack_vaddr + PROC_USER_STACK_SIZE - sizeof(uint64_t);
-    ps->envp = &((const char**) ps->cpu.regs.rbp)[-envc];
-    ps->argv = &ps->envp[-(argc + 1)];
-    ps->cpu.stack.rsp = ((uint64_t) ps->argv) - sizeof(uint64_t);
     ps->cpu.regs.rdi = argc;
-    ps->cpu.regs.rsi = (uint64_t) ps->argv;
-    ps->cpu.regs.rdx = (uint64_t) ps->envp;
+    ps->cpu.regs.rdx = (uint64_t) &((const char**) ps->cpu.regs.rbp)[-envc];
+    ps->cpu.regs.rsi = (uint64_t) &((const char**) ps->cpu.regs.rdx)[-(argc + 1)];
+    ps->cpu.stack.rsp = ps->cpu.regs.rsi - sizeof(uint64_t);
 
     return 0;
 }
