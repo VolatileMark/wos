@@ -20,5 +20,6 @@ extern void syscall_switch_to_kernel_stack(void* ret, uint64_t* stack);
 
 DEFSYSCALL(exit);
 DEFSYSCALL(execve);
+DEFSYSCALL(fork);
 
 #endif

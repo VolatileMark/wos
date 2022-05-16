@@ -16,7 +16,10 @@ typedef struct memory_segments_list_entry
 {
     struct memory_segments_list_entry* next;
     uint64_t paddr;
+    uint64_t vaddr;
     uint64_t pages;
+    page_access_type_t access;
+    privilege_level_t pl;
 } memory_segments_list_entry_t;
 
 typedef struct
@@ -53,6 +56,7 @@ typedef struct
 
 process_t* process_create_replacement(process_t* parent, const char* path, const char** argv, const char** envp);
 process_t* process_create(const char* path, const char** argv, const char** envp, uint64_t pid);
+process_t* process_clone(process_t* parent, uint64_t pid);
 void process_delete_resources(process_t* ps);
 void process_delete_and_free(process_t* ps);
 

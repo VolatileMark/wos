@@ -2,7 +2,8 @@
 
 static syscall_t syscalls[] = {
     &SYSCALL(exit),
-    &SYSCALL(execve)
+    &SYSCALL(execve),
+    &SYSCALL(fork)
 };
 
 #define NUM_SYSCALLS (sizeof(syscalls) / sizeof(uint64_t))

@@ -69,7 +69,10 @@ static int process_request_memory(process_t* ps, uint64_t size, uint64_t hint, p
 
     entry->next = NULL;
     entry->paddr = paddr;
+    entry->vaddr = vaddr;
     entry->pages = pages;
+    entry->access = access;
+    entry->pl = privilege;
 
     if (ps->mem.tail == NULL)
         ps->mem.head = entry;
@@ -208,18 +211,18 @@ static int process_load_elf(process_t* ps, const char* path)
 static int process_build_user_stack(process_t* ps, const char** argv, const char** envp)
 {
     int argc, envc, i;
-    uint64_t argv_size, envp_size, total_args_size, cpysize;
+    uint64_t total_args_size, cpysize;
     uint64_t args_kvaddr, stack_kvaddr;
     uint64_t args_vaddr, args_paddr, stack_vaddr, stack_paddr;
     const char** stack_ptr;
     const char** args_ptr;
     char* cpyptr;
 
-    for (argv_size = 0, argc = 0; argv != NULL && argv[argc] != NULL; argc++)
-        argv_size += strlen(argv[argc]) + 1;
-    for (envp_size = 0, envc = 0; envp != NULL && envp[envc] != NULL; envc++)
-        envp_size += strlen(envp[envc]) + 1;
-    total_args_size = argv_size + envp_size;
+    total_args_size = 0;
+    for (argc = 0; argv != NULL && argv[argc] != NULL; argc++)
+        total_args_size += strlen(argv[argc]) + 1;
+    for (envc = 0; envp != NULL && envp[envc] != NULL; envc++)
+        total_args_size += strlen(envp[envc]) + 1;
     
     args_ptr = calloc(1, (argc + envc + 2) * sizeof(const char*));
     if (args_ptr == NULL)
@@ -258,6 +261,8 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
         return -1;
     }
 
+    memset((void*) stack_kvaddr, 0, PROC_USER_STACK_SIZE);
+
     cpyptr = (char*) args_kvaddr;
     stack_ptr = (const char**) (stack_kvaddr + PROC_USER_STACK_SIZE - sizeof(uint64_t));
     
@@ -270,7 +275,6 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
         args_ptr[(argc + 1) + i] = (const char*) cpyptr;
         cpyptr += cpysize;
     }
-    stack_ptr[envc] = NULL; 
 
     stack_ptr = &stack_ptr[-(argc + 1)];
     for (i = 0; argv != NULL && i < argc; i++)
@@ -281,7 +285,6 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
         args_ptr[i] = (const char*) cpyptr;
         cpyptr += cpysize;
     }
-    stack_ptr[argc] = NULL;
 
     paging_unmap_memory(stack_kvaddr, PROC_USER_STACK_SIZE);
 
@@ -318,7 +321,10 @@ process_t* process_create(const char* path, const char** argv, const char** envp
 {
     process_t* ps = calloc(1, sizeof(process_t));
     if (ps == NULL)
+    {
+        trace_process("Could not create process descriptor");
         return NULL;
+    }
 
     ps->pid = pid;
     ps->cpu.stack.cs = gdt_get_user_cs() | PL3;
@@ -383,6 +389,102 @@ process_t* process_create_replacement(process_t* parent, const char* path, const
     }
 
     child->parent_pid = parent->parent_pid;
+    process_copy_file_descriptors(child, parent);
+
+    return child;
+}
+
+static int process_copy_memory_mappings(process_t* child, process_t* parent)
+{
+    uint64_t tmp_vaddr, vaddr, paddr, bytes;
+    memory_segments_list_entry_t* sentry;
+
+    for (sentry = parent->mem.head; sentry != NULL; sentry = sentry->next)
+    {
+        bytes = sentry->pages * SIZE_4KB;
+        if (kernel_get_next_vaddr(bytes, &tmp_vaddr) < bytes)
+            return -1;
+        if 
+        (
+            process_request_memory(child, bytes, sentry->vaddr, sentry->access, sentry->pl, &vaddr, &paddr) ||
+            vaddr != sentry->vaddr
+        )
+            return -1;
+        if (paging_map_memory(paddr, tmp_vaddr, bytes, PAGE_ACCESS_RW, PL0) < bytes)
+            return -1;
+        memcpy((void*) tmp_vaddr, (void*) sentry->vaddr, bytes);
+        paging_unmap_memory(tmp_vaddr, bytes);
+    }
+
+    return 0;
+}
+
+process_t* process_clone(process_t* parent, uint64_t pid)
+{
+    process_t* child;
+    uint64_t argc, envc, args_vaddr, args_count;
+    uint64_t total_args_size, i;
+    const char* argptr;
+
+    child = calloc(1, sizeof(process_t));
+    if (child == NULL)
+    {
+        trace_process("Could not create process descriptor (pid: %u)", pid);
+        return NULL;
+    }
+
+    child->pid = pid;
+    child->parent_pid = parent->pid;
+    child->cpu = parent->cpu;
+    child->brk_vaddr = parent->brk_vaddr;
+    child->kernel_stack_vaddr = parent->kernel_stack_vaddr;
+    child->user_stack_vaddr = parent->user_stack_vaddr;
+
+    total_args_size = 0;
+    for (argc = 0; parent->argv[argc] != NULL; argc++)
+        total_args_size += strlen(parent->argv[argc]) + 1;
+    for (envc = 0; parent->envp[envc] != NULL; envc++)
+        total_args_size += strlen(parent->envp[envc]) + 1;
+
+    args_vaddr = (uint64_t) aligned_alloc(SIZE_4KB, total_args_size);
+    memcpy((void*) args_vaddr, parent->envp[0], total_args_size);
+
+    args_count = (argc + envc + 2);
+    child->argv = calloc(1, args_count * sizeof(const char*));
+    if (child->argv == NULL)
+    {
+        trace_process("Failed to copy argv and envp from parent process (pid: %u)", pid);
+        process_delete_and_free(child);
+        return NULL;
+    }
+    child->envp = &child->argv[argc + 1];
+    
+    argptr = (const char*) args_vaddr;
+    for (i = 0; i < envc; i++)
+    {
+        child->envp[i] = argptr;
+        argptr += strlen(argptr) + 1;
+    }
+    for (i = 0; i < argc; i++)
+    {
+        child->argv[i] = argptr;
+        argptr += strlen(argptr) + 1;
+    }
+
+    if (process_create_pml4(child))
+    {
+        trace_process("Failed to create process PML4 (pid: %u)", pid);
+        process_delete_and_free(child);
+        return NULL;
+    }
+    
+    if (process_copy_memory_mappings(child, parent))
+    {
+        trace_process("Failed to copy parent's memory mappings (pid: %u)", pid);
+        process_delete_and_free(child);
+        return NULL;
+    }
+
     process_copy_file_descriptors(child, parent);
 
     return child;
