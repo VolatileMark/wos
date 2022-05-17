@@ -2,7 +2,6 @@
 #define __DEVFS_H__
 
 #include "../../../proc/vfs/vfs.h"
-#include "../../../proc/vfs/vnode.h"
 
 void devfs_init(void);
 int devfs_create(vfs_t* vfs);

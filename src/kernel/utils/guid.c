@@ -1,5 +1,4 @@
 #include "guid.h"
-#include <string.h>
 
 int guidcmp(guid_t* g1, guid_t* g2)
 {

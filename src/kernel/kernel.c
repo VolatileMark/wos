@@ -50,6 +50,8 @@ static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 {
     interrupts_disable();
 
+    scheduler_init_pss();
+
     paging_init();
     pfa_restore(current_bitmap);
     if (multiboot_parse_struct(multiboot_struct_addr))
@@ -59,7 +61,7 @@ static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
     pfa_init();
     tss_init();
     gdt_init();
-    init_idt();
+    idt_init();
     isr_init();
     
     crc32_fill_lookup_table();
@@ -101,5 +103,17 @@ void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
             error("Could not initialize kernel");
         return;
     }
+    const char* argv[] = {
+        "test_var",
+        "another_test_var",
+        NULL
+    };
+    const char* envp[] = {
+        "cool_env_var=somevalue",
+        "epic_env_var=somevalue2",
+        NULL
+    };
+    scheduler_queue_process(process_create("/test.elf", argv, envp, scheduler_get_next_pid()));
+    scheduler_run();
     info("Kernel initialized (FREE: %u kB | USED: %u kB)", pfa_get_free_memory() >> 10, pfa_get_used_memory() >> 10);
 }

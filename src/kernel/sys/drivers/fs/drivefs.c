@@ -1,13 +1,6 @@
 #include "drivefs.h"
-#include "devfs.h"
-#include "isofs.h"
-#include "../storage/partition-tables/mbr.h"
 #include "../storage/partition-tables/gpt.h"
-#include "../../../utils/alloc.h"
-#include "../../../utils/macros.h"
-#include "../../../utils/log.h"
 #include "../../../kernel.h"
-#include <stddef.h>
 
 #define trace_drivefs(msg, ...) trace("DRFS", msg, ##__VA_ARGS__)
 
@@ -90,10 +83,9 @@ static int drivefs_detect_partition_fs(drive_t* drive, uint64_t index)
     return -1;
 }
 
-int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_bytes)
+int drivefs_register_drive(drive_t* drive)
 {
     uint64_t i;
-    drive_t* drive;
     vnode_t* vnode;
     drive_partition_t* part;
     char path[] = "sda\0";
@@ -103,28 +95,10 @@ int drivefs_register_drive(void* interface, drive_ops_t* ops, uint64_t sector_by
         trace_drivefs("Maximum drive number reached");
         return -1;
     }
-
-    drive = malloc(sizeof(drive_t));
-    if (drive == NULL)
-    {
-        trace_drivefs("Failed to allocate memory for drive descriptor");
-        return -1;
-    }
-
-    drive->interface = interface;
-    drive->ops = ops;
-
-    if (drivefs_identify(drive))
-    {
-        free(drive);
-        trace_drivefs("Failed to IDENTIFY drive");
-    }
-    drive->sector_bytes = drive->ops->property(drive->interface, DRIVE_PROPERTY_SECSIZE);
     
     vnode = malloc(sizeof(vnode_t));
     if (vnode == NULL)
     {
-        free(drive);
         trace_drivefs("Failed to allocate memory for new devfs vnode");
         return -1;
     }
@@ -201,15 +175,5 @@ drive_t* drivefs_lookup(const char* path)
 
 uint64_t drivefs_read(drive_t* drive, uint64_t lba, uint64_t bytes, void* buffer)
 {
-    return drive->ops->read(drive->interface, lba, bytes, buffer);
-}
-
-int drivefs_identify(drive_t* drive)
-{
-    return drive->ops->identify(drive->interface);
-}
-
-uint64_t drivefs_property(drive_t* drive)
-{
-    return drive->ops->identify(drive->interface);
+    return drive->ops->read(drive, lba, bytes, buffer);
 }

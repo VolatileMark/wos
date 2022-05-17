@@ -1,36 +1,15 @@
 #include "alloc.h"
-#include "checksum.h"
 #include "../sys/mem/heap.h"
-#include <stddef.h>
 #include <mem.h>
-
-#define ALIGN_HEADER_MAGIC 0x414C474E
-
-struct align_header
-{
-    uint16_t offset;
-    uint32_t magic;
-    uint16_t checksum;
-} __attribute__((packed));
-typedef struct align_header align_header_t;
 
 void* malloc(uint64_t size)
 {
-    return ((void*) heap_allocate_memory(size)->data);
+    return ((void*) (heap_allocate_memory(size) + 1));
 }
 
 void* aligned_alloc(uint64_t align, uint64_t size)
 {
-    heap_segment_header_t* seg;
-    align_header_t* alignhd;
-    size = alignu(size + sizeof(align_header_t), align);
-    seg = heap_allocate_memory(size);
-    seg->data = alignu(seg->data, align);
-    alignhd = (align_header_t*)(seg->data - sizeof(align_header_t));
-    alignhd->offset = (uint16_t)(seg->data - ((uint64_t) seg));
-    alignhd->magic = ALIGN_HEADER_MAGIC;
-    gen_struct_checksum16(alignhd, sizeof(align_header_t));
-    return ((void*) seg->data);
+    return ((void*) (heap_allocate_aligned_memory(align, size) + 1));
 }
 
 void* calloc(uint64_t n, uint64_t size)
@@ -56,15 +35,6 @@ void* realloc(void* src, uint64_t new_size)
 void free(void* ptr)
 {
     heap_segment_header_t* seg;
-    align_header_t* alignhd;
-    alignhd = ((align_header_t*) ptr) - 1;
-    if 
-    (
-        alignhd->magic == ALIGN_HEADER_MAGIC &&
-        checksum16(alignhd, sizeof(align_header_t))
-    )
-        seg = (heap_segment_header_t*) (((uint64_t) ptr) - alignhd->offset);
-    else
-        seg = ((heap_segment_header_t*) ptr) - 1;
+    seg = ((heap_segment_header_t*) ptr) - 1;
     heap_free_memory(seg);
 }

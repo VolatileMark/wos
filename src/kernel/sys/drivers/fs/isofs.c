@@ -1,15 +1,12 @@
 #include "isofs.h"
-#include "../../../proc/vfs/vnode.h"
-#include "../../../proc/vfs/vattribs.h"
 #include "../../../utils/macros.h"
 #include "../../../utils/alloc.h"
 #include <stddef.h>
 #include <string.h>
-#include <mem.h>
 
 #define ISOFS_SIG "ISO9660"
 #define ISOFS_MAX_VDS 3
-#define ISOFS_SECTOR_SIZE 2048
+#define ISOFS_BLOCK_SIZE 2048
 #define ISOFS_VOLDESC_START 16
 #define ISOFS_VOLDESC_SIG "CD001"
 #define ISOFS_VOLDESC_VER 0x01
@@ -17,7 +14,7 @@
 #define ISOFS_VOLDESC_PRIM 1
 #define ISOFS_VOLDESC_TERM 255
 
-#define isofs_block_to_lba(block, sector) (((block) * ISOFS_SECTOR_SIZE) / (sector))
+#define isofs_block_offset(block, drive) (((block) * ISOFS_BLOCK_SIZE) / drive->sector_bytes)
 
 struct isofs_date
 {
@@ -86,7 +83,7 @@ typedef struct isofs_volume_descriptor_header isofs_volume_descriptor_header_t;
 struct isofs_volume_descriptor
 {
     isofs_volume_descriptor_header_t hdr;
-    uint8_t data[ISOFS_SECTOR_SIZE - sizeof(isofs_volume_descriptor_header_t)];
+    uint8_t data[ISOFS_BLOCK_SIZE - sizeof(isofs_volume_descriptor_header_t)];
 } __attribute__((packed));
 typedef struct isofs_volume_descriptor isofs_volume_descriptor_t;
 
@@ -95,7 +92,7 @@ struct isofs_boot_record
     isofs_volume_descriptor_header_t hdr;
     char boot_system_identifier[32];
     char boot_identifier[32];
-    uint8_t reserved[ISOFS_SECTOR_SIZE - (sizeof(isofs_volume_descriptor_header_t) + 32*2)];
+    uint8_t reserved[ISOFS_BLOCK_SIZE - (sizeof(isofs_volume_descriptor_header_t) + 32*2)];
 } __attribute__((packed));
 typedef struct isofs_boot_record isofs_boot_record_t;
 
@@ -136,7 +133,7 @@ struct isofs_primary_volume_descriptor
     uint8_t file_structure_version;
     uint8_t zero3;
     uint8_t application_used[512];
-    uint8_t reserved[ISOFS_SECTOR_SIZE - 1395];
+    uint8_t reserved[ISOFS_BLOCK_SIZE - 1395];
 } __attribute__((packed));
 typedef struct isofs_primary_volume_descriptor isofs_primary_volume_descriptor_t;
 
@@ -174,7 +171,7 @@ int isofs_load_volume_descriptor(drive_t* drive, isofs_volume_descriptor_t* desc
 
     index = 0;
     do {
-        drivefs_read(drive, isofs_block_to_lba(ISOFS_VOLDESC_START + (index++), drive->sector_bytes), sizeof(isofs_volume_descriptor_t), desc);
+        drivefs_read(drive, isofs_block_offset(ISOFS_VOLDESC_START + (index++), drive), sizeof(isofs_volume_descriptor_t), desc);
     } while (desc->hdr.type != type && index < ISOFS_MAX_VDS);
 
     return -(index == ISOFS_MAX_VDS);
@@ -233,7 +230,7 @@ static int isofs_read(vnode_t* node, void* buffer, uint64_t count)
     inode = node->data;
     if (inode->is_directory || !inode->exists)
         return -1;
-    if (drivefs_read(inode->drive, isofs_block_to_lba(inode->data_block, inode->drive->sector_bytes), count, buffer) < count)
+    if (drivefs_read(inode->drive, isofs_block_offset(inode->data_block, inode->drive), count, buffer) < count)
         return -1;
     return 0;
 }
@@ -258,7 +255,7 @@ static int isofs_lookup(vnode_t* dir, const char* path, vnode_t* out)
 {
     isofs_directory_entry_t* iso_dir;
     isofs_inode_t* inode;
-    uint8_t* sector;
+    uint8_t sector[ISOFS_BLOCK_SIZE];
     uint64_t path_offset, bytes_offset;
 
     inode = dir->data;
@@ -269,20 +266,13 @@ static int isofs_lookup(vnode_t* dir, const char* path, vnode_t* out)
         ++path;
     for (path_offset = 0; path[path_offset] != '\0' && path[path_offset] != '/'; path_offset++);
 
-    sector = malloc(ISOFS_SECTOR_SIZE);
-    if (sector == NULL)
+    if (drivefs_read(inode->drive, isofs_block_offset(inode->data_block, inode->drive), inode->data_size, sector) < ISOFS_BLOCK_SIZE)
         return -1;
-    
-    if (drivefs_read(inode->drive, isofs_block_to_lba(inode->data_block, inode->drive->sector_bytes), inode->data_size, sector) < ISOFS_SECTOR_SIZE)
-    {
-        free(sector);
-        return -1;
-    }
 
     for 
     (
         bytes_offset = 0, iso_dir = (isofs_directory_entry_t*) sector; 
-        bytes_offset < inode->data_size && bytes_offset < ISOFS_SECTOR_SIZE && iso_dir->entry_length != 0;
+        bytes_offset < inode->data_size && bytes_offset < ISOFS_BLOCK_SIZE && iso_dir->entry_length != 0;
         bytes_offset += iso_dir->entry_length
     ) 
     {
@@ -295,7 +285,6 @@ static int isofs_lookup(vnode_t* dir, const char* path, vnode_t* out)
             goto SUCCESS;
     }
 
-    free(sector);
     return -1;
 
 SUCCESS:
@@ -309,7 +298,6 @@ SUCCESS:
     inode->data_block = iso_dir->block_lsb;
     inode->data_size = iso_dir->bytes_lsb;
 
-    free(sector);
     return 0;
 }
 

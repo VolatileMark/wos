@@ -19,12 +19,12 @@ int multiboot_remap_struct(uint64_t struct_paddr)
 
 #define REMAP_TAG(tag) tag = (struct multiboot_tag_##tag*) (struct_vaddr + (((uint64_t) tag) - struct_paddr))
 
-    kernel_unmap_memory(0, SIZE_nMB(16));
+    paging_unmap_memory(0, SIZE_nMB(16));
     if (kernel_get_next_vaddr(struct_size, &struct_vaddr) < struct_size)
         return -1;
-    if (kernel_map_memory(struct_paddr, struct_vaddr, struct_size, PAGE_ACCESS_RO, PL0) < struct_size)
+    if (paging_map_memory(struct_paddr, struct_vaddr, struct_size, PAGE_ACCESS_RO, PL0) < struct_size)
     {
-        kernel_unmap_memory(struct_vaddr, struct_size);
+        paging_unmap_memory(struct_vaddr, struct_size);
         return -1;
     }
 

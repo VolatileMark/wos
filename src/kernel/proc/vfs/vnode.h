@@ -2,7 +2,6 @@
 #define __VNODE_H__
 
 #include "vattribs.h"
-#include <stdint.h>
 
 struct vnode_ops;
 

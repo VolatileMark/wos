@@ -1,104 +1,141 @@
 #include "process.h"
-#include "scheduler.h"
-#include "vfs/vfs.h"
-#include "vfs/vnode.h"
-#include "vfs/vattribs.h"
-#include "../kernel.h"
-#include "../sys/mem/pfa.h"
-#include "../sys/mem/paging.h"
-#include "../sys/cpu/gdt.h"
-#include "../utils/elf.h"
-#include "../utils/constants.h"
-#include "../utils/macros.h"
+#include "../headers/elf.h"
 #include "../utils/alloc.h"
+#include "../utils/log.h"
+#include "../sys/mem/pfa.h"
+#include "../sys/cpu/gdt.h"
 #include <stddef.h>
-#include <mem.h>
-#include <math.h>
 #include <string.h>
+#include <math.h>
+#include <mem.h>
 
-static void process_init(process_t* ps, uint64_t pid)
+#define trace_process(msg, ...) trace("PROC", msg, ##__VA_ARGS__)
+
+static void process_release_all_memory(process_t* ps)
 {
-    ps->pid = pid;
-    ps->parent_pid = 0;
-    
-    ps->pml4 = NULL;
-    ps->pml4_paddr = 0;
-    
-    ps->kernel_stack_start_vaddr = 0;
-    ps->code_start_vaddr = 0;
-    ps->args_start_vaddr = 0;
-    ps->stack_start_vaddr = PROC_DEFAULT_STACK_VADDR;
-    ps->mapping_start_vaddr = 0;
-    
-    ps->kernel_stack_pages.head = NULL;
-    ps->kernel_stack_pages.tail = NULL;
-    
-    ps->code_pages.head = NULL;
-    ps->code_pages.tail = NULL;
-    
-    ps->stack_pages.head = NULL;
-    ps->stack_pages.tail = NULL;
-    
-    ps->mapped_pages.head = NULL;
-    ps->mapped_pages.tail = NULL;
-    
-    ps->args_pages.head = NULL;
-    ps->args_pages.tail = NULL;
-
-    memset(&ps->flags, 0, sizeof(process_flags_t));
-    memset(ps->fds, 0, PROC_MAX_FDS * sizeof(file_descriptor_t));
-    memset(&ps->user_mode, 0, sizeof(cpu_state_t));
-    memset(&ps->current, 0, sizeof(cpu_state_t));
-
-    ps->user_mode.stack.rflags = PROC_DEFAULT_RFLAGS;
-    ps->user_mode.stack.cs = gdt_get_user_cs() | PL3;
-    ps->user_mode.stack.ss = gdt_get_user_ds() | PL3;
+    memory_segments_list_entry_t* entry;
+    for (entry = ps->mem.head; entry != NULL; entry = entry->next)
+        pfa_free_pages(entry->paddr, entry->pages);
 }
 
-static int process_init_pml4(process_t* ps)
+void process_delete_resources(process_t* ps)
 {
-    uint64_t paddr, vaddr;
+    process_release_all_memory(ps);
+    if (ps->exec_path != NULL)
+        free((void*) ps->exec_path);
+    if (ps->pml4 != NULL)
+        pml4_delete(ps->pml4, ps->pml4_paddr);
+    if (ps->argv != NULL)
+    {
+        if (ps->argv[0] != NULL)
+            free((void*) ps->argv[0]);
+        free(ps->argv);
+    }
+}
 
-    paddr = pfa_request_page();
-    if 
-    (
-        paddr == 0 || 
-        kernel_get_next_vaddr(SIZE_4KB, &vaddr) < SIZE_4KB ||
-        kernel_map_memory(paddr, vaddr, SIZE_4KB, PAGE_ACCESS_RW, PL0) < SIZE_4KB
-    )
+void process_delete_and_free(process_t* ps)
+{
+    process_delete_resources(ps);
+    free(ps);
+}
+
+static int process_request_memory(process_t* ps, uint64_t size, uint64_t hint, page_access_type_t access, privilege_level_t privilege, uint64_t* vaddr_out, uint64_t* paddr_out)
+{
+    uint64_t vaddr, paddr, pages;
+    memory_segments_list_entry_t* entry;
+    
+    if (size == 0)
+        return 0;
+
+    pages = ceil((double) size / SIZE_4KB);
+    if (pml4_get_next_vaddr(ps->pml4, hint, size, &vaddr) < size)
         return -1;
 
-    ps->pml4 = (page_table_t) vaddr;
-    ps->pml4_paddr = paddr;
-    memset(ps->pml4, 0, SIZE_4KB);
+    entry = malloc(sizeof(memory_segments_list_entry_t));
+    if (entry == NULL)
+        return -1;
+    
+    paddr = pfa_request_pages(pages);
+    if 
+    (
+        paddr == 0 ||
+        pml4_map_memory(ps->pml4, paddr, vaddr, size, access, privilege) < size
+    )
+    {
+        free(entry);
+        pml4_unmap_memory(ps->pml4, vaddr, size);
+        return -1;
+    }
+
+    entry->next = NULL;
+    entry->paddr = paddr;
+    entry->vaddr = vaddr;
+    entry->pages = pages;
+    entry->access = access;
+    entry->pl = privilege;
+
+    if (ps->mem.tail == NULL)
+        ps->mem.head = entry;
+    else
+        ps->mem.tail->next = entry;
+    ps->mem.tail = entry;
+    
+    if (vaddr_out != NULL)
+        *vaddr_out = vaddr;
+    if (paddr_out != NULL)
+        *paddr_out = paddr;
 
     return 0;
 }
 
-static int process_load_code(process_t* ps, const char* path)
+static int process_create_pml4(process_t* ps)
 {
-    uint64_t phdrs_offset, phdrs_total_size;
-    uint64_t copy_tmp_vaddr;
-    uint64_t highest_vaddr, section_highest_vaddr, lowest_vaddr, section_lowest_vaddr;
-    uint64_t alloc_paddr, alloc_pages;
-    pages_list_entry_t* code_pages;
-    Elf64_Phdr* phdr;
-    Elf64_Ehdr* ehdr;
-    vnode_t node;
-    vattribs_t attribs;
-    void* buffer;
+    ps->pml4 = aligned_alloc(SIZE_4KB, SIZE_4KB);
+    if (ps->pml4 == NULL)
+        return -1;
+    ps->pml4_paddr = paging_get_paddr((uint64_t) ps->pml4);
+    return 0;
+}
 
-    vfs_lookup(path, &node);
-    vfs_get_attribs(&node, &attribs);
-    
-    buffer = malloc(attribs.size);
+static int process_load_exec_path(process_t* ps, const char* path)
+{
+    ps->exec_path = malloc(strlen(path) + 1);
+    if (ps->exec_path == NULL)
+        return -1;
+    strcpy((char*) ps->exec_path, path);
+    return 0;
+}
+
+static int process_load_elf(process_t* ps, const char* path)
+{
+    vnode_t file;
+    vattribs_t attr;
+    uint8_t* buffer;
+    char* interp_path;
+    uint64_t phdrs_offset, phdrs_total_size;
+    uint64_t paddr, tmp_vaddr;
+    Elf64_Ehdr* ehdr;
+    Elf64_Phdr* phdr;
+
+    if 
+    (
+        vfs_lookup(path, &file) ||
+        vfs_get_attribs(&file, &attr) ||
+        attr.size == 0
+    )
+        return -1;    
+
+    buffer = malloc(attr.size);
     if (buffer == NULL)
         return -1;
-    
-    vfs_read(&node, buffer, attribs.size);
+
+    if (vfs_read(&file, buffer, attr.size))
+    {
+        free(buffer);
+        return -1;
+    }
 
     ehdr = (Elf64_Ehdr*) buffer;
-
     if 
     (
         ehdr->e_ident[EI_MAG0] != ELFMAG0 ||
@@ -112,501 +149,343 @@ static int process_load_code(process_t* ps, const char* path)
         ehdr->e_machine != EM_X86_64 ||
         ehdr->e_type != ET_EXEC
     )
+    {
+        free(buffer);
         return -1;
+    }
 
     phdrs_offset = (((uint64_t) ehdr) + ehdr->e_phoff);
     phdrs_total_size = ehdr->e_phentsize * ehdr->e_phnum;
-    highest_vaddr = 0;
-    lowest_vaddr = (uint64_t) -1;
+    interp_path = NULL;
 
-    for
+    for 
     (
         phdr = (Elf64_Phdr*) phdrs_offset;
         phdr < (Elf64_Phdr*) (((uint64_t) phdrs_offset) + phdrs_total_size);
         phdr = (Elf64_Phdr*) (((uint64_t) phdr) + ehdr->e_phentsize)
     )
     {
+        if (phdr->p_vaddr + phdr->p_memsz > ps->brk_vaddr)
+            ps->brk_vaddr = phdr->p_vaddr + phdr->p_memsz;
+
         switch (phdr->p_type)
         {
-        case PT_LOAD:            
-            alloc_pages = ceil((double) phdr->p_memsz / SIZE_4KB);
-            alloc_paddr = pfa_request_pages(alloc_pages);
+        case PT_INTERP:
+            if 
+            (
+                interp_path != NULL ||
+                ps->mem.head != NULL
+            )
+                return -1;
+            interp_path = malloc(phdr->p_memsz);
+            strcpy(interp_path, (char*) (buffer + phdr->p_offset));
+            free(buffer);
+            process_load_elf(ps, interp_path);
+            free(interp_path);
+            return 0;
             
-            if (kernel_get_next_vaddr(phdr->p_memsz, &copy_tmp_vaddr) < phdr->p_memsz)
+        case PT_LOAD:
+            if (process_request_memory(ps, phdr->p_memsz, phdr->p_vaddr, PAGE_ACCESS_RO, PL3, NULL, &paddr))
             {
                 free(buffer);
                 return -1;
             }
             if 
             (
-                kernel_map_memory(alloc_paddr, copy_tmp_vaddr, phdr->p_filesz, PAGE_ACCESS_RW, PL0) < phdr->p_filesz ||
-                pml4_map_memory(ps->pml4, alloc_paddr, phdr->p_vaddr, phdr->p_memsz, PAGE_ACCESS_WX, PL3) < phdr->p_memsz
+                kernel_get_next_vaddr(phdr->p_filesz, &tmp_vaddr) < phdr->p_filesz ||
+                paging_map_memory(paddr, tmp_vaddr, phdr->p_filesz, PAGE_ACCESS_RW, PL0) < phdr->p_filesz
             )
-            {
-                kernel_unmap_memory(copy_tmp_vaddr, phdr->p_filesz);
-                free(buffer);
                 return -1;
-            }
-            memcpy((void*) copy_tmp_vaddr, (void*) (((uint64_t) ehdr) + phdr->p_offset), phdr->p_filesz);
-            kernel_unmap_memory(copy_tmp_vaddr, phdr->p_filesz);
-            
-            code_pages = malloc(sizeof(pages_list_entry_t));
-            if (code_pages == NULL)
-            {
-                free(buffer);
-                return -1;
-            }
-
-            code_pages->next = NULL;
-            code_pages->pages = alloc_paddr;
-            code_pages->pages = alloc_pages;
-
-            if (ps->code_pages.tail == NULL)
-                ps->code_pages.head = code_pages;
-            else
-                ps->code_pages.tail->next = code_pages;
-            ps->code_pages.tail = code_pages;
-            
-            section_lowest_vaddr = phdr->p_vaddr;
-            section_highest_vaddr = section_lowest_vaddr + phdr->p_memsz;
-            if (highest_vaddr < section_highest_vaddr)
-                highest_vaddr = alignu(section_highest_vaddr, SIZE_4KB);
-            if (lowest_vaddr > section_lowest_vaddr)
-                lowest_vaddr = alignd(section_lowest_vaddr, SIZE_4KB);
-            
+            memcpy((void*) tmp_vaddr, buffer + phdr->p_offset, phdr->p_filesz);
+            paging_unmap_memory(tmp_vaddr, phdr->p_filesz);
             break;
         }
     }
 
+    ps->cpu.stack.rip = ehdr->e_entry;
     free(buffer);
     
-    ps->code_start_vaddr = lowest_vaddr;
-    ps->user_mode.stack.rip = ehdr->e_entry;
-    ps->mapping_start_vaddr = highest_vaddr;
-
     return 0;
 }
 
-static int process_init_stack(process_t* ps)
+static int process_build_user_stack(process_t* ps, const char** argv, const char** envp)
 {
-    uint64_t paddr, bytes, pages, size;
-    pages_list_entry_t* stack_pages;
+    int argc, envc, i;
+    uint64_t total_args_size, cpysize;
+    uint64_t args_kvaddr, stack_kvaddr;
+    uint64_t args_vaddr, args_paddr, stack_vaddr, stack_paddr;
+    const char** stack_ptr;
+    const char** args_ptr;
+    char* cpyptr;
 
-    pages = ceil((double) PROC_INITIAL_STACK_SIZE / SIZE_4KB);
-    paddr = pfa_request_pages(PROC_INITIAL_STACK_SIZE);
-    if (paddr == 0)
-        return -1;
+    total_args_size = 0;
+    for (argc = 0; argv != NULL && argv[argc] != NULL; argc++)
+        total_args_size += strlen(argv[argc]) + 1;
+    for (envc = 0; envp != NULL && envp[envc] != NULL; envc++)
+        total_args_size += strlen(envp[envc]) + 1;
     
-    bytes = pages * SIZE_4KB;
-    size = pml4_map_memory(ps->pml4, paddr, PROC_DEFAULT_STACK_VADDR, bytes, PAGE_ACCESS_RW, PL3);
-    if (size < bytes)
-    {
-        pfa_free_pages(paddr, pages);
+    args_ptr = calloc(1, (argc + envc + 2) * sizeof(const char*));
+    if (args_ptr == NULL)
         return -1;
-    }
-
-    stack_pages = malloc(sizeof(pages_list_entry_t));
-    if (stack_pages == NULL)
-    {
-        pfa_free_pages(paddr, pages);
-        return -1;
-    }
+    ps->argv = args_ptr;
+    ps->envp = args_ptr + (argc + 1);
     
-    stack_pages->paddr = paddr;
-    stack_pages->pages = pages;
-    stack_pages->next = NULL;
-
-    ps->stack_pages.head = stack_pages;
-    ps->stack_pages.tail = stack_pages;
-    ps->stack_start_vaddr = PROC_DEFAULT_STACK_VADDR;
-    ps->user_mode.stack.rsp = PROC_INITIAL_RSP;
-
-    return 0;
-}
-
-static int process_init_kernel_stack(process_t* ps)
-{
-    uint64_t pages, bytes, vaddr, paddr, size;
-    pages_list_entry_t* kernel_stack_pages;
-
-    bytes = PROC_INITIAL_STACK_SIZE;
-    size = kernel_get_next_vaddr(bytes, &vaddr);
-    if (size < bytes)
-        return -1;
-
-    pages = ceil((double) PROC_INITIAL_STACK_SIZE / SIZE_4KB);
-    paddr = pfa_request_pages(pages);
-    if (paddr == 0)
-        return -1;
-    
-    size = pml4_map_memory(ps->pml4, paddr, vaddr, bytes, PAGE_ACCESS_RW, PL0);
-    if (size < bytes)
+    args_kvaddr = (uint64_t) aligned_alloc(SIZE_4KB, alignu(total_args_size, SIZE_4KB));
+    if (args_kvaddr == 0)
     {
-        pfa_free_pages(paddr, pages);
-        return -1;
-    }
-    
-    kernel_stack_pages = malloc(sizeof(pages_list_entry_t));
-    if (kernel_stack_pages == NULL)
-    {
-        pfa_free_pages(paddr, pages);
-        return -1;
-    }
-    
-    kernel_stack_pages->paddr = paddr;
-    kernel_stack_pages->pages = pages;
-    kernel_stack_pages->next = NULL;
-
-    ps->kernel_stack_pages.head = kernel_stack_pages;
-    ps->kernel_stack_pages.tail = kernel_stack_pages;
-    ps->kernel_stack_start_vaddr = vaddr;
-
-    return 0;
-}
-
-static char** process_parse_args(char* c, uint64_t* argc, uint64_t* bytes)
-{
-    char** argv;
-    uint64_t i;
-
-    i = 0;
-    *argc = 1;
-    *bytes = strlen(c);
-
-#define SINGLE_QUOTE_OPEN_BIT (1 << 0)
-#define DOUBLE_QUOTE_OPEN_BIT (1 << 1)
-
-    while (*c != '\0')
-    {
-        switch (*c)
-        {
-        case '"':
-            i ^= DOUBLE_QUOTE_OPEN_BIT;
-            break;
-        case '\'':
-            i ^= SINGLE_QUOTE_OPEN_BIT;
-            break;
-        case ' ':
-            if ((i & (DOUBLE_QUOTE_OPEN_BIT | SINGLE_QUOTE_OPEN_BIT)))
-                break;
-            *c = '\0';
-            *argc += 1;
-            break;
-        }
-        ++c;
-    }
-
-    argv = calloc(1, *argc * sizeof(char*));
-    
-    for 
-    (
-        c = c - *bytes,
-        i = 0;
-        i < *argc;
-        c++
-    )
-    {
-        if (argv[i] == NULL)
-            argv[i] = c;
-        if (*c == '\0')
-        {
-            if (*(c - 1) == '\'' || *(c - 1) == '"')
-            {
-                ++argv[i];
-                *(c - 1) = '\0';
-            }
-            ++i;
-        }
-    }
-
-    return argv;
-}
-
-static int process_load_args(process_t* ps, const char* cmdline)
-{
-    pages_list_entry_t* args_pages;
-    uint64_t argc;
-    uint64_t cmdline_bytes, argv_bytes, total_bytes, pages, size;
-    uint64_t paddr, vaddr, tmp_vaddr;
-    char** argv;
-
-    if (cmdline == NULL)
-        return 0;
-    
-    argv = process_parse_args((char*) cmdline, &argc, &cmdline_bytes);
-    argv_bytes = argc * sizeof(char*);
-
-    if (cmdline_bytes > SIZE_4KB)
-    {
-        free(argv);
+        free((void*) args_kvaddr);
         return -1;
     }
 
-    total_bytes = cmdline_bytes + argv_bytes;
-    size = pml4_get_next_vaddr(ps->pml4, ps->code_start_vaddr, total_bytes, &vaddr);
-    if (size < total_bytes)
-    {
-        free(argv);
-        return -1;
-    }
-    
-    pages = ceil((double) total_bytes / SIZE_4KB);
-    paddr = pfa_request_pages(pages);
-    if (paddr == 0)
-    {
-        free(argv);
-        return -1;
-    }
-
-    tmp_vaddr = kernel_map_temporary_page(paddr, PAGE_ACCESS_RW, PL0);
-    memcpy((void*) tmp_vaddr, cmdline, cmdline_bytes);
-    kernel_unmap_temporary_page(tmp_vaddr);
-
-    tmp_vaddr = kernel_map_temporary_page(paddr + cmdline_bytes, PAGE_ACCESS_RW, PL0);
-    memcpy((void*) tmp_vaddr, argv, argv_bytes);
-    kernel_unmap_temporary_page(tmp_vaddr);
-
-    free(argv);
-
-    size = pml4_map_memory(ps->pml4, paddr, vaddr, total_bytes, PAGE_ACCESS_RW, PL3);
-    if (size < total_bytes)
-    {
-        pfa_free_pages(paddr, pages);
-        return -1;
-    }
-
-    args_pages = malloc(sizeof(pages_list_entry_t));
-    if (args_pages == NULL)
-    {
-        pfa_free_pages(paddr, pages);
-        return -1;
-    }
-
-    args_pages->paddr = paddr;
-    args_pages->pages = pages;
-    args_pages->next = NULL;
-
-    ps->args_pages.head = args_pages;
-    ps->args_pages.tail = args_pages;
-    ps->args_start_vaddr = vaddr;
-
-    ps->user_mode.regs.rdi = argc;
-    ps->user_mode.regs.rsi = ps->args_start_vaddr;
-
-    return 0;
-}
-
-static uint64_t process_delete_pages_list(pages_list_t* list)
-{
-    pages_list_entry_t* current;
-    pages_list_entry_t* tmp;
-    uint64_t pages;
-    
-    pages = 0;
-    current = list->head;
-    while (current != NULL)
-    {
-        pages += current->pages;
-        tmp = current->next;
-        pfa_free_pages(current->paddr, current->pages);
-        free(current);
-        current = tmp;
-    }
-
-    return pages * SIZE_4KB;
-}
-
-void process_delete_resources(process_t* ps)
-{
-    uint64_t i;
-
-    if (ps->pml4 != 0)
-    {
-        if (pml4_delete(ps->pml4, ps->pml4_paddr) > KERNEL_HEAP_START_ADDR)
-            return;
-        kernel_unmap_memory((uint64_t) ps->pml4, SIZE_4KB);
-    }
-    
-    if (ps->kernel_stack_start_vaddr != 0)
-        process_delete_pages_list(&ps->kernel_stack_pages);
-    if (ps->args_start_vaddr != 0)
-        process_delete_pages_list(&ps->args_pages);
-
-    process_delete_pages_list(&ps->code_pages);
-    process_delete_pages_list(&ps->stack_pages);
-    process_delete_pages_list(&ps->mapped_pages);
-
-    for (i = 0; i < PROC_MAX_FDS; i++)
-    {
-        if (ps->fds[i] != 0)
-        {
-            /* Free file descriptors */
-        }
-    }
-}
-
-void process_delete_and_free(process_t* ps)
-{
-    process_delete_resources(ps);
-    free(ps);
-}
-
-process_t* process_create(const char* path, uint64_t pid)
-{
-    process_t* ps;
-    
-    ps = malloc(sizeof(process_t));
-    if (ps == NULL)
-        return NULL;
-
-    process_init(ps, pid);
-
+    args_vaddr = alignd(PROC_CEIL_VADDR - total_args_size, SIZE_4KB);
+    args_paddr = paging_get_paddr(args_kvaddr);
+    stack_vaddr = args_vaddr - PROC_USER_STACK_SIZE;
     if 
     (
-        process_init_pml4(ps) ||
-        process_load_code(ps, path) || 
-        process_init_stack(ps) || 
-        process_init_kernel_stack(ps) ||
-        process_load_args(ps, NULL) /* TODO: Add back CMDLINE support */
+        process_request_memory(ps, PROC_USER_STACK_SIZE, stack_vaddr, PAGE_ACCESS_RW, PL3, &stack_vaddr, &stack_paddr) ||
+        paging_get_next_vaddr(args_vaddr, total_args_size, &args_vaddr) < total_args_size ||
+        pml4_map_memory(ps->pml4, args_paddr, args_vaddr, total_args_size, PAGE_ACCESS_RO, PL3) < total_args_size
     )
     {
+        free((void*) args_kvaddr);
+        return -1;
+    }
+    
+    if
+    (
+        kernel_get_next_vaddr(PROC_USER_STACK_SIZE, &stack_kvaddr) < PROC_USER_STACK_SIZE ||
+        paging_map_memory(stack_paddr, stack_kvaddr, PROC_USER_STACK_SIZE, PAGE_ACCESS_RW, PL0) < PROC_USER_STACK_SIZE
+    )
+    {
+        free((void*) args_kvaddr);
+        return -1;
+    }
+
+    memset((void*) stack_kvaddr, 0, PROC_USER_STACK_SIZE);
+
+    cpyptr = (char*) args_kvaddr;
+    stack_ptr = (const char**) (stack_kvaddr + PROC_USER_STACK_SIZE - sizeof(uint64_t));
+    
+    stack_ptr = &stack_ptr[-envc];
+    for (i = 0; envp != NULL && i < envc; i++)
+    {
+        cpysize = strlen(envp[i]) + 1;
+        memcpy(cpyptr, envp[i], cpysize);
+        stack_ptr[i] = (const char*) ((cpyptr - args_kvaddr) + args_vaddr);
+        args_ptr[(argc + 1) + i] = (const char*) cpyptr;
+        cpyptr += cpysize;
+    }
+
+    stack_ptr = &stack_ptr[-(argc + 1)];
+    for (i = 0; argv != NULL && i < argc; i++)
+    {
+        cpysize = strlen(argv[i]) + 1;
+        memcpy(cpyptr, argv[i], cpysize);
+        stack_ptr[i] = (const char*) ((cpyptr - args_kvaddr) + args_vaddr);
+        args_ptr[i] = (const char*) cpyptr;
+        cpyptr += cpysize;
+    }
+
+    paging_unmap_memory(stack_kvaddr, PROC_USER_STACK_SIZE);
+
+    ps->user_stack_vaddr = stack_vaddr;
+    ps->cpu.regs.rbp = ps->user_stack_vaddr + PROC_USER_STACK_SIZE - sizeof(uint64_t);
+    ps->cpu.regs.rdi = argc;
+    ps->cpu.regs.rdx = (uint64_t) &((const char**) ps->cpu.regs.rbp)[-envc];
+    ps->cpu.regs.rsi = (uint64_t) &((const char**) ps->cpu.regs.rdx)[-(argc + 1)];
+    ps->cpu.stack.rsp = ps->cpu.regs.rsi - sizeof(uint64_t);
+
+    return 0;
+}
+
+static int process_build_kernel_stack(process_t* ps)
+{
+    uint64_t hint, paddr;
+    if 
+    (
+        kernel_get_next_vaddr(PROC_KERNEL_STACK_SIZE, &hint) < PROC_KERNEL_STACK_SIZE ||
+        process_request_memory(ps, PROC_KERNEL_STACK_SIZE, hint, PAGE_ACCESS_RW, PL0, &ps->kernel_stack_vaddr, &paddr)
+    )
+        return -1;
+    if (paging_map_memory(paddr, hint, PROC_KERNEL_STACK_SIZE, PAGE_ACCESS_RW, PL0) < PROC_KERNEL_STACK_SIZE)
+    {
+        paging_unmap_memory(hint, PROC_KERNEL_STACK_SIZE);
+        return -1;
+    }
+    memset((void*) hint, 0, PROC_KERNEL_STACK_SIZE);
+    paging_unmap_memory(hint, PROC_KERNEL_STACK_SIZE);
+    return 0;
+}
+
+process_t* process_create(const char* path, const char** argv, const char** envp, uint64_t pid)
+{
+    process_t* ps = calloc(1, sizeof(process_t));
+    if (ps == NULL)
+    {
+        trace_process("Could not create process descriptor");
+        return NULL;
+    }
+
+    ps->pid = pid;
+    ps->cpu.stack.cs = gdt_get_user_cs() | PL3;
+    ps->cpu.stack.ss = gdt_get_user_ds() | PL3;
+    ps->cpu.stack.rflags = PROC_DEFAULT_RFLAGS;
+    
+    if (process_create_pml4(ps))
+    {
+        trace_process("Failed to create process PML4 (pid: %u)", pid);
         process_delete_and_free(ps);
         return NULL;
     }
 
-    ps->current = ps->user_mode;
+    if (process_load_elf(ps, path))
+    {
+        trace_process("Failed to load process executable (pid: %u)", pid);
+        process_delete_and_free(ps);
+        return NULL;
+    }
+    ps->brk_vaddr = alignu(ps->brk_vaddr, SIZE_1MB);
+
+    if (process_build_user_stack(ps, argv, envp))
+    {
+        trace_process("Failed to build user stack (pid: %u)", pid);
+        process_delete_and_free(ps);
+        return NULL;
+    }
+
+    if (process_build_kernel_stack(ps))
+    {
+        trace_process("Failed to build kernel stack (pid: %u)", pid);
+        process_delete_and_free(ps);
+        return NULL;
+    }
+
+    if (process_load_exec_path(ps, path))
+    {
+        trace_process("Failed to set process executable path");
+        process_delete_and_free(ps);
+        return NULL;
+    }
+
     return ps;
 }
 
-static int copy_file_descriptors(file_descriptor_t* from, file_descriptor_t* to)
+static void process_copy_file_descriptors(process_t* dest, process_t* src)
 {
-    uint64_t i;
+    int i;
     for (i = 0; i < PROC_MAX_FDS; i++)
-    {
-        if (from[i] != 0)
-        {
-            /* Implement file descriptor copy */
-            to[i] = from[i];
-        }
-    }
-    return 0;
+        dest->fds[i] = src->fds[i];
 }
 
-process_t* process_create_replacement(const char* path, process_t* parent)
+process_t* process_create_replacement(process_t* parent, const char* path, const char** argv, const char** envp)
 {
     process_t* child;
-    
-    child = process_create(path, parent->pid);
+
+    child = process_create(path, argv, envp, parent->pid);
     if (child == NULL)
-        return NULL;
-    
-    child->parent_pid = parent->parent_pid;
-    if (copy_file_descriptors(parent->fds, child->fds))
     {
-        process_delete_and_free(child);
+        trace_process("Could not create replacement from process with id %u", parent->pid);
         return NULL;
     }
-    
+
+    child->parent_pid = parent->parent_pid;
+    process_copy_file_descriptors(child, parent);
+
     return child;
 }
 
-static int copy_segments_list(page_table_t pml4, uint64_t vaddr, pages_list_t* from, pages_list_t* to)
+static int process_copy_memory_mappings(process_t* child, process_t* parent)
 {
-    uint64_t bytes, size, paddr, kernel_vaddr;
-    pages_list_entry_t* segment;
-    pages_list_entry_t* ptr;
+    uint64_t tmp_vaddr, vaddr, paddr, bytes;
+    memory_segments_list_entry_t* sentry;
 
-    ptr = from->head;
-    while (ptr != NULL)
+    for (sentry = parent->mem.head; sentry != NULL; sentry = sentry->next)
     {
-        paddr = pfa_request_pages(ptr->pages);
-        if (paddr == 0)
+        bytes = sentry->pages * SIZE_4KB;
+        if (kernel_get_next_vaddr(bytes, &tmp_vaddr) < bytes)
             return -1;
-        
-        bytes = ptr->pages * SIZE_4KB;
-        
-        size = kernel_get_next_vaddr(bytes, &kernel_vaddr);
-        if (size < bytes)
-        {
-            pfa_free_pages(paddr, ptr->pages);
+        if 
+        (
+            process_request_memory(child, bytes, sentry->vaddr, sentry->access, sentry->pl, &vaddr, &paddr) ||
+            vaddr != sentry->vaddr
+        )
             return -1;
-        }
-        
-        size = kernel_map_memory(paddr, kernel_vaddr, bytes, PAGE_ACCESS_RW, PL0);
-        if (size < bytes)
-        {
-            kernel_unmap_memory(kernel_vaddr, bytes);
-            pfa_free_pages(paddr, ptr->pages);
+        if (paging_map_memory(paddr, tmp_vaddr, bytes, PAGE_ACCESS_RW, PL0) < bytes)
             return -1;
-        }
-        
-        memcpy((void*) kernel_vaddr, (void*) vaddr, bytes);
-        kernel_unmap_memory(kernel_vaddr, bytes);
-        
-        segment = malloc(sizeof(pages_list_entry_t));
-        if (segment == NULL)
-        {
-            pfa_free_pages(paddr, ptr->pages);
-            return -1;
-        }
-
-        segment->paddr = paddr;
-        segment->pages = ptr->pages;
-        segment->next = NULL;
-
-        if (to->head == NULL)
-            to->head = segment;
-        else
-            to->tail->next = segment;
-        to->tail = segment;
-
-        size = pml4_map_memory(pml4, paddr, vaddr, bytes, PAGE_ACCESS_WX, PL3);
-        if (size < bytes)
-        {
-            free(segment);
-            pfa_free_pages(paddr, ptr->pages);
-            return -1;
-        }
-
-        vaddr += bytes;
-        ptr = ptr->next;
+        memcpy((void*) tmp_vaddr, (void*) sentry->vaddr, bytes);
+        paging_unmap_memory(tmp_vaddr, bytes);
     }
 
     return 0;
 }
 
-process_t* process_clone(process_t* parent, uint64_t id)
+process_t* process_clone(process_t* parent, uint64_t pid)
 {
     process_t* child;
-    
-    child = malloc(sizeof(process_t));
+    uint64_t argc, envc, args_vaddr, args_count;
+    uint64_t total_args_size, i;
+    const char* argptr;
+
+    child = calloc(1, sizeof(process_t));
     if (child == NULL)
-        return NULL;
-    
-    process_init(child, id);
-
-    child->parent_pid = parent->pid;
-    child->user_mode = parent->user_mode;
-
-    child->code_start_vaddr = parent->code_start_vaddr;
-    child->stack_start_vaddr = parent->stack_start_vaddr;
-    child->mapping_start_vaddr = parent->mapping_start_vaddr;
-    child->args_start_vaddr = parent->args_start_vaddr;
-
-    if 
-    (
-        process_init_pml4(child) ||
-        copy_segments_list(child->pml4, parent->code_start_vaddr, &parent->code_pages, &child->code_pages) ||
-        copy_segments_list(child->pml4, parent->stack_start_vaddr, &parent->stack_pages, &child->stack_pages) ||
-        copy_segments_list(child->pml4, parent->mapping_start_vaddr, &parent->mapped_pages, &child->mapped_pages) ||
-        copy_segments_list(child->pml4, parent->args_start_vaddr, &parent->args_pages, &child->args_pages) ||
-        process_init_kernel_stack(child) || 
-        copy_file_descriptors(parent->fds, child->fds)
-    )
     {
+        trace_process("Could not create process descriptor (pid: %u)", pid);
+        return NULL;
+    }
+
+    child->pid = pid;
+    child->parent_pid = parent->pid;
+    child->cpu = parent->cpu;
+    child->brk_vaddr = parent->brk_vaddr;
+    child->kernel_stack_vaddr = parent->kernel_stack_vaddr;
+    child->user_stack_vaddr = parent->user_stack_vaddr;
+
+    total_args_size = 0;
+    for (argc = 0; parent->argv[argc] != NULL; argc++)
+        total_args_size += strlen(parent->argv[argc]) + 1;
+    for (envc = 0; parent->envp[envc] != NULL; envc++)
+        total_args_size += strlen(parent->envp[envc]) + 1;
+
+    args_vaddr = (uint64_t) aligned_alloc(SIZE_4KB, total_args_size);
+    memcpy((void*) args_vaddr, parent->envp[0], total_args_size);
+
+    args_count = (argc + envc + 2);
+    child->argv = calloc(1, args_count * sizeof(const char*));
+    if (child->argv == NULL)
+    {
+        trace_process("Failed to copy argv and envp from parent process (pid: %u)", pid);
         process_delete_and_free(child);
         return NULL;
     }
+    child->envp = &child->argv[argc + 1];
+    
+    argptr = (const char*) args_vaddr;
+    for (i = 0; i < envc; i++)
+    {
+        child->envp[i] = argptr;
+        argptr += strlen(argptr) + 1;
+    }
+    for (i = 0; i < argc; i++)
+    {
+        child->argv[i] = argptr;
+        argptr += strlen(argptr) + 1;
+    }
+
+    if (process_create_pml4(child))
+    {
+        trace_process("Failed to create process PML4 (pid: %u)", pid);
+        process_delete_and_free(child);
+        return NULL;
+    }
+    
+    if (process_copy_memory_mappings(child, parent))
+    {
+        trace_process("Failed to copy parent's memory mappings (pid: %u)", pid);
+        process_delete_and_free(child);
+        return NULL;
+    }
+
+    process_copy_file_descriptors(child, parent);
 
     return child;
 }

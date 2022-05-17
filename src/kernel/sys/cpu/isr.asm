@@ -1,5 +1,3 @@
-[bits 64]
-
 [section .bss]
 
 int_frame:
@@ -31,10 +29,11 @@ int_frame:
     align 16
     fpu_state:
         resb 512
-
+    
 
 
 [section .text]
+[bits 64]
 
 %macro PUSHALL 0
     push rax
@@ -75,14 +74,14 @@ int_frame:
     isr%1:
         push qword 0
         push qword %1
-        jmp common_stub
+        jmp isr_stub
 %endmacro
 
 %macro ISR_ERR 1
     [global isr%1]
     isr%1:
         push qword %1
-        jmp common_stub
+        jmp isr_stub
 %endmacro
 
 %macro IRQ 1
@@ -90,7 +89,7 @@ int_frame:
     irq%1:
         push qword %1
         push qword %1+32
-        jmp common_stub
+        jmp isr_stub
 %endmacro
 
 %macro SOFTWARE 1
@@ -98,7 +97,7 @@ int_frame:
     sft%1:
         push qword 0x69
         push qword %1
-        jmp common_stub
+        jmp isr_stub
 %endmacro
 
 %macro FILL_STRUCT 0
@@ -142,7 +141,7 @@ int_frame:
 [extern gdt_get_kernel_ds]
 [extern isr_handler]
 
-common_stub:
+isr_stub:
     FILL_STRUCT
     PUSHALL
     mov ax, ds
@@ -216,5 +215,3 @@ IRQ 12
 IRQ 13
 IRQ 14
 IRQ 15
-
-SOFTWARE 128

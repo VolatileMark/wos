@@ -62,7 +62,6 @@ DECLARE_IRQ(13);
 DECLARE_IRQ(14);
 DECLARE_IRQ(15);
 
-DECLARE_SFT(128);
 
 
 struct interrupt_info
@@ -102,7 +101,7 @@ struct stack_state
 } __attribute__((packed));
 typedef struct stack_state stack_state_t;
 
-typedef __attribute__((aligned(16))) uint8_t fpu_state_t[512];
+typedef uint8_t fpu_state_t[512 + 16];
 
 struct interrupt_frame
 {

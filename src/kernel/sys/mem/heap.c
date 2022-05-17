@@ -1,8 +1,6 @@
 #include "heap.h"
 #include "pfa.h"
 #include "paging.h"
-#include "../../utils/constants.h"
-#include "../../utils/alloc.h"
 #include "../../utils/log.h"
 #include <stddef.h>
 #include <math.h>
@@ -23,6 +21,22 @@ typedef struct heap
 
 static heap_t kernel_heap;
 
+static void heap_combine_forward(heap_segment_header_t* seg)
+{
+    if (seg->next == NULL || !seg->next->free)
+        return;
+    if (seg->next == kernel_heap.tail)
+        kernel_heap.tail = seg;
+    seg->size += seg->next->size + sizeof(heap_segment_header_t);
+    seg->next = seg->next->next;
+}
+
+static void heap_combine_backward(heap_segment_header_t* seg)
+{
+    if (seg->prev != NULL && seg->prev->free)
+        heap_combine_forward(seg->prev);
+}
+
 static uint64_t heap_expand(uint64_t size)
 {
     uint64_t pages_paddr, pages_count, mapped_size, new_size;
@@ -39,7 +53,7 @@ static uint64_t heap_expand(uint64_t size)
     if (pages_paddr == 0)
         return 0;
     
-    mapped_size = kernel_map_memory(pages_paddr, kernel_heap.end_vaddr, new_size, PAGE_ACCESS_WX, PL0);
+    mapped_size = paging_map_memory(pages_paddr, kernel_heap.end_vaddr, new_size, PAGE_ACCESS_RW, PL0);
     if (mapped_size < new_size)
     {
         pfa_free_pages(pages_paddr, pages_count);
@@ -50,7 +64,6 @@ static uint64_t heap_expand(uint64_t size)
 
     new->free = 1;
     new->size = new_size - sizeof(heap_segment_header_t);
-    new->data = (uint64_t)(new + 1);
     new->prev = kernel_heap.tail;
     new->next = NULL;
     if (kernel_heap.tail != NULL)
@@ -59,6 +72,7 @@ static uint64_t heap_expand(uint64_t size)
         kernel_heap.tail->next = new;
     }
     kernel_heap.tail = new;
+    heap_combine_backward(new);
 
     return mapped_size;
 }
@@ -79,22 +93,6 @@ static heap_segment_header_t* heap_next_free_segment(uint64_t size)
         return NULL;
     
     return heap_next_free_segment(size);
-}
-
-static void heap_combine_forward(heap_segment_header_t* seg)
-{
-    if (seg->next == NULL || !seg->next->free)
-        return;
-    if (seg->next == kernel_heap.tail)
-        kernel_heap.tail = seg;
-    seg->size += seg->next->size + sizeof(heap_segment_header_t);
-    seg->next = seg->next->next;
-}
-
-static void heap_combine_backward(heap_segment_header_t* seg)
-{
-    if (seg->prev != NULL && seg->prev->free)
-        heap_combine_forward(seg->prev);
 }
 
 int heap_init(uint64_t start_vaddr, uint64_t ceil_vaddr, uint64_t initial_size)
@@ -131,17 +129,16 @@ heap_segment_header_t* heap_allocate_memory(uint64_t size)
     do {
         seg = heap_next_free_segment(size + sizeof(heap_segment_header_t));
         if (seg == NULL)
-            return 0;
+            return NULL;
     } while (seg->size < size);
     
-    new = (heap_segment_header_t*) (seg->data + size);
+    new = (heap_segment_header_t*) (((uint64_t)(seg + 1)) + size);
     new->free = 1;
     new->size = seg->size - size - sizeof(heap_segment_header_t);
     new->prev = seg;
     new->next = seg->next;
     if (new->next != NULL)
         new->next->prev = new;
-    new->data = (uint64_t)(new + 1);
     if (seg == kernel_heap.tail)
         kernel_heap.tail = new;
 
@@ -152,8 +149,34 @@ heap_segment_header_t* heap_allocate_memory(uint64_t size)
     return seg;
 }
 
+heap_segment_header_t* heap_allocate_aligned_memory(uint64_t alignment, uint64_t size)
+{
+    heap_segment_header_t* seg;
+    heap_segment_header_t* aligned;
+    uint64_t aligned_data_addr, data_addr;
+
+    seg = heap_allocate_memory(size + (alignment * 2) + sizeof(heap_segment_header_t));
+    if (seg == NULL)
+        return NULL;
+    
+    data_addr = (uint64_t) (seg + 1);
+    aligned_data_addr = alignu(data_addr, alignment);
+    if ((aligned_data_addr - data_addr) < sizeof(heap_segment_header_t))
+        aligned_data_addr = alignu(data_addr + sizeof(heap_segment_header_t), alignment);
+    
+    aligned = ((heap_segment_header_t*) aligned_data_addr) - 1;
+    aligned->free = 0;
+    aligned->size = (((uint64_t) (seg + 1)) + seg->size) - aligned_data_addr;
+    aligned->next = NULL;
+    aligned->prev = seg;
+    
+    return aligned;
+}
+
 void heap_free_memory(heap_segment_header_t* seg)
 {
+    if (seg->next == NULL && seg != kernel_heap.tail)
+        seg = seg->prev;
     seg->free = 1;
     heap_combine_forward(seg);
     heap_combine_backward(seg);

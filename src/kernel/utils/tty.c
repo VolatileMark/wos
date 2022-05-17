@@ -1,9 +1,8 @@
 #include "tty.h"
 #include "multiboot2-utils.h"
-#include "psf.h"
 #include "macros.h"
 #include "log.h"
-#include "../proc/vfs/vattribs.h"
+#include "../headers/psf.h"
 #include "../sys/drivers/video/framebuffer.h"
 #include <stdarg.h>
 #include <stddef.h>

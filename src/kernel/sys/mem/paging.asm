@@ -13,8 +13,8 @@ tlb_flush:
     mov cr3, rax
     ret
 
-[global pml4_get_current_paddr]
-pml4_get_current_paddr:
+[global paging_get_current_pml4_paddr]
+paging_get_current_pml4_paddr:
     mov rax, cr3
     and rax, 0x00000000FFFFF000
     ret

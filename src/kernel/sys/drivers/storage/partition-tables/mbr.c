@@ -3,7 +3,7 @@
 
 void mbr_load(drive_t* drive, mbr_t* mbr)
 {
-    drive->ops->read(drive->interface, 0, sizeof(mbr_t), mbr);
+    drivefs_read(drive, 0, sizeof(mbr_t), mbr);
 }
 
 int mbr_check(drive_t* drive)

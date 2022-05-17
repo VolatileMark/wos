@@ -2,7 +2,6 @@
 #include "../../../utils/macros.h"
 #include "../../../utils/log.h"
 #include "../../../utils/alloc.h"
-#include <stdint.h>
 #include <stddef.h>
 #include <string.h>
 
