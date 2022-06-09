@@ -9,7 +9,8 @@
 #define PROC_MAX_FDS 64
 #define PROC_DEFAULT_RFLAGS 0x202
 #define PROC_CEIL_VADDR 0x800000000000
-#define PROC_USER_STACK_SIZE SIZE_nMB(2)
+#define PROC_USER_STACK_MIN_SIZE SIZE_nKB(8)
+#define PROC_USER_STACK_MAX_SIZE SIZE_nMB(2)
 #define PROC_KERNEL_STACK_SIZE SIZE_nKB(16)
 
 typedef struct memory_segments_list_entry
@@ -48,6 +49,7 @@ typedef struct
     const char** envp;
     uint64_t brk_vaddr;
     uint64_t user_stack_vaddr;
+    uint64_t user_stack_size;
     uint64_t kernel_stack_vaddr;
     cpu_state_t cpu;
     memory_segments_list_t mem;
@@ -59,6 +61,6 @@ process_t* process_create(const char* path, const char** argv, const char** envp
 process_t* process_clone(process_t* parent, uint64_t pid);
 void process_delete_resources(process_t* ps);
 void process_delete_and_free(process_t* ps);
-
+int process_grow_user_stack(process_t* ps, uint64_t size);
 
 #endif

@@ -62,7 +62,41 @@ DECLARE_IRQ(13);
 DECLARE_IRQ(14);
 DECLARE_IRQ(15);
 
-
+typedef enum
+{
+    EXCEPTION_DE,
+    EXCEPTION_DB,
+    EXCEPTION_NMI,
+    EXCEPTION_BP,
+    EXCEPTION_OF,
+    EXCEPTION_BR,
+    EXCEPTION_UD,
+    EXCEPTION_NM,
+    EXCEPTION_DF,
+    EXCEPTION_LEG0,
+    EXCEPTION_TS,
+    EXCEPTION_NP,
+    EXCEPTION_SS,
+    EXCEPTION_GP,
+    EXCEPTION_PF,
+    EXCEPTION_RSV0,
+    EXCEPTION_MF,
+    EXCEPTION_AC,
+    EXCEPTION_MC,
+    EXCEPTION_XF,
+    EXCEPTION_VE,
+    EXCEPTION_CP,
+    EXCEPTION_RSV1,
+    EXCEPTION_RSV2,
+    EXCEPTION_RSV3,
+    EXCEPTION_RSV4,
+    EXCEPTION_RSV5,
+    EXCEPTION_RSV6,
+    EXCEPTION_HV,
+    EXCEPTION_VC,
+    EXCEPTION_SX,
+    EXCEPTION_RSV7,
+} exception_t;
 
 struct interrupt_info
 {
@@ -115,6 +149,6 @@ typedef struct interrupt_frame interrupt_frame_t;
 typedef void (*isr_handler_t)(const interrupt_frame_t* info); 
 
 void isr_init(void);
-uint8_t isr_register_handler(uint8_t interrupt_number, isr_handler_t handler);
+void isr_register_handler(uint8_t interrupt_number, isr_handler_t handler);
 
 #endif

@@ -155,7 +155,7 @@ heap_segment_header_t* heap_allocate_aligned_memory(uint64_t alignment, uint64_t
     heap_segment_header_t* aligned;
     uint64_t aligned_data_addr, data_addr;
 
-    seg = heap_allocate_memory(size + (alignment * 2) + sizeof(heap_segment_header_t));
+    seg = heap_allocate_memory(size + alignment + (sizeof(heap_segment_header_t) * 2));
     if (seg == NULL)
         return NULL;
     

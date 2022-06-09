@@ -14,13 +14,6 @@ typedef enum
     IDT_INTERRUPT_GATE,
 } idt_gate_type_t;
 
-struct idt64_descriptor 
-{
-    uint16_t limit;         /* Size in bytes of the IDT - 1 */
-    uint64_t base;          /* Where the IDT starts (base address) */
-} __attribute__((packed));
-typedef struct idt64_descriptor idt64_descriptor_t;
-
 struct idt64_entry 
 {
     uint16_t offset_lo;                 /* Offset bits 0..15 */
@@ -129,4 +122,9 @@ void idt_init(void)
     SET_IRQ(15);
 
     idt_load((uint64_t) &idt_descriptor);
+}
+
+idt64_descriptor_t* idt_get_descriptor(void)
+{
+    return &idt_descriptor;
 }

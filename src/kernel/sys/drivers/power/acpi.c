@@ -137,7 +137,7 @@ sdt_header_t* acpi_find_table(const char* signature)
     {
         entry_paddr = acpi_get_next_sdt_entry_pointer(&main_sdt, entry);
         header = (sdt_header_t*) (paging_map_temporary_page(entry_paddr, PAGE_ACCESS_RO, PL0) + GET_ADDR_OFFSET(entry_paddr));
-        if (!strncmp(header->signature, signature, 4))
+        if (strncmp(header->signature, signature, 4) == 0)
         {
             entry_size = header->length;
             paging_unmap_temporary_page((uint64_t) header);

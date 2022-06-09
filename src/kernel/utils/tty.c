@@ -4,7 +4,6 @@
 #include "log.h"
 #include "../headers/psf.h"
 #include "../sys/drivers/video/framebuffer.h"
-#include <stdarg.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -21,7 +20,7 @@ static framebuffer_info_t* fb;
 #define font_header _binary_font_psf_start.header
 #define font_glyphs _binary_font_psf_start.glyphs
 
-static void tty_putc(char c)
+void tty_putc(char c)
 {
     uint64_t glyph_offset;
     uint64_t x, y, sx, sy;
@@ -33,6 +32,14 @@ static void tty_putc(char c)
     case '\n':
         cursor_x = 0;
         ++cursor_y;
+        break;
+    case '\t':
+        cursor_x += 4;
+        if (cursor_x > max_x)
+        {
+            cursor_y++;
+            cursor_x -= max_x;
+        }
         break;
     default:
         glyph_offset = ((uint8_t) c) * font_header.bytes_per_glyph;
@@ -66,7 +73,7 @@ static void tty_putc(char c)
         cursor_y = 0;
 }
 
-static void tty_puts(const char* str)
+void tty_puts(const char* str)
 {
     uint8_t c;
     while (*str != '\0')
@@ -88,14 +95,11 @@ static void tty_puts(const char* str)
     }
 }
 
-void tty_printf(const char* str, ...)
+void tty_printva(const char* str, va_list ap)
 {
-    va_list ap;
     char* p;
     char tmp_str[64];
     uint8_t i;
-
-    va_start(ap, str);
 
     for (p = ((char*) str); *p != '\0'; p++)
     {
@@ -118,13 +122,22 @@ void tty_printf(const char* str, ...)
         }
 
         tmp_str[0] = '\0';
+        i = 0;
+
+    FORMAT:
         switch (*(++p))
         {
+        case '0':
+            i = *(++p) - '0';
+            goto FORMAT;
         case 'c':
             tty_putc((uint8_t) va_arg(ap, uint32_t));
             break;
         case 'p':
             tty_puts(utoan(va_arg(ap, uint64_t), tmp_str, 16, 16));
+            break;
+        case 'X':
+            tty_puts(utoan(va_arg(ap, uint64_t), tmp_str, 16, i));
             break;
         case 'x':
             tty_puts(itoa(va_arg(ap, long), tmp_str, 16));
@@ -146,7 +159,13 @@ void tty_printf(const char* str, ...)
             break;
         }
     }
+}
 
+void tty_printf(const char* str, ...)
+{
+    va_list ap;
+    va_start(ap, str);
+    tty_printva(str, ap);
     va_end(ap);
 }
 
@@ -156,8 +175,10 @@ void tty_clear_screen(void)
     uint64_t i;
 
     fb_ptr = (uint32_t*) fb->addr;
-    for (i = 0; i < fb->size; i++)
+    for (i = 0; i < fb->size / sizeof(uint32_t); i++)
         fb_ptr[i] = bg_color;
+    
+    tty_set_cursor_pos(0, 0);
 }
 
 static int tty_open(vnode_t* vnode)
@@ -286,4 +307,14 @@ void tty_get_vnode(vnode_t* out)
 {
     out->ops = &vnode_ops;
     out->data = NULL;
+}
+
+uint32_t tty_width(void)
+{
+    return max_x;
+}
+
+uint32_t tty_height(void)
+{
+    return max_y;
 }

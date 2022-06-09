@@ -164,7 +164,7 @@ static uint64_t pd_unmap_memory
 
         if (!entry.present)
         {
-            vaddr = alignu(++vaddr, PD_ENTRY_SIZE);
+            vaddr += PD_ENTRY_SIZE;
             total_unmapped_size += PD_ENTRY_SIZE;
             ++pd_idx;
             continue;
@@ -218,7 +218,7 @@ static uint64_t pdp_unmap_memory
 
         if (!entry.present)
         {
-            vaddr = alignu(++vaddr, PDP_ENTRY_SIZE);
+            vaddr += PDP_ENTRY_SIZE;
             total_unmapped_size += PDP_ENTRY_SIZE;
             ++pdp_idx;
             continue;
@@ -273,7 +273,7 @@ uint64_t pml4_unmap_memory
 
         if (!entry.present)
         {
-            vaddr = alignu(++vaddr, PML4_ENTRY_SIZE);
+            vaddr += PML4_ENTRY_SIZE;
             total_unmapped_size += PML4_ENTRY_SIZE;
             ++pml4_idx;
             continue;
