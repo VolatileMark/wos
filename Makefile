@@ -28,7 +28,7 @@ EMU_FLAGS_UEFI = -drive file=$(BUILD_DIR)/$(OS_NAME).img,format=raw \
 				 -net none \
 				 -machine q35
 
-EMU_DBG_FLAGS = -s -d guest_errors,cpu_reset,int -no-reboot -no-shutdown
+EMU_DBG_FLAGS = -s -S -d guest_errors,cpu_reset,int -no-reboot -no-shutdown
 
 DBG_FLAGS = -ex "target remote localhost:1234" \
 			-ex "set confirm off" \

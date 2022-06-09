@@ -7,13 +7,6 @@
 #define GDT_NUM_STD_ENTRIES 5
 #define GDT_NUM_ENTRIES (GDT_NUM_STD_ENTRIES + GDT_NUM_TSS_ENTRIES * 2)
 
-struct gdt_descriptor 
-{
-    uint16_t size;
-    uint64_t addr;
-} __attribute__((packed));
-typedef struct gdt_descriptor gdt_descriptor_t;
-
 struct gdt_entry 
 {
     uint16_t limit_lo;
@@ -169,4 +162,9 @@ uint16_t gdt_get_user_ds(void)
 uint16_t gdt_get_tss_ss(void)
 {
     return tss_ss;
+}
+
+gdt_descriptor_t* gdt_get_descriptor(void)
+{
+    return &gdt_descriptor;
 }

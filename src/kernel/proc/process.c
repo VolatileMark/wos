@@ -94,6 +94,7 @@ static int process_create_pml4(process_t* ps)
     if (ps->pml4 == NULL)
         return -1;
     ps->pml4_paddr = paging_get_paddr((uint64_t) ps->pml4);
+    memset(ps->pml4, 0, SIZE_4KB);
     return 0;
 }
 
@@ -239,10 +240,10 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
 
     args_vaddr = alignd(PROC_CEIL_VADDR - total_args_size, SIZE_4KB);
     args_paddr = paging_get_paddr(args_kvaddr);
-    stack_vaddr = args_vaddr - PROC_USER_STACK_SIZE;
+    stack_vaddr = args_vaddr - PROC_USER_STACK_MIN_SIZE;
     if 
     (
-        process_request_memory(ps, PROC_USER_STACK_SIZE, stack_vaddr, PAGE_ACCESS_RW, PL3, &stack_vaddr, &stack_paddr) ||
+        process_request_memory(ps, PROC_USER_STACK_MIN_SIZE, stack_vaddr, PAGE_ACCESS_RW, PL3, &stack_vaddr, &stack_paddr) ||
         paging_get_next_vaddr(args_vaddr, total_args_size, &args_vaddr) < total_args_size ||
         pml4_map_memory(ps->pml4, args_paddr, args_vaddr, total_args_size, PAGE_ACCESS_RO, PL3) < total_args_size
     )
@@ -253,18 +254,18 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
     
     if
     (
-        kernel_get_next_vaddr(PROC_USER_STACK_SIZE, &stack_kvaddr) < PROC_USER_STACK_SIZE ||
-        paging_map_memory(stack_paddr, stack_kvaddr, PROC_USER_STACK_SIZE, PAGE_ACCESS_RW, PL0) < PROC_USER_STACK_SIZE
+        kernel_get_next_vaddr(PROC_USER_STACK_MIN_SIZE, &stack_kvaddr) < PROC_USER_STACK_MIN_SIZE ||
+        paging_map_memory(stack_paddr, stack_kvaddr, PROC_USER_STACK_MIN_SIZE, PAGE_ACCESS_RW, PL0) < PROC_USER_STACK_MIN_SIZE
     )
     {
         free((void*) args_kvaddr);
         return -1;
     }
 
-    memset((void*) stack_kvaddr, 0, PROC_USER_STACK_SIZE);
+    memset((void*) stack_kvaddr, 0, PROC_USER_STACK_MIN_SIZE);
 
     cpyptr = (char*) args_kvaddr;
-    stack_ptr = (const char**) (stack_kvaddr + PROC_USER_STACK_SIZE - sizeof(uint64_t));
+    stack_ptr = (const char**) (stack_kvaddr + PROC_USER_STACK_MIN_SIZE - sizeof(uint64_t));
     
     stack_ptr = &stack_ptr[-envc];
     for (i = 0; envp != NULL && i < envc; i++)
@@ -286,14 +287,37 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
         cpyptr += cpysize;
     }
 
-    paging_unmap_memory(stack_kvaddr, PROC_USER_STACK_SIZE);
+    paging_unmap_memory(stack_kvaddr, PROC_USER_STACK_MIN_SIZE);
 
     ps->user_stack_vaddr = stack_vaddr;
-    ps->cpu.regs.rbp = ps->user_stack_vaddr + PROC_USER_STACK_SIZE - sizeof(uint64_t);
+    ps->user_stack_size = PROC_USER_STACK_MIN_SIZE;
+    ps->cpu.regs.rbp = ps->user_stack_vaddr + ps->user_stack_size - sizeof(uint64_t);
     ps->cpu.regs.rdi = argc;
     ps->cpu.regs.rdx = (uint64_t) &((const char**) ps->cpu.regs.rbp)[-envc];
     ps->cpu.regs.rsi = (uint64_t) &((const char**) ps->cpu.regs.rdx)[-(argc + 1)];
     ps->cpu.stack.rsp = ps->cpu.regs.rsi - sizeof(uint64_t);
+
+    return 0;
+}
+
+int process_grow_user_stack(process_t* ps, uint64_t size)
+{
+    uint64_t hint, vaddr;
+
+    size = alignu(size, SIZE_4KB);
+    hint = ps->user_stack_vaddr - size;
+    if 
+    (
+        process_request_memory(ps, size, hint, PAGE_ACCESS_RW, PL3, &vaddr, NULL) ||
+        vaddr != hint
+    )
+    {
+        trace_process("Could not allocate memory for stack expansion (pid: %u)", ps->pid);
+        return -1;
+    }
+
+    ps->user_stack_vaddr = hint;
+    ps->user_stack_size += size;
 
     return 0;
 }
@@ -439,6 +463,7 @@ process_t* process_clone(process_t* parent, uint64_t pid)
     child->brk_vaddr = parent->brk_vaddr;
     child->kernel_stack_vaddr = parent->kernel_stack_vaddr;
     child->user_stack_vaddr = parent->user_stack_vaddr;
+    child->user_stack_size = parent->user_stack_size;
 
     total_args_size = 0;
     for (argc = 0; parent->argv[argc] != NULL; argc++)

@@ -206,7 +206,7 @@ void pic_toggle_irq(uint8_t index)
 
 void pic_acknowledge(uint8_t interrupt_number)
 {
-    if (interrupt_number < IRQ(0) || interrupt_number >= IRQ(IRQ_COUNT))
+    if (interrupt_number >= IRQ(IRQ_COUNT))
         return;
     if (interrupt_number >= IRQ(IRQ_COUNT / 2))
         port_out(PIC2_COMM, PIC_EOI);
