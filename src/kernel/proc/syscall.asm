@@ -79,7 +79,9 @@ syscall_hook:
     push rbp
     mov rbx, rsp
     ; Load the kernel stack
-    call tss_get
+    push rdx
+    call tss_get ; STOP FUCKING WITH RDX WHEN YOU'RE NOT SUPPOSED TO PIECE OF SHIT FUNCTION
+    pop rdx
     mov rbp, [rax + 4]
     mov rsp, rbp
     ; Store syscall arguments on the stack

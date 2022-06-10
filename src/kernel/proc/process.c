@@ -266,24 +266,24 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
 
     cpyptr = (char*) args_kvaddr;
     stack_ptr = (const char**) (stack_kvaddr + PROC_USER_STACK_MIN_SIZE - sizeof(uint64_t));
-    
-    stack_ptr = &stack_ptr[-envc];
-    for (i = 0; envp != NULL && i < envc; i++)
-    {
-        cpysize = strlen(envp[i]) + 1;
-        memcpy(cpyptr, envp[i], cpysize);
-        stack_ptr[i] = (const char*) ((cpyptr - args_kvaddr) + args_vaddr);
-        args_ptr[(argc + 1) + i] = (const char*) cpyptr;
-        cpyptr += cpysize;
-    }
 
-    stack_ptr = &stack_ptr[-(argc + 1)];
+    stack_ptr = &stack_ptr[-(envc + argc + 1)];
     for (i = 0; argv != NULL && i < argc; i++)
     {
         cpysize = strlen(argv[i]) + 1;
         memcpy(cpyptr, argv[i], cpysize);
         stack_ptr[i] = (const char*) ((cpyptr - args_kvaddr) + args_vaddr);
         args_ptr[i] = (const char*) cpyptr;
+        cpyptr += cpysize;
+    }
+
+    stack_ptr = &stack_ptr[argc + 1];
+    for (i = 0; envp != NULL && i < envc; i++)
+    {
+        cpysize = strlen(envp[i]) + 1;
+        memcpy(cpyptr, envp[i], cpysize);
+        stack_ptr[i] = (const char*) ((cpyptr - args_kvaddr) + args_vaddr);
+        args_ptr[(argc + 1) + i] = (const char*) cpyptr;
         cpyptr += cpysize;
     }
 
@@ -472,7 +472,7 @@ process_t* process_clone(process_t* parent, uint64_t pid)
         total_args_size += strlen(parent->envp[envc]) + 1;
 
     args_vaddr = (uint64_t) aligned_alloc(SIZE_4KB, total_args_size);
-    memcpy((void*) args_vaddr, parent->envp[0], total_args_size);
+    memcpy((void*) args_vaddr, parent->argv[0], total_args_size);
 
     args_count = (argc + envc + 2);
     child->argv = calloc(1, args_count * sizeof(const char*));
@@ -485,14 +485,14 @@ process_t* process_clone(process_t* parent, uint64_t pid)
     child->envp = &child->argv[argc + 1];
     
     argptr = (const char*) args_vaddr;
-    for (i = 0; i < envc; i++)
-    {
-        child->envp[i] = argptr;
-        argptr += strlen(argptr) + 1;
-    }
     for (i = 0; i < argc; i++)
     {
         child->argv[i] = argptr;
+        argptr += strlen(argptr) + 1;
+    }
+    for (i = 0; i < envc; i++)
+    {
+        child->envp[i] = argptr;
         argptr += strlen(argptr) + 1;
     }
 

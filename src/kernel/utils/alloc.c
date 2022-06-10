@@ -1,15 +1,24 @@
 #include "alloc.h"
 #include "../sys/mem/heap.h"
 #include <mem.h>
+#include <stddef.h>
 
 void* malloc(uint64_t size)
 {
-    return ((void*) (heap_allocate_memory(size) + 1));
+    heap_segment_header_t* seg;
+    seg = heap_allocate_memory(size);
+    if (seg == NULL)
+        return NULL;
+    return ((void*) (seg + 1));
 }
 
 void* aligned_alloc(uint64_t align, uint64_t size)
 {
-    return ((void*) (heap_allocate_aligned_memory(align, size) + 1));
+    heap_segment_header_t* seg;
+    seg = heap_allocate_aligned_memory(align, size);
+    if (seg == NULL)
+        return NULL;
+    return ((void*) (seg + 1));
 }
 
 void* calloc(uint64_t n, uint64_t size)
@@ -17,6 +26,8 @@ void* calloc(uint64_t n, uint64_t size)
     void* ptr;
     size = n * size;
     ptr = malloc(size);
+    if (ptr == NULL)
+        return NULL;
     memset(ptr, 0, size);
     return ptr;
 }
