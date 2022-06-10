@@ -9,6 +9,7 @@
     : "=m" (var) \
     )
 
+__attribute__((noreturn))
 void panic(const interrupt_frame_t* frame, const char* msg, ...);
 
 #endif

@@ -74,7 +74,7 @@ void pfa_free_page(uint64_t page_addr)
         used_memory -= SIZE_4KB;
     }
     if (last_page_index > index)
-        last_page_index = index;
+            last_page_index = index;
 }
 
 void pfa_lock_pages(uint64_t page_addr, uint64_t num)

@@ -85,9 +85,9 @@ static int kernel_init(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
 
     if 
     (
-        scheduler_init() || 
+        scheduler_init() ||
         acpi_init() || 
-        pci_init() || 
+        pci_init() ||
         ahci_init()
     )
         return -1;
@@ -103,6 +103,7 @@ void kernel_main(uint64_t multiboot_struct_addr, bitmap_t* current_bitmap)
             error("Could not initialize kernel");
         return;
     }
+
     const char* argv[] = {
         "test_var",
         "another_test_var",

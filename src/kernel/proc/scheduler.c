@@ -30,7 +30,7 @@ static process_list_t zombie;
 static process_list_t running;
 static uint64_t ms;
 
-extern void scheduler_switch_pml4_and_stack(uint64_t pml4_paddr, uint64_t rsp);
+extern process_t* scheduler_switch_pml4_and_stack(process_t* ps, uint64_t rsp);
 extern void scheduler_run_process(cpu_state_t* cpu);
 
 static uint64_t scheduler_get_max_pid_in_process_list(process_list_t* pss)
@@ -239,6 +239,6 @@ void scheduler_run(void)
 
     tss_set_kernel_stack(ps->kernel_stack_vaddr + PROC_KERNEL_STACK_SIZE - sizeof(uint64_t));
     paging_inject_kernel_pml4(ps->pml4);
-    scheduler_switch_pml4_and_stack(ps->pml4_paddr, tss_get()->rsp0);
+    ps = scheduler_switch_pml4_and_stack(ps, tss_get()->rsp0);
     scheduler_run_process(&ps->cpu);
 }

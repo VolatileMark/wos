@@ -6,14 +6,12 @@
 [global scheduler_switch_pml4_and_stack]
 scheduler_switch_pml4_and_stack:
     pop rcx
-    pop rdx
-    pop rdx
     mov rsp, rsi
     mov rbp, rsp
-    mov cr3, rdi
-    push rdx
-    push 0
+    mov rdx, [rdi+8*2]
+    mov cr3, rdx
     push rcx
+    mov rax, rdi
     ret
 
 [global scheduler_run_process]

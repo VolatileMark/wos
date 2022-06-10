@@ -1,5 +1,6 @@
 #include "panic.h"
 #include "tty.h"
+#include "macros.h"
 #include "../sys/cpu/gdt.h"
 #include "../sys/cpu/idt.h"
 #include <string.h>
@@ -60,6 +61,7 @@ static void panic_title(char filler, const char* title)
         tty_putc(filler);
 }
 
+__attribute__((noreturn))
 void panic(const interrupt_frame_t* frame, const char* msg, ...) 
 {
     va_list ap;
@@ -69,7 +71,7 @@ void panic(const interrupt_frame_t* frame, const char* msg, ...)
     uint64_t cr0, cr2, cr3, cr4;
 
     if (!tty_is_initialized())
-        goto HALT;
+        goto END;
 
     tty_set_background_color(0, 0, 255);
     tty_set_foreground_color(255, 255, 0);
@@ -88,7 +90,7 @@ void panic(const interrupt_frame_t* frame, const char* msg, ...)
     tty_puts("\n\n");
 
     if (frame == NULL)
-        goto HALT;
+        goto END;
 
     panic_title('-', "  CRASH DUMP  ");
     tty_putc('\n');
@@ -191,6 +193,6 @@ void panic(const interrupt_frame_t* frame, const char* msg, ...)
         cr0, cr2, cr3, cr4
     );
 
-HALT:
-    while (1);
+END:
+    HALT();
 }
