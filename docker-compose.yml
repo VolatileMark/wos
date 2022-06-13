@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  workspace:
+    container_name: "osdev"
+    build: .
+    network_mode: "host"
+    environment:
+      - "DISPLAY=:0"
+    volumes:
+      - ./:/workspace
+    stdin_open: true
+    tty: true
+    user: user
+    hostname: osdev
+    working_dir: /workspace
+    entrypoint: /bin/zsh
