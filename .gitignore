@@ -13,7 +13,9 @@ doxygen/
 src/test/
 compile_commands.json
 
+tools/tmp
 tools/x86_64-elf-cross
 tools/x86_64-grub2
 tools/x86_64-qemu
 tools/ovmf-bins
+tools/gcc-11/usr

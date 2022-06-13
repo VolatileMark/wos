@@ -2,9 +2,10 @@
 
 FTP_URL="https://download.qemu.org/"
 
-QEMU_VERSION="6.2.0"
+CORES=${CORES:-$(nproc)}
+QEMU_VERSION="7.0.0"
 
-WORKDIR="/tmp/osworkdir"
+WORKDIR=$(realpath "./tmp")
 BUILD_DIR="build-qemu"
 
 TARGET="x86_64"
@@ -18,12 +19,12 @@ mkdir -p "$PREFIX"
 
 echo "Downloading qemu-$QEMU_VERSION..."
 curl -O "$FTP_URL/qemu-$QEMU_VERSION.tar.xz"
-tar xvJf "qemu-$QEMU_VERSION.tar.xz"
+tar -xJf "qemu-$QEMU_VERSION.tar.xz"
 
 echo "Building qemu-$QEMU_VERSION..."
 mkdir -p "$BUILD_DIR" && cd "$BUILD_DIR"
 sh -c "../qemu-$QEMU_VERSION/configure --target-list=\"$TARGET-softmmu\" --prefix=\"$PREFIX\""
-make -j$(nproc)
+make -j$CORES
 make install
 
 rm -rf "$WORKDIR"
