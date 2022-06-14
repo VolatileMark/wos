@@ -26,11 +26,7 @@ void process_delete_resources(process_t* ps)
     if (ps->pml4 != NULL)
         pml4_delete(ps->pml4, ps->pml4_paddr);
     if (ps->argv != NULL)
-    {
-        if (ps->argv[0] != NULL)
-            free((void*) ps->argv[0]);
         free(ps->argv);
-    }
 }
 
 void process_delete_and_free(process_t* ps)
@@ -214,9 +210,10 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
     int argc, envc, i;
     uint64_t total_args_size, cpysize;
     uint64_t args_kvaddr, stack_kvaddr;
-    uint64_t args_vaddr, args_paddr, stack_vaddr, stack_paddr;
+    uint64_t args_vaddr, stack_vaddr;
+    uint64_t args_paddr, stack_paddr;
+    uint64_t args_pages;
     const char** stack_ptr;
-    const char** args_ptr;
     char* cpyptr;
 
     total_args_size = 0;
@@ -225,21 +222,24 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
     for (envc = 0; envp != NULL && envp[envc] != NULL; envc++)
         total_args_size += strlen(envp[envc]) + 1;
     
-    args_ptr = calloc(1, (argc + envc + 2) * sizeof(const char*));
-    if (args_ptr == NULL)
+    ps->argv = calloc(1, (argc + envc + 2) * sizeof(const char*));
+    if (ps->argv == NULL)
         return -1;
-    ps->argv = args_ptr;
-    ps->envp = args_ptr + (argc + 1);
+    ps->envp = &ps->argv[argc + 1];
     
-    args_kvaddr = (uint64_t) aligned_alloc(SIZE_4KB, alignu(total_args_size, SIZE_4KB));
-    if (args_kvaddr == 0)
+    args_pages = ceil((double) total_args_size / SIZE_4KB);
+    args_paddr = pfa_request_pages(args_pages);
+    if 
+    (
+        kernel_get_next_vaddr(total_args_size, &args_kvaddr) < total_args_size ||
+        paging_map_memory(args_paddr, args_kvaddr, total_args_size, PAGE_ACCESS_RW, PL0) < total_args_size
+    )
     {
-        free((void*) args_kvaddr);
+        pfa_free_pages(args_paddr, args_pages);
         return -1;
     }
-
     args_vaddr = alignd(PROC_CEIL_VADDR - total_args_size, SIZE_4KB);
-    args_paddr = paging_get_paddr(args_kvaddr);
+
     stack_vaddr = args_vaddr - PROC_USER_STACK_MIN_SIZE;
     if 
     (
@@ -248,7 +248,8 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
         pml4_map_memory(ps->pml4, args_paddr, args_vaddr, total_args_size, PAGE_ACCESS_RO, PL3) < total_args_size
     )
     {
-        free((void*) args_kvaddr);
+        paging_unmap_memory(args_kvaddr, total_args_size);
+        pfa_free_pages(args_paddr, args_pages);
         return -1;
     }
     
@@ -258,7 +259,8 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
         paging_map_memory(stack_paddr, stack_kvaddr, PROC_USER_STACK_MIN_SIZE, PAGE_ACCESS_RW, PL0) < PROC_USER_STACK_MIN_SIZE
     )
     {
-        free((void*) args_kvaddr);
+        paging_unmap_memory(args_kvaddr, total_args_size);
+        pfa_free_pages(args_paddr, args_pages);
         return -1;
     }
 
@@ -273,7 +275,7 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
         cpysize = strlen(argv[i]) + 1;
         memcpy(cpyptr, argv[i], cpysize);
         stack_ptr[i] = (const char*) ((cpyptr - args_kvaddr) + args_vaddr);
-        args_ptr[i] = (const char*) cpyptr;
+        ps->argv[i] = stack_ptr[i];
         cpyptr += cpysize;
     }
 
@@ -283,11 +285,12 @@ static int process_build_user_stack(process_t* ps, const char** argv, const char
         cpysize = strlen(envp[i]) + 1;
         memcpy(cpyptr, envp[i], cpysize);
         stack_ptr[i] = (const char*) ((cpyptr - args_kvaddr) + args_vaddr);
-        args_ptr[(argc + 1) + i] = (const char*) cpyptr;
+        ps->envp[i] = stack_ptr[i];
         cpyptr += cpysize;
     }
 
     paging_unmap_memory(stack_kvaddr, PROC_USER_STACK_MIN_SIZE);
+    paging_unmap_memory(args_kvaddr, total_args_size);
 
     ps->user_stack_vaddr = stack_vaddr;
     ps->user_stack_size = PROC_USER_STACK_MIN_SIZE;
@@ -446,9 +449,7 @@ static int process_copy_memory_mappings(process_t* child, process_t* parent)
 process_t* process_clone(process_t* parent, uint64_t pid)
 {
     process_t* child;
-    uint64_t argc, envc, args_vaddr, args_count;
-    uint64_t total_args_size, i;
-    const char* argptr;
+    uint64_t argc, envc, args_size;
 
     child = calloc(1, sizeof(process_t));
     if (child == NULL)
@@ -465,35 +466,18 @@ process_t* process_clone(process_t* parent, uint64_t pid)
     child->user_stack_vaddr = parent->user_stack_vaddr;
     child->user_stack_size = parent->user_stack_size;
 
-    total_args_size = 0;
-    for (argc = 0; parent->argv[argc] != NULL; argc++)
-        total_args_size += strlen(parent->argv[argc]) + 1;
-    for (envc = 0; parent->envp[envc] != NULL; envc++)
-        total_args_size += strlen(parent->envp[envc]) + 1;
+    for (envc = 0; parent->envp[envc] != NULL; envc++);
+    argc = (((uint64_t) parent->envp) - ((uint64_t) parent->argv)) / sizeof(const char*);
+    args_size = (argc + envc + 2) * sizeof(const char*);
+    child->argv = calloc(1, args_size);
+    child->envp = &child->argv[argc + 1];
+    memcpy(child->argv, parent->argv, args_size);
 
-    args_vaddr = (uint64_t) aligned_alloc(SIZE_4KB, total_args_size);
-    memcpy((void*) args_vaddr, parent->argv[0], total_args_size);
-
-    args_count = (argc + envc + 2);
-    child->argv = calloc(1, args_count * sizeof(const char*));
     if (child->argv == NULL)
     {
         trace_process("Failed to copy argv and envp from parent process (pid: %u)", pid);
         process_delete_and_free(child);
         return NULL;
-    }
-    child->envp = &child->argv[argc + 1];
-    
-    argptr = (const char*) args_vaddr;
-    for (i = 0; i < argc; i++)
-    {
-        child->argv[i] = argptr;
-        argptr += strlen(argptr) + 1;
-    }
-    for (i = 0; i < envc; i++)
-    {
-        child->envp[i] = argptr;
-        argptr += strlen(argptr) + 1;
     }
 
     if (process_create_pml4(child))

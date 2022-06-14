@@ -2,6 +2,7 @@
 #include "pfa.h"
 #include "paging.h"
 #include "../../utils/log.h"
+#include "../../utils/panic.h"
 #include <stddef.h>
 #include <math.h>
 #include <mem.h>
@@ -80,10 +81,26 @@ static uint64_t heap_expand(uint64_t size)
 static heap_segment_header_t* heap_next_free_segment(uint64_t size)
 {
     heap_segment_header_t* current;
-    
+    uint64_t heap_size;
+
     current = kernel_heap.head;
+    heap_size = kernel_heap.end_vaddr - kernel_heap.start_vaddr;
     while (current != NULL)
     {
+        if 
+        (
+            (current->next != NULL && (((uint64_t) current->next) < kernel_heap.start_vaddr || ((uint64_t) current->next) > kernel_heap.end_vaddr)) ||
+            (current->prev != NULL && (((uint64_t) current->prev) < kernel_heap.start_vaddr || ((uint64_t) current->prev) > kernel_heap.end_vaddr)) ||
+            (current->size > heap_size || current->size < MIN_ALLOC_SIZE)
+        )
+            panic
+            (
+                NULL, 
+                "Kernel heap corruption detected.\n\t\t  Corrupted header: %p"
+                "\n\t\t\t->next = %p\n\t\t\t->prev = %p\n\t\t\t->size = %u\n\t\t\t->free = %u",
+                current, current->next, current->prev, current->size, current->free
+            );
+        
         if (current->free && current->size >= size)
             return current;
         current = current->next;
