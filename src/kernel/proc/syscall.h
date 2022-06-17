@@ -11,7 +11,7 @@
 #define DEFSYSCALL(name) int SYSCALL(name)(uint64_t* stack)
 
 #define get_arg(n, T) (*((T*) (stack - n)))
-#define set_arg(n, v) *(stack - n) = (uint64_t) (v)
+#define set_arg(n, v) stack[-n] = (uint64_t) (v)
 
 typedef int (*syscall_t)(uint64_t* stack_ptr);
 

@@ -43,30 +43,28 @@ syscall_init:
     mov rdx, syscall_hook
     shr rdx, 32
     mov rax, syscall_hook
-    mov rcx, 0xC0000082 ; LSTAR register selector
+    mov ecx, 0xC0000082 ; LSTAR register selector
     wrmsr
     
-    mov rcx, 0xC0000080 ; EFER register selector
+    mov ecx, 0xC0000080 ; EFER register selector
     rdmsr
     or eax, 1 << 0 ; Enable SYSCALL and SYSRET
     wrmsr
 
-    mov rcx, 0xC0000081 ; STAR register selector
-    rdmsr
     ; Set the correct segment selectors
-    mov edx, 0x00000000
     call gdt_get_kernel_ds
     or ax, 0x03
-    mov dx, ax
-    shl edx, 16
-    call gdt_get_kernel_cs
-    mov dx, ax
+    mov cx, ax
+    shl ecx, 16
+    call gdt_get_kernel_cs ; Hello my friend would you happen to know another function that fucks with RDX WHEN IT SHOULDN'T?
+    mov cx, ax
+    mov eax, 0
+    mov edx, ecx
+    mov ecx, 0xC0000081 ; STAR register selector
     wrmsr
 
-    mov rcx, 0xC0000084 ; SFMASK register selector
-    rdmsr
-    mov eax, 0x00000000
-    or eax, 1 << 9 ; Set SFMASK to disable interrupts on SYSCALL
+    mov ecx, 0xC0000084 ; SFMASK register selector
+    mov eax, 1 << 9 ; Set SFMASK to disable interrupts on SYSCALL
     wrmsr
 
     ret
@@ -75,18 +73,17 @@ syscall_hook:
     ; Save return address and FLAGS
     push rcx
     push r11
+    mov rcx, rdx
     ; Save user RBP to the user stack and the user RSP to RBX
     push rbp
     mov rbx, rsp
     ; Load the kernel stack
-    push rdx
     call tss_get ; STOP FUCKING WITH RDX WHEN YOU'RE NOT SUPPOSED TO PIECE OF SHIT FUNCTION
-    pop rdx
     mov rbp, [rax + 4]
     mov rsp, rbp
     ; Store syscall arguments on the stack
     mov [rsp], rsi
-    push rdx
+    push rcx
     push r10
     push r8
     push r9

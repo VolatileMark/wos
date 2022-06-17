@@ -2,10 +2,11 @@
 
 FTP_URL="https://ftp.gnu.org/gnu"
 
-GCC_VERSION="11.1.0"
-BINUTILS_VERSION="2.36.1"
+CORES=${CORES:-$(nproc)}
+GCC_VERSION="12.1.0"
+BINUTILS_VERSION="2.38"
 
-WORKDIR="/tmp/osworkdir"
+WORKDIR=$(realpath "./tmp")
 BUILD_DIR="build"
 
 TARGET="x86_64-elf"
@@ -32,7 +33,7 @@ tar -xf "binutils-$BINUTILS_VERSION.tar.gz"
 echo "Building binutils-$BINUTILS_VERSION..."
 mkdir -p "$BUILD_DIR-binutils" && cd "$BUILD_DIR-binutils"
 sh -c "../binutils-$BINUTILS_VERSION/configure --target=$TARGET --enable-interwork --enable-multilib --with-sysroot --disable-nls --disable-werror --prefix=\"$PREFIX\""
-make -j$(nproc)
+make -j$CORES
 make install
 cd ..
 
@@ -42,10 +43,11 @@ curl -O "$FTP_URL/gcc/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.gz"
 echo "Uncompressing gcc-$GCC_VERSION..."
 tar -xf "gcc-$GCC_VERSION.tar.gz"
 echo "Building gcc-$GCC_VERSION..."
+sh -c "cd ./gcc-$GCC_VERSION && ./contrib/download_prerequisites"
 mkdir -p "$BUILD_DIR-gcc" && cd "$BUILD_DIR-gcc"
 sh -c "../gcc-$GCC_VERSION/configure --target=$TARGET --prefix=\"$PREFIX\" --disable-nls --disable-libssp --enable-languages=c,c++ --without-headers"
-make all-gcc -j$(nproc)
-make all-target-libgcc -j$(nproc)
+make all-gcc -j$CORES
+make all-target-libgcc -j$CORES
 make install-gcc
 make install-target-libgcc
 

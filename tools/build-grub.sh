@@ -2,15 +2,21 @@
 
 FTP_URL="https://ftp.gnu.org/gnu"
 
+CORES=${CORES:-$(nproc)}
 GRUB_VERSION="2.06"
 
-WORKDIR="/tmp/osworkdir"
+WORKDIR=$(realpath "./tmp")
 BUILD_DIR="build-grub"
 
 TARGET="x86_64"
 PREFIX_BASE=$(realpath "./$TARGET-grub2")
 PREFIX_EFI="$PREFIX_BASE/efi"
 PREFIX_PC="$PREFIX_BASE/pc"
+
+if [ -d "./gcc11/" ]; then
+    export PATH="$(realpath ./gcc11/bin/):$PATH"
+    export LD_LIBRARY_PATH="$(realpath ./gcc11/lib64):$(realpath ./gcc11/lib):$(realpath ./gcc11/libexec):$LD_LIBRARY_PATH"
+fi
 
 echo "Creating working directory..."
 mkdir -p "$WORKDIR" && cd "$WORKDIR"
@@ -26,19 +32,19 @@ tar -xf "grub-$GRUB_VERSION.tar.gz"
 echo "Building grub-$GRUB_VERSION-efi..."
 mkdir -p "$BUILD_DIR-efi" && cd "$BUILD_DIR-efi"
 sh -c "../grub-$GRUB_VERSION/configure --prefix=\"$PREFIX_EFI\" --target=$TARGET --with-platform=efi"
-make -j$(nproc)
+make -j$CORES
 make install
 cd "$PREFIX_EFI"
-sh -c "bin/grub-mkfont -o share/grub/unicode.pf2 /usr/share/fonts/truetype/unifont/unifont.ttf"
+sh -c "bin/grub-mkfont -o share/grub/unicode.pf2 /usr/share/fonts/unifont/unifont.ttf"
 
 cd "$WORKDIR"
 echo "Building grub-$GRUB_VERSION-pc..."
 mkdir -p "$BUILD_DIR-pc" && cd "$BUILD_DIR-pc"
 sh -c "../grub-$GRUB_VERSION/configure --prefix=\"$PREFIX_PC\" --target=$TARGET --with-platform=pc"
-make -j$(nproc)
+make -j$CORES
 make install
 cd "$PREFIX_PC"
-sh -c "bin/grub-mkfont -o share/grub/unicode.pf2 /usr/share/fonts/truetype/unifont/unifont.ttf"
+sh -c "bin/grub-mkfont -o share/grub/unicode.pf2 /usr/share/fonts/unifont/unifont.ttf"
 
 rm -rf "$WORKDIR"
 
