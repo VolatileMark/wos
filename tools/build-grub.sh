@@ -13,9 +13,9 @@ PREFIX_BASE=$(realpath "./$TARGET-grub2")
 PREFIX_EFI="$PREFIX_BASE/efi"
 PREFIX_PC="$PREFIX_BASE/pc"
 
-if [ -d "./gcc11/" ]; then
-    export PATH="$(realpath ./gcc11/bin/):$PATH"
-    export LD_LIBRARY_PATH="$(realpath ./gcc11/lib64):$(realpath ./gcc11/lib):$(realpath ./gcc11/libexec):$LD_LIBRARY_PATH"
+if [ -d "./grub-gcc/" ]; then
+    export PATH="$(realpath ./grub-gcc/bin/):$PATH"
+    export LD_LIBRARY_PATH="$(realpath ./grub-gcc/lib):$(realpath ./grub-gcc/libexec):$LD_LIBRARY_PATH"
 fi
 
 echo "Creating working directory..."
