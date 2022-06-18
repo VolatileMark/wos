@@ -16,6 +16,8 @@ PREFIX_PC="$PREFIX_BASE/pc"
 if [ -d "./grub-gcc/" ]; then
     export PATH="$(realpath ./grub-gcc/bin/):$PATH"
     export LD_LIBRARY_PATH="$(realpath ./grub-gcc/lib):$(realpath ./grub-gcc/libexec):$LD_LIBRARY_PATH"
+else
+    CONFIGURE_FLAGS="--disable-werror"
 fi
 
 echo "Creating working directory..."
@@ -31,7 +33,7 @@ tar -xf "grub-$GRUB_VERSION.tar.gz"
 
 echo "Building grub-$GRUB_VERSION-efi..."
 mkdir -p "$BUILD_DIR-efi" && cd "$BUILD_DIR-efi"
-sh -c "../grub-$GRUB_VERSION/configure --prefix=\"$PREFIX_EFI\" --target=$TARGET --with-platform=efi"
+sh -c "../grub-$GRUB_VERSION/configure $CONFIGURE_FLAGS --prefix=\"$PREFIX_EFI\" --target=$TARGET --with-platform=efi"
 make -j$CORES
 make install
 cd "$PREFIX_EFI"
@@ -40,7 +42,7 @@ sh -c "bin/grub-mkfont -o share/grub/unicode.pf2 /usr/share/fonts/unifont/unifon
 cd "$WORKDIR"
 echo "Building grub-$GRUB_VERSION-pc..."
 mkdir -p "$BUILD_DIR-pc" && cd "$BUILD_DIR-pc"
-sh -c "../grub-$GRUB_VERSION/configure --prefix=\"$PREFIX_PC\" --target=$TARGET --with-platform=pc"
+sh -c "../grub-$GRUB_VERSION/configure $CONFIGURE_FLAGS --prefix=\"$PREFIX_PC\" --target=$TARGET --with-platform=pc"
 make -j$CORES
 make install
 cd "$PREFIX_PC"

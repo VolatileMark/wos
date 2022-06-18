@@ -9,7 +9,7 @@
 static const char symbol[] = {
     'C', '-', 'P', '-',
     'A', '-', 'Z', 'S',
-    'T', 'I', 'D', 'O'
+    '-', 'I', '-', 'O'
 };
 
 static uint16_t panic_bit_index(uint16_t num, uint16_t mask)
@@ -28,13 +28,13 @@ static void panic_print_flags(uint16_t flags)
         /* Ignore reserved flags */
         if 
         (
-            mask == 0x0002 || 
-            mask == 0x0008 || 
-            mask == 0x0020
+            mask == 0x0002 || mask == 0x0008 || 
+            mask == 0x0020 || mask == 0x0100 ||
+            mask == 0x0400
         )
             continue;
         i = panic_bit_index(flags, mask);
-        tty_putc((i < 16) ? symbol[i] : '-');
+        tty_putc((i < 12) ? symbol[i] : '-');
     }
     tty_putc(']');
 }
@@ -152,12 +152,12 @@ void panic(const interrupt_frame_t* frame, const char* msg, ...)
 
     tty_printf
     (
-        "RIP=%p RFL=%p ", 
+        "RIP=%p RFL=%08X ", 
         frame->stack_state.rip, 
         frame->stack_state.rflags
     );
     panic_print_flags((uint16_t) frame->stack_state.rflags);
-    tty_printf(" CPL=%x II=\n", cpl);
+    tty_printf(" CPL=%x\n", cpl);
 
     tty_printf
     (

@@ -91,14 +91,18 @@ static heap_segment_header_t* heap_next_free_segment(uint64_t size)
         (
             (current->next != NULL && (((uint64_t) current->next) < kernel_heap.start_vaddr || ((uint64_t) current->next) > kernel_heap.end_vaddr)) ||
             (current->prev != NULL && (((uint64_t) current->prev) < kernel_heap.start_vaddr || ((uint64_t) current->prev) > kernel_heap.end_vaddr)) ||
-            (current->size > heap_size || current->size < MIN_ALLOC_SIZE)
+            (current->size > heap_size || (current->size < MIN_ALLOC_SIZE && !current->free))
         )
             panic
             (
                 NULL, 
-                "Kernel heap corruption detected.\n\t\t  Corrupted header: %p"
-                "\n\t\t\t->next = %p\n\t\t\t->prev = %p\n\t\t\t->size = %u\n\t\t\t->free = %u",
-                current, current->next, current->prev, current->size, current->free
+                "Kernel heap corruption detected."
+                "\n\t\t  Corrupted header @ %p:"
+                "\n\t\t\t->next = %p\n\t\t\t->prev = %p\n\t\t\t->size = %u\n\t\t\t->free = %u"
+                "\n\t\t  Heap information:"
+                "\n\t\t\t->head = %p\n\t\t\t->tail = %p\n\t\t\t->start = %p\n\t\t\t->end = %p\n\t\t\t->ceil = %p",
+                current, current->next, current->prev, current->size, current->free,
+                kernel_heap.head, kernel_heap.tail, kernel_heap.start_vaddr, kernel_heap.end_vaddr, kernel_heap.ceil_vaddr
             );
         
         if (current->free && current->size >= size)
