@@ -1,6 +1,8 @@
 #include "framebuffer.h"
 #include "../../mem/paging.h"
+#include "../../mem/pfa.h"
 #include "../../../utils/multiboot2-utils.h"
+#include <math.h>
 
 #define FRAMEBUFFER_DIRECT_COLOR 1
 
@@ -31,6 +33,7 @@ int framebuffer_init(void)
     framebuffer_info.pitch = framebuffer_tag->common.framebuffer_pitch;
     framebuffer_info.bytes_per_pixel = framebuffer_tag->common.framebuffer_bpp / 8;
     framebuffer_info.size = framebuffer_info.pitch * framebuffer_info.height;
+    pfa_lock_pages(framebuffer_tag->common.framebuffer_addr, ceil((double) framebuffer_info.size / SIZE_4KB));
 
     if (kernel_get_next_vaddr(framebuffer_info.size, &framebuffer_info.addr) < framebuffer_info.size)
         return -1;

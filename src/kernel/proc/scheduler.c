@@ -230,6 +230,7 @@ void scheduler_run(void)
 {
     process_t* ps;
 
+START_SCHEDULING:
     ps = scheduler_fetch_next_running_process();
     if (ps == NULL)
     {
@@ -237,8 +238,12 @@ void scheduler_run(void)
         HALT();
     }
 
-    tss_set_kernel_stack(ps->kernel_stack_vaddr + PROC_KERNEL_STACK_SIZE - sizeof(uint64_t));
-    paging_inject_kernel_pml4(ps->pml4);
+    if (paging_inject_kernel_pml4(ps->pml4))
+    {
+        trace_scheduler("Failed to inject kernel PML4 (pid %u). Continuing...", ps->pid);
+        goto START_SCHEDULING;
+    }
+    tss_set_kernel_stack(ps->kernel_stack.floor - sizeof(uint64_t));
     ps = scheduler_switch_pml4_and_stack(ps, tss_get()->rsp0);
     scheduler_run_process(&ps->cpu);
 }
