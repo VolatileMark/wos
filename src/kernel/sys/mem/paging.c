@@ -3,8 +3,6 @@
 #include "../../proc/scheduler.h"
 #include <mem.h>
 
-#define KERNEL_PML4_VADDR VADDR_GET_TEMPORARY(0)
-
 static page_table_t kernel_pml4;
 static page_table_t kernel_tmp_pt;
 static uint64_t kernel_tmp_index;

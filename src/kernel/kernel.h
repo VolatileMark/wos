@@ -28,6 +28,7 @@
 #define KERNEL_STACK_SIZE 32768
 #define KERNEL_HEAP_START_ADDR VADDR_GET(511, 0, 0, 0)
 #define KERNEL_HEAP_CEIL_ADDR VADDR_GET(511, 509, 511, 511)
+#define KERNEL_PML4_VADDR VADDR_GET_TEMPORARY(0)
 
 extern uint64_t _start_addr;
 extern uint64_t _end_addr;

@@ -63,6 +63,7 @@ extern void tlb_flush(void);
 extern void pte_invalidate(uint64_t vaddr);
 
 uint64_t kernel_get_pml4_paddr(void);
+
 page_table_t paging_get_current_pml4(void);
 extern uint64_t paging_get_current_pml4_paddr(void);
 

@@ -1,8 +1,5 @@
 #include "../handlers.h"
-#include "../gdt.h"
-#include "../../../proc/scheduler.h"
-#include "../../../utils/log.h"
-#include <stddef.h>
+#include "../../../kernel.h"
 
 #define trace_pf(msg, ...) trace("PGFT", msg, ##__VA_ARGS__)
 
@@ -14,9 +11,13 @@ void handler_pf(const interrupt_frame_t* int_frame)
     READ_REGISTER("cr2", fault_address);
 
     ps = scheduler_get_current_process();
-    if (ps == NULL)
+    if 
+    (
+        ps == NULL || 
+        fault_address > KERNEL_PML4_VADDR
+    )
         panic(int_frame, "Page fault occurred in kernel context. Fault address %p", fault_address);
-    
+
     if 
     (
         fault_address < ps->user_stack.ceil &&
@@ -45,4 +46,6 @@ void handler_pf(const interrupt_frame_t* int_frame)
         }
         return;
     }
+
+    panic(int_frame, "Unhandled page fault at address %p", fault_address);
 }
