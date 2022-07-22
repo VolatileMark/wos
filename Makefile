@@ -1,10 +1,11 @@
 export PATH := $(abspath tools/x86_64-qemu/bin):$(abspath tools/x86_64-elf-cross/bin):$(PATH)
 
-OS_NAME = wos
+OS_NAME ?= wos
 
-BUILD_DIR = $(abspath build/)
-SOURCE_DIR = $(abspath src/)
-OVMF_DIR = $(abspath tools/ovmf-bins)
+HOST_DIR ?= "/workspace"
+BUILD_DIR ?= $(abspath build/)
+SOURCE_DIR ?= $(abspath src/)
+OVMF_DIR ?= $(abspath tools/ovmf-bins)
 
 EMU = qemu-system-x86_64
 DBG = gdb
@@ -35,7 +36,7 @@ DBG_FLAGS = -ex "target remote localhost:1234" \
 			-ex "set disassemble-next-line on" \
 			-ex "set step-mode on" \
 			-ex "set disassembly-flavor intel" \
-			-ex "add-symbol-file $(BUILD_DIR)/test/test.elf" -ex "add-symbol-file $(BUILD_DIR)/kernel/kernel.elf"
+			-ex "add-symbol-file $(BUILD_DIR)/bootstrap/bootstrap.elf" -ex "add-symbol-file $(BUILD_DIR)/kernel/kernel.elf"
 
 
 
@@ -52,7 +53,7 @@ uefi: build img
 
 .PHONY: build
 build: build-intlibc build-bootstrap build-kernel
-	$(MAKE) -C $(SOURCE_DIR)/test SOURCE_DIR="$(SOURCE_DIR)/test" BUILD_DIR="$(BUILD_DIR)/test"
+#	$(MAKE) -C $(SOURCE_DIR)/test SOURCE_DIR="$(SOURCE_DIR)/test" BUILD_DIR="$(BUILD_DIR)/test"
 
 .PHONY: build-kernel
 build-kernel:
@@ -96,7 +97,7 @@ debug-uefi:
 iso: $(BUILD_DIR)/iso/boot/grub/grub.cfg
 	cp -f $(BUILD_DIR)/bootstrap/bootstrap.elf $(BUILD_DIR)/iso/boot/wboot.elf
 	cp -f $(BUILD_DIR)/kernel/kernel.elf $(BUILD_DIR)/iso/boot/wkernel.elf
-	cp -f $(BUILD_DIR)/test/test.elf $(BUILD_DIR)/iso/test.elf
+#	cp -f $(BUILD_DIR)/test/test.elf $(BUILD_DIR)/iso/test.elf
 	@rm -f $(BUILD_DIR)/$(OS_NAME).iso
 	$(MKRESCUE) -o $(BUILD_DIR)/$(OS_NAME).iso $(BUILD_DIR)/iso
 
@@ -179,3 +180,8 @@ grub-version:
 .PHONY: qemu-version
 qemu-version:
 	@$(EMU) --version
+
+.PHONY: gen-ccs
+gen-ccs: clean-all
+	bear --output compile_commands.json -- $(MAKE)
+	sed -i -e "s_$(shell pwd)_$(HOST_DIR)_g" compile_commands.json

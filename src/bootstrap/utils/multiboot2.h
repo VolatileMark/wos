@@ -1,5 +1,5 @@
-/*  multiboot2.h - Multiboot 2 header file.  */
-/*  Copyright (C) 1999,2003,2007,2008,2009,2010  Free Software Foundation, Inc.
+/*   multiboot2.h - Multiboot 2 header file. */
+/*   Copyright (C) 1999,2003,2007,2008,2009,2010  Free Software Foundation, Inc.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -22,23 +22,23 @@
 #ifndef MULTIBOOT_HEADER
 #define MULTIBOOT_HEADER 1
 
-/* How many bytes from the start of the file we search for the header.  */
-#define MULTIBOOT_SEARCH			32768
-#define MULTIBOOT_HEADER_ALIGN			8
+/*  How many bytes from the start of the file we search for the header. */
+#define MULTIBOOT_SEARCH                        32768
+#define MULTIBOOT_HEADER_ALIGN                  8
 
-/* The magic field should contain this.  */
-#define MULTIBOOT2_HEADER_MAGIC			0xe85250d6
+/*  The magic field should contain this. */
+#define MULTIBOOT2_HEADER_MAGIC                 0xe85250d6
 
-/* This should be in %eax.  */
-#define MULTIBOOT2_BOOTLOADER_MAGIC		0x36d76289
+/*  This should be in %eax. */
+#define MULTIBOOT2_BOOTLOADER_MAGIC             0x36d76289
 
-/* Alignment of multiboot modules.  */
-#define MULTIBOOT_MOD_ALIGN			0x00001000
+/*  Alignment of multiboot modules. */
+#define MULTIBOOT_MOD_ALIGN                     0x00001000
 
-/* Alignment of the multiboot info structure.  */
-#define MULTIBOOT_INFO_ALIGN			0x00000008
+/*  Alignment of the multiboot info structure. */
+#define MULTIBOOT_INFO_ALIGN                    0x00000008
 
-/* Flags set in the 'flags' member of the multiboot header.  */
+/*  Flags set in the ’flags’ member of the multiboot header. */
 
 #define MULTIBOOT_TAG_ALIGN                  8
 #define MULTIBOOT_TAG_TYPE_END               0
@@ -71,12 +71,13 @@
 #define MULTIBOOT_HEADER_TAG_CONSOLE_FLAGS  4
 #define MULTIBOOT_HEADER_TAG_FRAMEBUFFER  5
 #define MULTIBOOT_HEADER_TAG_MODULE_ALIGN  6
-#define MULTIBOOT_HEADER_TAG_EFI_BS  7
+#define MULTIBOOT_HEADER_TAG_EFI_BS        7
+#define MULTIBOOT_HEADER_TAG_ENTRY_ADDRESS_EFI32  8
 #define MULTIBOOT_HEADER_TAG_ENTRY_ADDRESS_EFI64  9
 #define MULTIBOOT_HEADER_TAG_RELOCATABLE  10
 
-#define MULTIBOOT2_ARCHITECTURE_I386  0
-#define MULTIBOOT2_ARCHITECTURE_MIPS32  4
+#define MULTIBOOT_ARCHITECTURE_I386  0
+#define MULTIBOOT_ARCHITECTURE_MIPS32  4
 #define MULTIBOOT_HEADER_TAG_OPTIONAL 1
 
 #define MULTIBOOT_LOAD_PREFERENCE_NONE 0
@@ -88,23 +89,23 @@
 
 #ifndef ASM_FILE
 
-typedef unsigned char		multiboot_uint8_t;
-typedef unsigned short		multiboot_uint16_t;
-typedef unsigned int		multiboot_uint32_t;
-typedef unsigned long long	multiboot_uint64_t;
+typedef unsigned char           multiboot_uint8_t;
+typedef unsigned short          multiboot_uint16_t;
+typedef unsigned int            multiboot_uint32_t;
+typedef unsigned long long      multiboot_uint64_t;
 
 struct multiboot_header
 {
-  /* Must be MULTIBOOT_MAGIC - see above.  */
+  /*  Must be MULTIBOOT_MAGIC - see above. */
   multiboot_uint32_t magic;
 
-  /* ISA */
+  /*  ISA */
   multiboot_uint32_t architecture;
 
-  /* Total header length.  */
+  /*  Total header length. */
   multiboot_uint32_t header_length;
 
-  /* The above fields plus this one must equal 0 mod 2^32. */
+  /*  The above fields plus this one must equal 0 mod 2^32. */
   multiboot_uint32_t checksum;
 };
 
@@ -189,8 +190,8 @@ struct multiboot_mmap_entry
 {
   multiboot_uint64_t addr;
   multiboot_uint64_t len;
-#define MULTIBOOT_MEMORY_AVAILABLE		1
-#define MULTIBOOT_MEMORY_RESERVED		2
+#define MULTIBOOT_MEMORY_AVAILABLE              1
+#define MULTIBOOT_MEMORY_RESERVED               2
 #define MULTIBOOT_MEMORY_ACPI_RECLAIMABLE       3
 #define MULTIBOOT_MEMORY_NVS                    4
 #define MULTIBOOT_MEMORY_BADRAM                 5
@@ -283,7 +284,7 @@ struct multiboot_tag_framebuffer_common
   multiboot_uint8_t framebuffer_bpp;
 #define MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED 0
 #define MULTIBOOT_FRAMEBUFFER_TYPE_RGB     1
-#define MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT	2
+#define MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT     2
   multiboot_uint8_t framebuffer_type;
   multiboot_uint16_t reserved;
 };
@@ -411,6 +412,6 @@ struct multiboot_tag_load_base_addr
   multiboot_uint32_t load_base_addr;
 };
 
-#endif /* ! ASM_FILE */
+#endif /*  ! ASM_FILE */
 
-#endif /* ! MULTIBOOT_HEADER */
+#endif /*  ! MULTIBOOT_HEADER */

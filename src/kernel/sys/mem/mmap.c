@@ -6,10 +6,8 @@ static struct multiboot_mmap_entry* largest_segments[5];
 
 void mmap_init(struct multiboot_tag_mmap* tag)
 {
-    uint32_t entries, i;
+    uint32_t entry_type;
     struct multiboot_mmap_entry* entry;
-
-    entries = (tag->size - (((uint64_t) tag) - ((uint64_t) &tag->entries))) / tag->entry_size;
 
     memory_segment_sizes[MULTIBOOT_MEMORY_BADRAM - 1] = 0;
     memory_segment_sizes[MULTIBOOT_MEMORY_NVS - 1] = 0;
@@ -23,16 +21,16 @@ void mmap_init(struct multiboot_tag_mmap* tag)
     largest_segments[MULTIBOOT_MEMORY_RESERVED - 1] = NULL;
     largest_segments[MULTIBOOT_MEMORY_AVAILABLE - 1] = NULL;
 
-    for (i = 0; i < entries; i ++)
+    for (entry = tag->entries; ((uint8_t*) entry) < ((uint8_t*) tag) + tag->size; entry = (struct multiboot_mmap_entry*) (((uint64_t) entry) + tag->entry_size))
     {
-        entry = &tag->entries[i];
-        memory_segment_sizes[entry->type - 1] += entry->len;
+        entry_type = entry->type - 1;
+        memory_segment_sizes[entry_type] += entry->len;
         if 
         (
-            largest_segments[entry->type - 1] != NULL &&
-            largest_segments[entry->type - 1]->len < entry->len
+            largest_segments[entry_type] != NULL &&
+            largest_segments[entry_type]->len < entry->len
         )
-            largest_segments[entry->type - 1] = entry;
+            largest_segments[entry_type] = entry;
     }
 }
 
