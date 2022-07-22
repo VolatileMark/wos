@@ -5,9 +5,9 @@ AC = nasm
 BUILD_DIR ?= .
 SOURCE_DIR = .
 
-TARGET = intlibc.a
+TARGET = cstd.a
 
-CC_FLAGS = -I $(SOURCE_DIR) -g -std=c99 -m64 -Wall -Werror -ffreestanding -mcmodel=kernel -mno-red-zone -nostdinc -nostartfiles -nodefaultlibs -nostdlib
+CC_FLAGS = -I $(SOURCE_DIR) -g -std=c99 -m64 -Wall -Werror -ffreestanding -mcmodel=kernel -mno-red-zone
 AC_FLAGS = -I $(SOURCE_DIR) -f elf64 -F dwarf -g
 AR_FLAGS = -rc --target=elf64-x86-64
 

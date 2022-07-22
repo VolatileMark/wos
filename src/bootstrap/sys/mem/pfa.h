@@ -1,7 +1,7 @@
 #ifndef __PFA_H__
 #define __PFA_H__
 
-#include "../utils/bitmap.h"
+#include "../../utils/bitmap.h"
 
 uint64_t pfa_request_page(void);
 uint64_t pfa_request_pages(uint64_t num);

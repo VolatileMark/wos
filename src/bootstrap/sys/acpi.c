@@ -1,6 +1,6 @@
 #include "acpi.h"
-#include "../mem/pfa.h"
-#include "../mem/paging.h"
+#include "mem/pfa.h"
+#include "mem/paging.h"
 #include <math.h>
 #include <string.h>
 

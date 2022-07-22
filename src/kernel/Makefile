@@ -6,8 +6,8 @@ AC = nasm
 BUILD_DIR ?= .
 SOURCE_DIR = .
 
-INTLIBC_PATH = $(abspath $(BUILD_DIR)/../intlibc)
-INTLIBC_INCLUDE = $(SOURCE_DIR)/../intlibc
+CSTD_LIB = $(abspath $(BUILD_DIR)/../cstd/cstd.a)
+CSTD_INCLUDE = $(SOURCE_DIR)/../cstd
 
 TARGET = kernel.elf
 
@@ -24,13 +24,13 @@ FONT_OBJ = $(patsubst $(SOURCE_DIR)%.psf, $(BUILD_DIR)%.o, $(FONT_SRC))
 LDS = $(SOURCE_DIR)/Linker.ld
 
 AC_FLAGS = -I$(SOURCE_DIR) -f elf64 -F dwarf -g
-CC_FLAGS = -I$(INTLIBC_INCLUDE) -g -std=c99 -m64 -Wall -Werror -ffreestanding -fstack-protector-all -mcmodel=kernel -mno-red-zone  -nostdinc -nostartfiles -nodefaultlibs -nostdlib
-LD_FLAGS = -T$(LDS) -nostdlib -z max-page-size=4096
+CC_FLAGS = -I$(CSTD_INCLUDE) -g -std=c99 -m64 -Wall -Werror -ffreestanding -fstack-protector-all -mcmodel=kernel -mno-red-zone
+LD_FLAGS = -T$(LDS) -z max-page-size=4096 -nostdlib
 
 
 
 .PHONY: all
-all: $(C_OBJS) $(ASM_OBJS) $(FONT_OBJ) $(INTLIBC_PATH)/intlibc.a
+all: $(C_OBJS) $(ASM_OBJS) $(FONT_OBJ) $(CSTD_LIB)
 	@mkdir -p $(BUILD_DIR)
 	$(LD) $(LD_FLAGS) -o $(BUILD_DIR)/$(TARGET) $^
 
